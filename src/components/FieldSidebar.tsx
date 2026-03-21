@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { GeometricField } from "@/lib/fieldData";
+import PdfUploader from "./PdfUploader";
 
 const CLUSTER_COLORS = [
   "hsl(180, 70%, 50%)",
@@ -13,8 +14,10 @@ interface FieldSidebarProps {
   field: GeometricField;
   activeCluster: number | null;
   onSelectCluster: (id: number | null) => void;
-  useCase: "therapy" | "didactics" | "research";
+  useCase: "therapy" | "didactics" | "research" | "uploaded";
   onChangeUseCase: (uc: "therapy" | "didactics" | "research") => void;
+  uploadedFileName?: string | null;
+  onUploadField: (field: GeometricField, fileName: string) => void;
 }
 
 const USE_CASE_LABELS = {
@@ -29,6 +32,8 @@ export default function FieldSidebar({
   onSelectCluster,
   useCase,
   onChangeUseCase,
+  uploadedFileName,
+  onUploadField,
 }: FieldSidebarProps) {
   return (
     <aside className="w-80 flex-shrink-0 h-full bg-card border-r border-border flex flex-col overflow-hidden">
