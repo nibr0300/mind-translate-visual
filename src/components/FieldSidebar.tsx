@@ -1,0 +1,160 @@
+import { motion } from "framer-motion";
+import type { GeometricField } from "@/lib/fieldData";
+
+const CLUSTER_COLORS = [
+  "hsl(180, 70%, 50%)",
+  "hsl(280, 60%, 60%)",
+  "hsl(25, 90%, 55%)",
+  "hsl(140, 60%, 45%)",
+  "hsl(340, 65%, 55%)",
+];
+
+interface FieldSidebarProps {
+  field: GeometricField;
+  activeCluster: number | null;
+  onSelectCluster: (id: number | null) => void;
+  useCase: "therapy" | "didactics" | "research";
+  onChangeUseCase: (uc: "therapy" | "didactics" | "research") => void;
+}
+
+const USE_CASE_LABELS = {
+  therapy: "Therapy Journal",
+  didactics: "Didactic Material",
+  research: "Research Paper",
+};
+
+export default function FieldSidebar({
+  field,
+  activeCluster,
+  onSelectCluster,
+  useCase,
+  onChangeUseCase,
+}: FieldSidebarProps) {
+  return (
+    <aside className="w-80 flex-shrink-0 h-full bg-card border-r border-border flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="p-5 border-b border-border">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-2 h-2 rounded-full bg-primary animate-field-pulse" />
+          <h1 className="font-mono text-sm font-semibold tracking-wider uppercase text-primary">
+            Geometric Field
+          </h1>
+        </div>
+        <p className="text-[11px] text-muted-foreground font-mono">
+          Permutation-invariant semantic topology
+        </p>
+      </div>
+
+      {/* Use Case Selector */}
+      <div className="p-4 border-b border-border">
+        <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-2">
+          Field Mode
+        </label>
+        <div className="flex flex-col gap-1">
+          {(["therapy", "didactics", "research"] as const).map((uc) => (
+            <button
+              key={uc}
+              onClick={() => onChangeUseCase(uc)}
+              className={`text-left px-3 py-2 rounded-md font-mono text-xs transition-colors ${
+                useCase === uc
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              }`}
+            >
+              {USE_CASE_LABELS[uc]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Field Stats */}
+      <div className="p-4 border-b border-border">
+        <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-3">
+          Field Statistics
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="font-mono text-lg font-bold text-foreground">{field.stats.totalUnits}</div>
+            <div className="text-[10px] text-muted-foreground font-mono">Units</div>
+          </div>
+          <div>
+            <div className="font-mono text-lg font-bold text-field-fz">{field.stats.boundaryUnits}</div>
+            <div className="text-[10px] text-muted-foreground font-mono">Boundary</div>
+          </div>
+          <div>
+            <div className="font-mono text-lg font-bold text-field-fz">{field.stats.avgFZ.toFixed(2)}</div>
+            <div className="text-[10px] text-muted-foreground font-mono">Avg FZ</div>
+          </div>
+          <div>
+            <div className="font-mono text-lg font-bold text-field-fy">{field.stats.avgFY.toFixed(2)}</div>
+            <div className="text-[10px] text-muted-foreground font-mono">Avg FY</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Clusters */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-3">
+          Eigenstates (Clusters)
+        </label>
+        <div className="flex flex-col gap-2">
+          {field.clusters.map((cluster, i) => {
+            const isActive = activeCluster === null || activeCluster === i;
+            return (
+              <motion.button
+                key={cluster.id}
+                onClick={() => onSelectCluster(activeCluster === i ? null : i)}
+                className={`text-left p-3 rounded-lg border transition-colors ${
+                  activeCluster === i
+                    ? "border-primary/30 bg-primary/5"
+                    : "border-border hover:border-border hover:bg-secondary/50"
+                }`}
+                animate={{ opacity: isActive ? 1 : 0.4 }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ background: CLUSTER_COLORS[i] }}
+                  />
+                  <span className="font-mono text-xs font-medium text-foreground">
+                    {cluster.label}
+                  </span>
+                  <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+                    n={cluster.unitCount}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed pl-4">
+                  {cluster.description}
+                </p>
+                <div className="flex gap-4 mt-2 pl-4">
+                  <span className="font-mono text-[10px]">
+                    <span className="text-field-fz">FZ</span>{" "}
+                    <span className="text-muted-foreground">{cluster.avgFZ.toFixed(2)}</span>
+                  </span>
+                  <span className="font-mono text-[10px]">
+                    <span className="text-field-fy">FY</span>{" "}
+                    <span className="text-muted-foreground">{cluster.avgFY.toFixed(2)}</span>
+                  </span>
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="p-4 border-t border-border">
+        <div className="flex items-center gap-4 text-[10px] font-mono text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-field-fz" />
+            <span>FZ = tension</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-field-fy" />
+            <span>FY = resonance</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
