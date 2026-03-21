@@ -50,11 +50,27 @@ export default function FieldSidebar({
         </p>
       </div>
 
+      {/* PDF Upload */}
+      <PdfUploader onFieldGenerated={onUploadField} />
+
       {/* Use Case Selector */}
       <div className="p-4 border-b border-border">
         <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-2">
-          Field Mode
+          {uploadedFileName ? "Demo Modes" : "Field Mode"}
         </label>
+        {uploadedFileName && (
+          <button
+            className={`w-full text-left px-3 py-2 rounded-md font-mono text-xs transition-colors mb-1 ${
+              useCase === "uploaded"
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            }`}
+            onClick={() => onChangeUseCase("therapy")} // triggers re-select of uploaded
+            disabled={useCase === "uploaded"}
+          >
+            📄 {uploadedFileName}
+          </button>
+        )}
         <div className="flex flex-col gap-1">
           {(["therapy", "didactics", "research"] as const).map((uc) => (
             <button
