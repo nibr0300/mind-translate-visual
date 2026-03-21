@@ -1,24 +1,39 @@
-import { useState, useMemo } from "react";
-import { generateDemoField, type FieldUnit } from "@/lib/fieldData";
+import { useState, useMemo, useCallback } from "react";
+import { generateDemoField, type FieldUnit, type GeometricField } from "@/lib/fieldData";
 import FieldCanvas from "@/components/FieldCanvas";
 import FieldSidebar from "@/components/FieldSidebar";
 import FieldInfoPanel from "@/components/FieldInfoPanel";
 
-type UseCase = "therapy" | "didactics" | "research";
+type UseCase = "therapy" | "didactics" | "research" | "uploaded";
 
 export default function Index() {
   const [useCase, setUseCase] = useState<UseCase>("therapy");
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<FieldUnit | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [uploadedField, setUploadedField] = useState<GeometricField | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
-  const field = useMemo(() => generateDemoField(useCase), [useCase]);
+  const demoField = useMemo(
+    () => (useCase !== "uploaded" ? generateDemoField(useCase as "therapy" | "didactics" | "research") : null),
+    [useCase]
+  );
 
-  const handleChangeUseCase = (uc: UseCase) => {
+  const field = useCase === "uploaded" && uploadedField ? uploadedField : demoField!;
+
+  const handleChangeUseCase = (uc: "therapy" | "didactics" | "research") => {
     setUseCase(uc);
     setActiveCluster(null);
     setSelectedUnit(null);
   };
+
+  const handleUploadField = useCallback((newField: GeometricField, fileName: string) => {
+    setUploadedField(newField);
+    setUploadedFileName(fileName);
+    setUseCase("uploaded");
+    setActiveCluster(null);
+    setSelectedUnit(null);
+  }, []);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
@@ -28,10 +43,11 @@ export default function Index() {
         onSelectCluster={setActiveCluster}
         useCase={useCase}
         onChangeUseCase={handleChangeUseCase}
+        uploadedFileName={uploadedFileName}
+        onUploadField={handleUploadField}
       />
 
       <main className="flex-1 relative flex flex-col">
-        {/* Top bar */}
         <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-card/50 backdrop-blur-sm">
           <div className="flex items-center gap-3">
             <span className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
@@ -52,7 +68,6 @@ export default function Index() {
           </div>
         </header>
 
-        {/* Canvas */}
         <div className="flex-1 relative p-4">
           <FieldCanvas
             field={field}
