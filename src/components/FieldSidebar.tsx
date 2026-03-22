@@ -1,6 +1,8 @@
+import { useRef } from "react";
 import { motion } from "framer-motion";
 import type { GeometricField } from "@/lib/fieldData";
 import PdfUploader from "./PdfUploader";
+import { Download, Upload } from "lucide-react";
 
 const CLUSTER_COLORS = [
   "hsl(180, 70%, 50%)",
