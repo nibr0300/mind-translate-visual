@@ -1,6 +1,8 @@
+import { useRef } from "react";
 import { motion } from "framer-motion";
 import type { GeometricField } from "@/lib/fieldData";
 import PdfUploader from "./PdfUploader";
+import { Download, Upload } from "lucide-react";
 
 const CLUSTER_COLORS = [
   "hsl(180, 70%, 50%)",
@@ -35,6 +37,33 @@ export default function FieldSidebar({
   uploadedFileName,
   onUploadField,
 }: FieldSidebarProps) {
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(field, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `geometric-field-${field.useCase}-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string) as GeometricField;
+        if (parsed.units && parsed.clusters && parsed.stats) {
+          onUploadField(parsed, file.name.replace(/\.json$/, ""));
+        }
+      } catch { /* ignore invalid JSON */ }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
   return (
     <aside className="w-80 flex-shrink-0 h-full bg-card border-r border-border flex flex-col overflow-hidden">
       {/* Header */}
@@ -161,6 +190,23 @@ export default function FieldSidebar({
             );
           })}
         </div>
+      </div>
+
+      {/* Export / Import */}
+      <div className="p-4 border-t border-border flex gap-2">
+        <button
+          onClick={handleExport}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+        >
+          <Download className="w-3 h-3" /> Export
+        </button>
+        <button
+          onClick={() => importRef.current?.click()}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+        >
+          <Upload className="w-3 h-3" /> Import
+        </button>
+        <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
       </div>
 
       {/* Legend */}
