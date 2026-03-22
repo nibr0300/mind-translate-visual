@@ -37,6 +37,33 @@ export default function FieldSidebar({
   uploadedFileName,
   onUploadField,
 }: FieldSidebarProps) {
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(field, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `geometric-field-${field.useCase}-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string) as GeometricField;
+        if (parsed.units && parsed.clusters && parsed.stats) {
+          onUploadField(parsed, file.name.replace(/\.json$/, ""));
+        }
+      } catch { /* ignore invalid JSON */ }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
   return (
     <aside className="w-80 flex-shrink-0 h-full bg-card border-r border-border flex flex-col overflow-hidden">
       {/* Header */}
