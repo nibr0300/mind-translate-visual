@@ -192,6 +192,23 @@ export default function FieldSidebar({
         </div>
       </div>
 
+      {/* Export / Import */}
+      <div className="p-4 border-t border-border flex gap-2">
+        <button
+          onClick={handleExport}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+        >
+          <Download className="w-3 h-3" /> Export
+        </button>
+        <button
+          onClick={() => importRef.current?.click()}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+        >
+          <Upload className="w-3 h-3" /> Import
+        </button>
+        <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
+      </div>
+
       {/* Legend */}
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-4 text-[10px] font-mono text-muted-foreground">
