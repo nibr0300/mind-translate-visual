@@ -42,6 +42,13 @@ export async function extractTextFromPDF(file: File): Promise<string[]> {
   return sentences;
 }
 
+/** Extract text units from spatial groups (for diagram-heavy PDFs) */
+function extractUnitsFromSpatialGroups(spatialGroups: SpatialGroup[]): string[] {
+  return spatialGroups
+    .map((g) => g.text.replace(/\s+/g, " ").trim())
+    .filter((t) => t.length >= 3);
+}
+
 /**
  * Blend spatial positions with PCA-projected semantic positions.
  * 
@@ -124,26 +131,32 @@ export async function generateFieldFromPDF(
 ): Promise<GeometricField> {
   // Run text extraction and spatial analysis in parallel
   onProgress?.("Extracting text & analyzing layout…", 0.1);
-  const [sentences, spatialItems] = await Promise.all([
+  const [rawSentences, spatialItems] = await Promise.all([
     extractTextFromPDF(file),
     extractSpatialText(file),
   ]);
-
-  if (sentences.length < 5) {
-    throw new Error("PDF contains too little text to generate a meaningful field. Need at least 5 sentences.");
-  }
 
   onProgress?.("Detecting spatial structures…", 0.25);
   const spatialGroups = detectSpatialGroups(spatialItems);
   const { isDiagram, confidence: diagramConfidence } = detectDiagramLayout(spatialGroups);
 
-  // Cap at 80 sentences for performance
+  // For diagram-heavy PDFs with too few sentences, use spatial groups as text units
+  let sentences = rawSentences;
+  if (sentences.length < 5 && spatialGroups.length >= 3) {
+    sentences = extractUnitsFromSpatialGroups(spatialGroups);
+  }
+
+  if (sentences.length < 3) {
+    throw new Error("PDF contains too little text to generate a meaningful field. Need at least 3 text units.");
+  }
+
+  // Cap at 80 units for performance
   const capped = sentences.length > 80 ? sentences.slice(0, 80) : sentences;
 
   onProgress?.("Computing TF-IDF vectors…", 0.35);
   const { vectors } = computeTFIDF(capped);
 
-  const k = Math.min(5, Math.max(3, Math.floor(capped.length / 6)));
+  const k = Math.min(5, Math.max(2, Math.floor(capped.length / 6)));
 
   onProgress?.("Clustering semantic units…", 0.5);
   const assignments = kMeans(vectors, k);
