@@ -42,6 +42,13 @@ export async function extractTextFromPDF(file: File): Promise<string[]> {
   return sentences;
 }
 
+/** Extract text units from spatial groups (for diagram-heavy PDFs) */
+function extractUnitsFromSpatialGroups(spatialGroups: SpatialGroup[]): string[] {
+  return spatialGroups
+    .map((g) => g.text.replace(/\s+/g, " ").trim())
+    .filter((t) => t.length >= 3);
+}
+
 /**
  * Blend spatial positions with PCA-projected semantic positions.
  * 
