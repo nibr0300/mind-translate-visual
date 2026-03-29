@@ -1,5 +1,6 @@
 import * as pdfjsLib from "pdfjs-dist";
 import type { GeometricField, FieldUnit, FieldCluster } from "./fieldData";
+import { extractOcrUnitsFromPDF } from "./pdfOcr";
 import {
   extractSpatialText,
   detectSpatialGroups,
@@ -49,13 +50,33 @@ function extractUnitsFromSpatialGroups(spatialGroups: SpatialGroup[]): string[] 
     .filter((t) => t.length >= 3);
 }
 
+function mergeTextUnits(...unitSets: string[][]): string[] {
+  const seen = new Set<string>();
+
+  return unitSets
+    .flat()
+    .map((unit) => unit.replace(/\s+/g, " ").trim())
+    .filter((unit) => unit.length >= 3)
+    .filter((unit) => {
+      const key = unit.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function shouldUseOcrFallback(sentences: string[], spatialGroups: SpatialGroup[]): boolean {
+  const nonWhitespaceChars = sentences.join(" ").replace(/\s+/g, "").length;
+  return sentences.length < 5 || nonWhitespaceChars < 120 || spatialGroups.length < 3;
+}
+
 /**
  * Blend spatial positions with PCA-projected semantic positions.
- * 
+ *
  * When the document contains diagram-like layouts, spatial positions
  * from the page are weighted more heavily. For prose-heavy documents,
  * semantic (TF-IDF/PCA) positions dominate.
- * 
+ *
  * @param semanticCoords - PCA-projected coordinates from TF-IDF
  * @param spatialGroups - Detected spatial groups (may be fewer than sentences)
  * @param sentences - Original text units
@@ -79,33 +100,33 @@ function blendCoordinates(
     const sentLower = sentence.toLowerCase();
     for (const group of spatialGroups) {
       const groupLower = group.text.toLowerCase();
-      // Check substring overlap
       const overlap = sentLower.length > 0 && groupLower.includes(sentLower.slice(0, 40))
         ? sentLower.length
         : commonWordOverlap(sentLower, groupLower);
+
       if (overlap > bestOverlap) {
         bestOverlap = overlap;
         bestMatch = group;
       }
     }
 
-    if (bestMatch && bestOverlap > 5) {
-      // Convert normalized page position to field coordinates [-3.5, 3.5]
+    if (bestMatch && bestOverlap >= Math.min(5, sentLower.length)) {
       return [
         bestMatch.normPos.x * 7 - 3.5,
         bestMatch.normPos.y * 7 - 3.5,
       ] as [number, number];
     }
+
     return null;
   });
 
-  // Blend: weight spatial vs semantic based on diagram confidence
-  const spatialWeight = diagramConfidence * 0.7; // max 70% spatial
+  const spatialWeight = diagramConfidence * 0.7;
   const semanticWeight = 1 - spatialWeight;
 
   return semanticCoords.map((semantic, i) => {
     const spatial = spatialPositions[i];
     if (!spatial) return semantic;
+
     return [
       semantic[0] * semanticWeight + spatial[0] * spatialWeight,
       semantic[1] * semanticWeight + spatial[1] * spatialWeight,
@@ -118,9 +139,11 @@ function commonWordOverlap(a: string, b: string): number {
   const wordsA = new Set(a.split(/\s+/).filter((w) => w.length > 3));
   const wordsB = new Set(b.split(/\s+/).filter((w) => w.length > 3));
   let count = 0;
+
   for (const w of wordsA) {
     if (wordsB.has(w)) count++;
   }
+
   return count;
 }
 
@@ -129,50 +152,66 @@ export async function generateFieldFromPDF(
   file: File,
   onProgress?: (stage: string, progress: number) => void
 ): Promise<GeometricField> {
-  // Run text extraction and spatial analysis in parallel
-  onProgress?.("Extracting text & analyzing layout…", 0.1);
+  onProgress?.("Extracting text & analyzing layout…", 0.08);
   const [rawSentences, spatialItems] = await Promise.all([
     extractTextFromPDF(file),
     extractSpatialText(file),
   ]);
 
-  onProgress?.("Detecting spatial structures…", 0.25);
-  const spatialGroups = detectSpatialGroups(spatialItems);
+  let spatialGroups = detectSpatialGroups(spatialItems);
+  let ocrTextUnits: string[] = [];
+
+  if (shouldUseOcrFallback(rawSentences, spatialGroups)) {
+    try {
+      onProgress?.("Running OCR fallback for image-based pages…", 0.18);
+      const ocrResult = await extractOcrUnitsFromPDF(file, (progress) => {
+        onProgress?.("Running OCR fallback for image-based pages…", 0.18 + progress * 0.18);
+      });
+
+      ocrTextUnits = ocrResult.textUnits;
+      if (ocrResult.spatialGroups.length > 0) {
+        spatialGroups = [...spatialGroups, ...ocrResult.spatialGroups];
+      }
+    } catch (error) {
+      console.warn("OCR fallback failed", error);
+    }
+  }
+
+  onProgress?.("Detecting spatial structures…", 0.38);
   const { isDiagram, confidence: diagramConfidence } = detectDiagramLayout(spatialGroups);
 
-  // For diagram-heavy PDFs with too few sentences, use spatial groups as text units
   let sentences = rawSentences;
   if (sentences.length < 5 && spatialGroups.length >= 3) {
-    sentences = extractUnitsFromSpatialGroups(spatialGroups);
+    sentences = mergeTextUnits(rawSentences, extractUnitsFromSpatialGroups(spatialGroups), ocrTextUnits);
+  } else if (sentences.length < 5 && ocrTextUnits.length > 0) {
+    sentences = mergeTextUnits(rawSentences, ocrTextUnits);
   }
 
   if (sentences.length < 3) {
-    throw new Error("PDF contains too little text to generate a meaningful field. Need at least 3 text units.");
+    throw new Error("PDF contains too little text to generate a meaningful field, even after OCR. Need at least 3 text units.");
   }
 
-  // Cap at 80 units for performance
   const capped = sentences.length > 80 ? sentences.slice(0, 80) : sentences;
 
-  onProgress?.("Computing TF-IDF vectors…", 0.35);
+  onProgress?.("Computing TF-IDF vectors…", 0.5);
   const { vectors } = computeTFIDF(capped);
 
   const k = Math.min(5, Math.max(2, Math.floor(capped.length / 6)));
 
-  onProgress?.("Clustering semantic units…", 0.5);
+  onProgress?.("Clustering semantic units…", 0.65);
   const assignments = kMeans(vectors, k);
 
-  onProgress?.("Projecting to 2D field…", 0.65);
+  onProgress?.("Projecting to 2D field…", 0.78);
   const semanticCoords = projectTo2D(vectors);
 
   onProgress?.(
     isDiagram ? "Blending spatial layout with semantics…" : "Generating field topology…",
-    0.8
+    0.9
   );
   const coords2D = blendCoordinates(semanticCoords, spatialGroups, capped, diagramConfidence);
 
   const clusterLabels = generateClusterLabels(capped, assignments, k);
 
-  // Build FieldUnits
   const units: FieldUnit[] = capped.map((text, i) => {
     const clusterId = assignments[i];
     const clusterMembers = coords2D.filter((_, j) => assignments[j] === clusterId);
@@ -199,7 +238,6 @@ export async function generateFieldFromPDF(
     };
   });
 
-  // Build clusters
   const clusters: FieldCluster[] = Array.from({ length: k }, (_, i) => {
     const clusterUnits = units.filter((u) => u.clusterId === i);
     const center: [number, number] = clusterUnits.length
