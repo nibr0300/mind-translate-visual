@@ -156,7 +156,7 @@ export async function generateFieldFromPDF(
   onProgress?.("Computing TF-IDF vectors…", 0.35);
   const { vectors } = computeTFIDF(capped);
 
-  const k = Math.min(5, Math.max(3, Math.floor(capped.length / 6)));
+  const k = Math.min(5, Math.max(2, Math.floor(capped.length / 6)));
 
   onProgress?.("Clustering semantic units…", 0.5);
   const assignments = kMeans(vectors, k);
