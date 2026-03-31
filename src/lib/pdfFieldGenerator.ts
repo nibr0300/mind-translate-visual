@@ -209,15 +209,18 @@ export async function generateFieldFromPDF(
   onProgress?.("Clustering semantic units…", 0.55);
   const assignments = kMeans(vectors, k);
 
-  onProgress?.("Analyzing intentions & truth-seeking…", 0.65);
-  const intentionResults = await analyzeIntentions(capped);
+  onProgress?.("Analyzing intentions & truth-seeking…", 0.62);
+  const [intentionResults, hedgingScores] = await Promise.all([
+    analyzeIntentions(capped),
+    Promise.resolve(analyzeHedgingBatch(capped)),
+  ]);
 
-  onProgress?.("Projecting to 2D field…", 0.78);
+  onProgress?.("Projecting to 2D field…", 0.75);
   const semanticCoords = projectTo2D(vectors);
 
   onProgress?.(
     isDiagram ? "Blending spatial layout with semantics…" : "Generating field topology…",
-    0.88
+    0.85
   );
   const coords2D = blendCoordinates(semanticCoords, spatialGroups, capped, diagramConfidence);
 
@@ -231,6 +234,18 @@ export async function generateFieldFromPDF(
     }
   }
 
+  // Pre-compute cluster intention groups for deviation calculation
+  const clusterIntentionGroups = new Map<number, IntentionAnalysis[]>();
+  if (intentionResults) {
+    for (const a of intentionResults) {
+      const cId = assignments[a.index];
+      if (!clusterIntentionGroups.has(cId)) clusterIntentionGroups.set(cId, []);
+      clusterIntentionGroups.get(cId)!.push(a);
+    }
+  }
+
+  onProgress?.("Triangulating truth tension…", 0.92);
+
   const units: FieldUnit[] = capped.map((text, i) => {
     const clusterId = assignments[i];
     const clusterMembers = coords2D.filter((_, j) => assignments[j] === clusterId);
@@ -243,7 +258,24 @@ export async function generateFieldFromPDF(
     const fy = Math.max(0, 1 - dist / 3);
 
     const intention = intentionMap.get(i);
-    const fz = intention ? blendFZWithIntention(lexicalFZ, intention) : Math.round(lexicalFZ * 100) / 100;
+    const hedging = hedgingScores[i];
+
+    // Compute cluster deviation if intention data available
+    const clusterDeviation = intention
+      ? computeClusterDeviation(intention, clusterIntentionGroups.get(clusterId) || [])
+      : 0;
+
+    // Triangulate truthTension from all sources
+    const triangulation = triangulateTruthTension(
+      intention?.truthTension ?? null,
+      hedging,
+      intention?.speechAct ?? null,
+      clusterDeviation
+    );
+
+    const fz = intention
+      ? blendFZWithIntention(lexicalFZ, triangulation.triangulated, intention.epistemicCertainty, intention.intentionalForce)
+      : Math.round(lexicalFZ * 100) / 100;
 
     const wordCount = text.split(/\s+/).length;
     const type: FieldUnit["type"] = wordCount < 8 ? "fragment" : wordCount > 25 ? "paragraph" : "heading";
@@ -265,6 +297,13 @@ export async function generateFieldFromPDF(
           truthTension: intention.truthTension,
         },
       }),
+      triangulation: {
+        llmTension: triangulation.llmTension,
+        lexicalTension: triangulation.lexicalTension,
+        discrepancy: triangulation.discrepancy,
+        clusterDeviation: triangulation.clusterDeviation,
+        triangulated: triangulation.triangulated,
+      },
     };
   });
 
