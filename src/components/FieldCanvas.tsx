@@ -271,6 +271,50 @@ export default function FieldCanvas({
                 </div>
               </div>
             )}
+            {displayUnit.triangulation && (
+              <div className="mt-2 pt-2 border-t border-border/50">
+                <div className="text-[10px] tracking-wider uppercase text-muted-foreground mb-2">
+                  Triangulering av sanningsspänning
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-purple-300">LLM</span>
+                    <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-purple-300" style={{ width: `${displayUnit.triangulation.llmTension * 100}%` }} />
+                    </div>
+                    <span className="text-muted-foreground w-7 text-right">{displayUnit.triangulation.llmTension.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-300">Lexikal</span>
+                    <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-amber-300" style={{ width: `${displayUnit.triangulation.lexicalTension * 100}%` }} />
+                    </div>
+                    <span className="text-muted-foreground w-7 text-right">{displayUnit.triangulation.lexicalTension.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-rose-300">Diskrepans</span>
+                    <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-rose-300" style={{ width: `${displayUnit.triangulation.discrepancy * 100}%` }} />
+                    </div>
+                    <span className="text-muted-foreground w-7 text-right">{displayUnit.triangulation.discrepancy.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-cyan-300">Kluster Δ</span>
+                    <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-cyan-300" style={{ width: `${displayUnit.triangulation.clusterDeviation * 100}%` }} />
+                    </div>
+                    <span className="text-muted-foreground w-7 text-right">{displayUnit.triangulation.clusterDeviation.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+                  <span className="text-purple-400 font-semibold">Σ Triangulerad</span>
+                  <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-purple-400 to-amber-400" style={{ width: `${displayUnit.triangulation.triangulated * 100}%` }} />
+                  </div>
+                  <span className="text-foreground font-semibold">{displayUnit.triangulation.triangulated.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
