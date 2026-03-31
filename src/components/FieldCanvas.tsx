@@ -95,6 +95,33 @@ export default function FieldCanvas({
           );
         })}
 
+      {/* CTI critical node markers — double ring pulse for genuinely problematic nodes */}
+      {field.units
+        .filter((u) => (u.cti ?? 0) > 0.35)
+        .map((u) => {
+          const idx = field.units.indexOf(u);
+          const pos = unitPositions[idx];
+          const cti = u.cti ?? 0;
+          const ringSize = 28 + cti * 30;
+          return (
+            <div
+              key={`cti-${u.id}`}
+              className="absolute rounded-full pointer-events-none"
+              style={{
+                left: pos.x,
+                top: pos.y,
+                width: `${ringSize}px`,
+                height: `${ringSize}px`,
+                transform: "translate(-50%, -50%)",
+                border: `1.5px solid hsl(340, 80%, 60%, ${0.3 + cti * 0.5})`,
+                boxShadow: `0 0 ${cti * 20}px hsl(340, 80%, 60%, ${cti * 0.3}), inset 0 0 ${cti * 12}px hsl(340, 80%, 60%, ${cti * 0.15})`,
+                animation: `tension-ripple ${2 + cti * 2}s ease-in-out infinite`,
+                zIndex: 1,
+              }}
+            />
+          );
+        })}
+
       {/* Cluster center labels */}
       {field.clusters.map((cluster, i) => {
         const pos = clusterCenterPositions[i];

@@ -305,6 +305,7 @@ export async function generateFieldFromPDF(
         clusterDeviation: triangulation.clusterDeviation,
         triangulated: triangulation.triangulated,
       },
+      cti: computeCTI(triangulation.discrepancy, triangulation.clusterDeviation),
     };
   });
 
