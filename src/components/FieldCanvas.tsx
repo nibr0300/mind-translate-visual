@@ -213,7 +213,7 @@ export default function FieldCanvas({
               </span>
             </div>
             <p className="text-sm text-foreground mb-3 italic">"{displayUnit.text}"</p>
-            <div className="flex gap-6 text-[11px]">
+            <div className="flex gap-6 text-[11px] flex-wrap">
               <div>
                 <span className="text-field-fz font-semibold">FZ</span>
                 <span className="text-muted-foreground ml-1">{displayUnit.fz.toFixed(2)}</span>
@@ -238,6 +238,39 @@ export default function FieldCanvas({
                 type: <span className="text-foreground">{displayUnit.type}</span>
               </div>
             </div>
+            {displayUnit.intention && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <div className="text-[10px] tracking-wider uppercase text-muted-foreground mb-2">
+                  Intentionsanalys
+                </div>
+                <div className="flex gap-4 text-[11px] flex-wrap">
+                  <div className="text-muted-foreground">
+                    talakt: <span className="text-foreground">{displayUnit.intention.speechAct}</span>
+                  </div>
+                  <div>
+                    <span className="text-purple-400 font-semibold">Sanning</span>
+                    <span className="text-muted-foreground ml-1">{displayUnit.intention.truthTension.toFixed(2)}</span>
+                    <div className="w-14 h-1 bg-secondary rounded-full mt-1 overflow-hidden">
+                      <div className="h-full rounded-full bg-purple-400" style={{ width: `${displayUnit.intention.truthTension * 100}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-emerald-400 font-semibold">Visshet</span>
+                    <span className="text-muted-foreground ml-1">{displayUnit.intention.epistemicCertainty.toFixed(2)}</span>
+                    <div className="w-14 h-1 bg-secondary rounded-full mt-1 overflow-hidden">
+                      <div className="h-full rounded-full bg-emerald-400" style={{ width: `${displayUnit.intention.epistemicCertainty * 100}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-rose-400 font-semibold">Kraft</span>
+                    <span className="text-muted-foreground ml-1">{displayUnit.intention.intentionalForce.toFixed(2)}</span>
+                    <div className="w-14 h-1 bg-secondary rounded-full mt-1 overflow-hidden">
+                      <div className="h-full rounded-full bg-rose-400" style={{ width: `${displayUnit.intention.intentionalForce * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

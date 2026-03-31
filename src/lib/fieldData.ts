@@ -9,6 +9,12 @@ export interface FieldUnit {
   type: "heading" | "paragraph" | "fragment";
   fz: number; // epistemic tension 0-1
   fy: number; // resonance 0-1
+  intention?: {
+    speechAct: "assertive" | "directive" | "commissive" | "expressive" | "declarative";
+    epistemicCertainty: number;
+    intentionalForce: number;
+    truthTension: number;
+  };
 }
 
 export interface FieldCluster {
