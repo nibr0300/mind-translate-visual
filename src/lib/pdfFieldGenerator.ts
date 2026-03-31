@@ -18,6 +18,7 @@ import {
   blendFZWithIntention,
   triangulateTruthTension,
   computeClusterDeviation,
+  computeCTI,
   type IntentionAnalysis,
 } from "./intentionAnalyzer";
 import { analyzeHedgingBatch } from "./hedgingAnalyzer";

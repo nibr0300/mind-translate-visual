@@ -154,6 +154,24 @@ export function blendFZWithIntention(
   return clamp(blended);
 }
 
+/**
+ * Compute Composite Tension Index (CTI).
+ *
+ * Combines two orthogonal tension measures:
+ * - Internal discrepancy: speechAct vs hedging content (intra-utterance inconsistency)
+ * - External deviation: how much the unit's intention deviates from its cluster
+ *
+ * Uses geometric mean so both must be elevated for high CTI,
+ * filtering out statistical noise where only one axis is high.
+ *
+ * CTI > 0.4 → genuinely problematic node (not just a statistical outlier)
+ */
+export function computeCTI(discrepancy: number, clusterDeviation: number): number {
+  // Geometric mean: √(d × c) — both must be high for high CTI
+  const raw = Math.sqrt(discrepancy * clusterDeviation);
+  return Math.round(Math.min(1, raw) * 100) / 100;
+}
+
 function clamp(v: number): number {
   return Math.round(Math.min(1, Math.max(0, v)) * 100) / 100;
 }
