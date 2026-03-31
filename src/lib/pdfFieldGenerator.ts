@@ -16,8 +16,11 @@ import {
 import {
   analyzeIntentions,
   blendFZWithIntention,
+  triangulateTruthTension,
+  computeClusterDeviation,
   type IntentionAnalysis,
 } from "./intentionAnalyzer";
+import { analyzeHedgingBatch } from "./hedgingAnalyzer";
 
 // Configure pdf.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
