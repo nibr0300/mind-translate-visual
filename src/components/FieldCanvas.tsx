@@ -95,6 +95,33 @@ export default function FieldCanvas({
           );
         })}
 
+      {/* CTI critical node markers — double ring pulse for genuinely problematic nodes */}
+      {field.units
+        .filter((u) => (u.cti ?? 0) > 0.35)
+        .map((u) => {
+          const idx = field.units.indexOf(u);
+          const pos = unitPositions[idx];
+          const cti = u.cti ?? 0;
+          const ringSize = 28 + cti * 30;
+          return (
+            <div
+              key={`cti-${u.id}`}
+              className="absolute rounded-full pointer-events-none"
+              style={{
+                left: pos.x,
+                top: pos.y,
+                width: `${ringSize}px`,
+                height: `${ringSize}px`,
+                transform: "translate(-50%, -50%)",
+                border: `1.5px solid hsl(340, 80%, 60%, ${0.3 + cti * 0.5})`,
+                boxShadow: `0 0 ${cti * 20}px hsl(340, 80%, 60%, ${cti * 0.3}), inset 0 0 ${cti * 12}px hsl(340, 80%, 60%, ${cti * 0.15})`,
+                animation: `tension-ripple ${2 + cti * 2}s ease-in-out infinite`,
+                zIndex: 1,
+              }}
+            />
+          );
+        })}
+
       {/* Cluster center labels */}
       {field.clusters.map((cluster, i) => {
         const pos = clusterCenterPositions[i];
@@ -313,6 +340,28 @@ export default function FieldCanvas({
                   </div>
                   <span className="text-foreground font-semibold">{displayUnit.triangulation.triangulated.toFixed(2)}</span>
                 </div>
+              </div>
+            )}
+            {displayUnit.cti != null && displayUnit.cti > 0.15 && (
+              <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-2 text-[11px]">
+                <span className={`font-bold ${displayUnit.cti > 0.4 ? "text-rose-400" : displayUnit.cti > 0.25 ? "text-amber-400" : "text-muted-foreground"}`}>
+                  CTI
+                </span>
+                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${displayUnit.cti * 100}%`,
+                      background: displayUnit.cti > 0.4
+                        ? "linear-gradient(90deg, hsl(340, 80%, 55%), hsl(25, 90%, 55%))"
+                        : "hsl(340, 60%, 50%)",
+                    }}
+                  />
+                </div>
+                <span className="text-foreground font-semibold">{displayUnit.cti.toFixed(2)}</span>
+                {displayUnit.cti > 0.4 && (
+                  <span className="text-rose-400 text-[9px] tracking-wider uppercase">kritisk nod</span>
+                )}
               </div>
             )}
           </motion.div>

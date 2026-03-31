@@ -18,6 +18,7 @@ import {
   blendFZWithIntention,
   triangulateTruthTension,
   computeClusterDeviation,
+  computeCTI,
   type IntentionAnalysis,
 } from "./intentionAnalyzer";
 import { analyzeHedgingBatch } from "./hedgingAnalyzer";
@@ -304,6 +305,7 @@ export async function generateFieldFromPDF(
         clusterDeviation: triangulation.clusterDeviation,
         triangulated: triangulation.triangulated,
       },
+      cti: computeCTI(triangulation.discrepancy, triangulation.clusterDeviation),
     };
   });
 

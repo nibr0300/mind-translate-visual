@@ -22,6 +22,8 @@ export interface FieldUnit {
     clusterDeviation: number;
     triangulated: number;
   };
+  /** Composite Tension Index: geometric mean of internal discrepancy × external cluster deviation */
+  cti?: number;
 }
 
 export interface FieldCluster {
