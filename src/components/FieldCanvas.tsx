@@ -342,6 +342,28 @@ export default function FieldCanvas({
                 </div>
               </div>
             )}
+            {displayUnit.cti != null && displayUnit.cti > 0.15 && (
+              <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-2 text-[11px]">
+                <span className={`font-bold ${displayUnit.cti > 0.4 ? "text-rose-400" : displayUnit.cti > 0.25 ? "text-amber-400" : "text-muted-foreground"}`}>
+                  CTI
+                </span>
+                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${displayUnit.cti * 100}%`,
+                      background: displayUnit.cti > 0.4
+                        ? "linear-gradient(90deg, hsl(340, 80%, 55%), hsl(25, 90%, 55%))"
+                        : "hsl(340, 60%, 50%)",
+                    }}
+                  />
+                </div>
+                <span className="text-foreground font-semibold">{displayUnit.cti.toFixed(2)}</span>
+                {displayUnit.cti > 0.4 && (
+                  <span className="text-rose-400 text-[9px] tracking-wider uppercase">kritisk nod</span>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
