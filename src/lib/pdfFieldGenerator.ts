@@ -198,24 +198,35 @@ export async function generateFieldFromPDF(
 
   const capped = sentences.length > 80 ? sentences.slice(0, 80) : sentences;
 
-  onProgress?.("Computing TF-IDF vectors…", 0.5);
+  onProgress?.("Computing TF-IDF vectors…", 0.45);
   const { vectors } = computeTFIDF(capped);
 
   const k = Math.min(5, Math.max(2, Math.floor(capped.length / 6)));
 
-  onProgress?.("Clustering semantic units…", 0.65);
+  onProgress?.("Clustering semantic units…", 0.55);
   const assignments = kMeans(vectors, k);
+
+  onProgress?.("Analyzing intentions & truth-seeking…", 0.65);
+  const intentionResults = await analyzeIntentions(capped);
 
   onProgress?.("Projecting to 2D field…", 0.78);
   const semanticCoords = projectTo2D(vectors);
 
   onProgress?.(
     isDiagram ? "Blending spatial layout with semantics…" : "Generating field topology…",
-    0.9
+    0.88
   );
   const coords2D = blendCoordinates(semanticCoords, spatialGroups, capped, diagramConfidence);
 
   const clusterLabels = generateClusterLabels(capped, assignments, k);
+
+  // Build a lookup map for intention results
+  const intentionMap = new Map<number, IntentionAnalysis>();
+  if (intentionResults) {
+    for (const a of intentionResults) {
+      intentionMap.set(a.index, a);
+    }
+  }
 
   const units: FieldUnit[] = capped.map((text, i) => {
     const clusterId = assignments[i];
@@ -225,8 +236,11 @@ export async function generateFieldFromPDF(
       clusterMembers.reduce((s, c) => s + c[1], 0) / (clusterMembers.length || 1),
     ];
     const dist = Math.sqrt((coords2D[i][0] - centroid[0]) ** 2 + (coords2D[i][1] - centroid[1]) ** 2);
-    const fz = Math.min(1, dist / 4 + 0.1);
+    const lexicalFZ = Math.min(1, dist / 4 + 0.1);
     const fy = Math.max(0, 1 - dist / 3);
+
+    const intention = intentionMap.get(i);
+    const fz = intention ? blendFZWithIntention(lexicalFZ, intention) : Math.round(lexicalFZ * 100) / 100;
 
     const wordCount = text.split(/\s+/).length;
     const type: FieldUnit["type"] = wordCount < 8 ? "fragment" : wordCount > 25 ? "paragraph" : "heading";
@@ -238,8 +252,16 @@ export async function generateFieldFromPDF(
       vector2d: coords2D[i],
       clusterId,
       type,
-      fz: Math.round(fz * 100) / 100,
+      fz,
       fy: Math.round(fy * 100) / 100,
+      ...(intention && {
+        intention: {
+          speechAct: intention.speechAct,
+          epistemicCertainty: intention.epistemicCertainty,
+          intentionalForce: intention.intentionalForce,
+          truthTension: intention.truthTension,
+        },
+      }),
     };
   });
 
