@@ -15,6 +15,13 @@ export interface FieldUnit {
     intentionalForce: number;
     truthTension: number;
   };
+  triangulation?: {
+    llmTension: number;
+    lexicalTension: number;
+    discrepancy: number;
+    clusterDeviation: number;
+    triangulated: number;
+  };
 }
 
 export interface FieldCluster {
