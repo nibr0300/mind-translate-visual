@@ -13,6 +13,11 @@ import {
   projectTo2D,
   generateClusterLabels,
 } from "./textAnalyzer";
+import {
+  analyzeIntentions,
+  blendFZWithIntention,
+  type IntentionAnalysis,
+} from "./intentionAnalyzer";
 
 // Configure pdf.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
