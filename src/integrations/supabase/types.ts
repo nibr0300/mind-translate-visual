@@ -14,13 +14,196 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chunks: {
+        Row: {
+          chunk_index: number
+          cluster_id: number | null
+          cluster_label: string | null
+          content_hash: string
+          created_at: string
+          cti: number | null
+          document_id: string
+          embedding: string | null
+          embedding_dim: number
+          fy: number | null
+          fz: number | null
+          id: string
+          intention: Json | null
+          source_path: string | null
+          text: string
+          triangulation: Json | null
+        }
+        Insert: {
+          chunk_index: number
+          cluster_id?: number | null
+          cluster_label?: string | null
+          content_hash: string
+          created_at?: string
+          cti?: number | null
+          document_id: string
+          embedding?: string | null
+          embedding_dim?: number
+          fy?: number | null
+          fz?: number | null
+          id?: string
+          intention?: Json | null
+          source_path?: string | null
+          text: string
+          triangulation?: Json | null
+        }
+        Update: {
+          chunk_index?: number
+          cluster_id?: number | null
+          cluster_label?: string | null
+          content_hash?: string
+          created_at?: string
+          cti?: number | null
+          document_id?: string
+          embedding?: string | null
+          embedding_dim?: number
+          fy?: number | null
+          fz?: number | null
+          id?: string
+          intention?: Json | null
+          source_path?: string | null
+          text?: string
+          triangulation?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clusters_summary: {
+        Row: {
+          avg_cti: number | null
+          avg_fy: number | null
+          avg_fz: number | null
+          centroid_embedding: string | null
+          cluster_id: number
+          created_at: string
+          description: string | null
+          document_id: string
+          embedding_dim: number
+          id: string
+          label: string
+          unit_count: number
+        }
+        Insert: {
+          avg_cti?: number | null
+          avg_fy?: number | null
+          avg_fz?: number | null
+          centroid_embedding?: string | null
+          cluster_id: number
+          created_at?: string
+          description?: string | null
+          document_id: string
+          embedding_dim?: number
+          id?: string
+          label: string
+          unit_count?: number
+        }
+        Update: {
+          avg_cti?: number | null
+          avg_fy?: number | null
+          avg_fz?: number | null
+          centroid_embedding?: string | null
+          cluster_id?: number
+          created_at?: string
+          description?: string | null
+          document_id?: string
+          embedding_dim?: number
+          id?: string
+          label?: string
+          unit_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clusters_summary_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          embedding_dim: number
+          embedding_model: string
+          filename: string
+          id: string
+          source_type: string
+          stats: Json
+          uploaded_at: string
+        }
+        Insert: {
+          embedding_dim?: number
+          embedding_model?: string
+          filename: string
+          id?: string
+          source_type: string
+          stats?: Json
+          uploaded_at?: string
+        }
+        Update: {
+          embedding_dim?: number
+          embedding_model?: string
+          filename?: string
+          id?: string
+          source_type?: string
+          stats?: Json
+          uploaded_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      match_chunks: {
+        Args: {
+          match_count?: number
+          min_cti?: number
+          min_similarity?: number
+          query_embedding: string
+        }
+        Returns: {
+          cluster_label: string
+          cti: number
+          document_id: string
+          fz: number
+          id: string
+          similarity: number
+          source_path: string
+          text: string
+        }[]
+      }
+      match_clusters: {
+        Args: {
+          exclude_document_id?: string
+          match_count?: number
+          min_similarity?: number
+          query_embedding: string
+        }
+        Returns: {
+          avg_cti: number
+          avg_fz: number
+          cluster_id: number
+          description: string
+          document_id: string
+          id: string
+          label: string
+          similarity: number
+          unit_count: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

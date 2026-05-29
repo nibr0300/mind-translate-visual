@@ -1,13 +1,22 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { generateFieldFromPDF } from "@/lib/pdfFieldGenerator";
+import { generateFieldFromFile } from "@/lib/fieldGenerator";
 import type { GeometricField } from "@/lib/fieldData";
 
-interface PdfUploaderProps {
+interface FileUploaderProps {
   onFieldGenerated: (field: GeometricField, fileName: string) => void;
 }
 
-export default function PdfUploader({ onFieldGenerated }: PdfUploaderProps) {
+const ACCEPT =
+  ".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.yaml,.yml,.xml,.html,.htm,.tex," +
+  ".js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.swift,.c,.cc,.cpp,.h,.hpp,.cs,.php,.sh,.sql,.r,.lua," +
+  ".png,.jpg,.jpeg,.webp,.gif," +
+  ".mp3,.wav,.m4a,.ogg,.flac,.webm," +
+  ".zip";
+
+const MAX_BYTES = 50 * 1024 * 1024; // 50MB cap across types
+
+export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState({ stage: "", value: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -16,12 +25,8 @@ export default function PdfUploader({ onFieldGenerated }: PdfUploaderProps) {
 
   const processFile = useCallback(
     async (file: File) => {
-      if (file.type !== "application/pdf") {
-        setError("Only PDF files are supported");
-        return;
-      }
-      if (file.size > 20 * 1024 * 1024) {
-        setError("File too large (max 20MB)");
+      if (file.size > MAX_BYTES) {
+        setError(`File too large (max ${MAX_BYTES / 1024 / 1024}MB)`);
         return;
       }
 
@@ -30,12 +35,12 @@ export default function PdfUploader({ onFieldGenerated }: PdfUploaderProps) {
       setProgress({ stage: "Starting…", value: 0 });
 
       try {
-        const field = await generateFieldFromPDF(file, (stage, value) => {
-          setProgress({ stage, value });
-        });
+        const field = await generateFieldFromFile(file, (stage, value) =>
+          setProgress({ stage, value })
+        );
         onFieldGenerated(field, file.name);
       } catch (err: any) {
-        setError(err.message || "Failed to process PDF");
+        setError(err.message || "Failed to process file");
       } finally {
         setIsProcessing(false);
       }
@@ -56,13 +61,13 @@ export default function PdfUploader({ onFieldGenerated }: PdfUploaderProps) {
   return (
     <div className="p-4 border-b border-border">
       <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-2">
-        Upload PDF
+        Upload Source
       </label>
 
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf"
+        accept={ACCEPT}
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -104,26 +109,19 @@ export default function PdfUploader({ onFieldGenerated }: PdfUploaderProps) {
               </div>
             </motion.div>
           ) : (
-            <motion.div
-              key="idle"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
+            <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="font-mono text-[11px] text-muted-foreground">
-                Drop PDF or <span className="text-primary underline">browse</span>
+                Drop file or <span className="text-primary underline">browse</span>
               </div>
               <div className="font-mono text-[9px] text-muted-foreground/50 mt-1">
-                Client-side processing · no upload
+                PDF · text · script · image · audio · zip
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {error && (
-        <p className="font-mono text-[10px] text-destructive mt-2">{error}</p>
-      )}
+      {error && <p className="font-mono text-[10px] text-destructive mt-2">{error}</p>}
     </div>
   );
 }
