@@ -74,6 +74,13 @@ export type Database = {
             foreignKeyName: "chunks_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
+            referencedRelation: "document_cti_ranking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
             referencedRelation: "documents"
             referencedColumns: ["id"]
           },
@@ -87,6 +94,8 @@ export type Database = {
           centroid_embedding: string | null
           cluster_id: number
           created_at: string
+          custom_label: string | null
+          custom_label_updated_at: string | null
           description: string | null
           document_id: string
           embedding_dim: number
@@ -101,6 +110,8 @@ export type Database = {
           centroid_embedding?: string | null
           cluster_id: number
           created_at?: string
+          custom_label?: string | null
+          custom_label_updated_at?: string | null
           description?: string | null
           document_id: string
           embedding_dim?: number
@@ -115,6 +126,8 @@ export type Database = {
           centroid_embedding?: string | null
           cluster_id?: number
           created_at?: string
+          custom_label?: string | null
+          custom_label_updated_at?: string | null
           description?: string | null
           document_id?: string
           embedding_dim?: number
@@ -123,6 +136,13 @@ export type Database = {
           unit_count?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "clusters_summary_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "document_cti_ranking"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clusters_summary_document_id_fkey"
             columns: ["document_id"]
@@ -164,7 +184,21 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      document_cti_ranking: {
+        Row: {
+          avg_cti: number | null
+          avg_fy: number | null
+          avg_fz: number | null
+          chunk_count: number | null
+          cluster_count: number | null
+          filename: string | null
+          id: string | null
+          max_cti: number | null
+          source_type: string | null
+          uploaded_at: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       match_chunks: {
@@ -204,6 +238,35 @@ export type Database = {
           unit_count: number
         }[]
       }
+      match_clusters_hybrid: {
+        Args: {
+          exclude_doc_id?: string
+          fz_fy_weight?: number
+          match_count?: number
+          min_similarity?: number
+          query_embedding: string
+          query_fy: number
+          query_fz: number
+        }
+        Returns: {
+          avg_cti: number
+          avg_fy: number
+          avg_fz: number
+          cluster_id: number
+          custom_label: string
+          description: string
+          document_id: string
+          filename: string
+          fy_delta: number
+          fz_delta: number
+          hybrid_score: number
+          id: string
+          label: string
+          similarity: number
+          unit_count: number
+        }[]
+      }
+      refresh_document_cti_ranking: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
