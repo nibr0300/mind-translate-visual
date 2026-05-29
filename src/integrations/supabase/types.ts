@@ -154,6 +154,7 @@ export type Database = {
       }
       documents: {
         Row: {
+          content_hash: string | null
           embedding_dim: number
           embedding_model: string
           filename: string
@@ -163,6 +164,7 @@ export type Database = {
           uploaded_at: string
         }
         Insert: {
+          content_hash?: string | null
           embedding_dim?: number
           embedding_model?: string
           filename: string
@@ -172,6 +174,7 @@ export type Database = {
           uploaded_at?: string
         }
         Update: {
+          content_hash?: string | null
           embedding_dim?: number
           embedding_model?: string
           filename?: string
@@ -201,6 +204,23 @@ export type Database = {
       }
     }
     Functions: {
+      corpus_cluster_edges: {
+        Args: { max_edges?: number; min_similarity?: number }
+        Returns: {
+          dst_cluster: number
+          dst_doc: string
+          dst_id: string
+          dst_label: string
+          fy_delta: number
+          fz_delta: number
+          hybrid: number
+          similarity: number
+          src_cluster: number
+          src_doc: string
+          src_id: string
+          src_label: string
+        }[]
+      }
       match_chunks: {
         Args: {
           match_count?: number
