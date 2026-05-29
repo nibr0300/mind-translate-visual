@@ -68,11 +68,16 @@ export default function FieldSidebar({
   };
 
   const handleExportCorpusMap = async () => {
-    const { data } = await supabase
-      .from("clusters_summary")
-      .select("document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti");
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), clusters: data ?? [] }, null, 2)],
-      { type: "application/json" });
+    // Use the topology edge function so the export contains nodes + edges +
+    // cross-document cluster groups — not just a flat inventory.
+    const { data, error } = await supabase.functions.invoke("corpus-map", {
+      body: { min_similarity: 0.55, max_edges: 500 },
+    });
+    if (error) {
+      console.warn("[corpus-map] export failed:", error.message);
+      return;
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

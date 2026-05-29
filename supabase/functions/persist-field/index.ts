@@ -1,5 +1,8 @@
 // Persist a Geometric Field into the searchable vector DB.
-// Writes: documents, chunks (with embeddings + content_hash dedup), clusters_summary.
+// - Document-level dedup via content_hash (reuses existing doc when re-uploaded)
+// - Chunks upsert (dedup via UNIQUE (document_id, content_hash))
+// - Cluster centroids
+// - Fires async LLM relabel + ranking refresh
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -32,6 +35,7 @@ interface ClusterPayload {
 interface PersistPayload {
   filename: string;
   source_type: string;
+  content_hash?: string;          // NEW: document-level fingerprint
   embedding_model?: string;
   embedding_dim?: number;
   stats?: Record<string, unknown>;
@@ -52,23 +56,51 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 1. Insert document
-    const { data: doc, error: docErr } = await supabase
-      .from("documents")
-      .insert({
-        filename: payload.filename,
-        source_type: payload.source_type,
-        embedding_model: payload.embedding_model ?? "openai/text-embedding-3-small",
-        embedding_dim: payload.embedding_dim ?? 1536,
-        stats: payload.stats ?? {},
-      })
-      .select("id")
-      .single();
-    if (docErr) throw docErr;
+    // 1. Document-level dedup
+    let documentId: string | null = null;
+    let reused = false;
 
-    const documentId = doc.id;
+    if (payload.content_hash) {
+      const { data: existing } = await supabase
+        .from("documents")
+        .select("id")
+        .eq("content_hash", payload.content_hash)
+        .maybeSingle();
+      if (existing?.id) {
+        documentId = existing.id;
+        reused = true;
+      }
+    }
 
-    // 2. Upsert chunks (dedup via UNIQUE (document_id, content_hash))
+    if (!documentId) {
+      const { data: doc, error: docErr } = await supabase
+        .from("documents")
+        .insert({
+          filename: payload.filename,
+          source_type: payload.source_type,
+          content_hash: payload.content_hash ?? null,
+          embedding_model: payload.embedding_model ?? "openai/text-embedding-3-small",
+          embedding_dim: payload.embedding_dim ?? 1536,
+          stats: payload.stats ?? {},
+        })
+        .select("id")
+        .single();
+      if (docErr) throw docErr;
+      documentId = doc.id;
+    }
+
+    if (reused) {
+      // Skip re-writing chunks/clusters — content already persisted under this doc
+      return new Response(JSON.stringify({
+        document_id: documentId,
+        persisted_chunks: 0,
+        reused: true,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 2. Upsert chunks (per-chunk dedup via UNIQUE (document_id, content_hash))
     const chunkRows = payload.chunks.map((c) => ({
       document_id: documentId,
       chunk_index: c.chunk_index,
@@ -86,7 +118,6 @@ Deno.serve(async (req) => {
       embedding_dim: payload.embedding_dim ?? 1536,
     }));
 
-    // Chunked inserts to keep payloads reasonable
     const CHUNK_BATCH = 200;
     for (let i = 0; i < chunkRows.length; i += CHUNK_BATCH) {
       const slice = chunkRows.slice(i, i + CHUNK_BATCH);
@@ -98,7 +129,9 @@ Deno.serve(async (req) => {
 
     // 3. Cluster summaries
     if (payload.clusters?.length) {
-      const clusterRows = payload.clusters.map((c) => ({
+      // Skip empty clusters — no more "ghost" placeholders in corpus map
+      const meaningful = payload.clusters.filter((c) => (c.unit_count ?? 0) > 0);
+      const clusterRows = meaningful.map((c) => ({
         document_id: documentId,
         cluster_id: c.cluster_id,
         label: c.label,
@@ -110,18 +143,28 @@ Deno.serve(async (req) => {
         centroid_embedding: c.centroid_embedding,
         embedding_dim: payload.embedding_dim ?? 1536,
       }));
-      const { error: clErr } = await supabase
-        .from("clusters_summary")
-        .upsert(clusterRows, { onConflict: "document_id,cluster_id" });
-      if (clErr) throw clErr;
+      if (clusterRows.length) {
+        const { error: clErr } = await supabase
+          .from("clusters_summary")
+          .upsert(clusterRows, { onConflict: "document_id,cluster_id" });
+        if (clErr) throw clErr;
+      }
     }
 
-    // Fire-and-forget refresh of the corpus CTI ranking view
+    // Fire-and-forget: refresh ranking view + LLM relabel
     supabase.rpc("refresh_document_cti_ranking").then(({ error }) => {
       if (error) console.warn("[persist-field] refresh view failed:", error.message);
     });
 
-    return new Response(JSON.stringify({ document_id: documentId, persisted_chunks: chunkRows.length }), {
+    supabase.functions
+      .invoke("label-clusters", { body: { document_id: documentId } })
+      .then(({ error }) => { if (error) console.warn("[persist-field] relabel failed:", error.message); });
+
+    return new Response(JSON.stringify({
+      document_id: documentId,
+      persisted_chunks: chunkRows.length,
+      reused: false,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
