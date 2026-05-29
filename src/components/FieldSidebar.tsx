@@ -247,10 +247,18 @@ export default function FieldSidebar({
             );
           })}
         </div>
+
+        {/* Etapp 2 — corpus navigation */}
+        <SearchPanel
+          field={field}
+          fileName={uploadedFileName ?? null}
+          activeClusterId={activeCluster}
+          onSelectCluster={onSelectCluster}
+        />
       </div>
 
       {/* Export / Import */}
-      <div className="p-4 border-t border-border flex gap-2">
+      <div className="p-4 border-t border-border flex gap-2 flex-wrap">
         <button
           onClick={handleExport}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
@@ -262,6 +270,13 @@ export default function FieldSidebar({
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
         >
           <Upload className="w-3 h-3" /> Import
+        </button>
+        <button
+          onClick={handleExportCorpusMap}
+          className="basis-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+          title="Export all cluster summaries across the corpus"
+        >
+          <MapIcon className="w-3 h-3" /> Corpus map (JSON)
         </button>
         <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
       </div>
