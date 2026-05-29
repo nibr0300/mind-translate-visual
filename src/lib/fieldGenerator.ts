@@ -166,6 +166,7 @@ async function buildFieldFromChunks(
       type,
       fz,
       fy: Math.round(fy * 100) / 100,
+      sourcePath: chunks[i]?.source,
       ...(intention && {
         intention: {
           speechAct: intention.speechAct,
