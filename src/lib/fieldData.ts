@@ -24,6 +24,8 @@ export interface FieldUnit {
   };
   /** Composite Tension Index: geometric mean of internal discrepancy × external cluster deviation */
   cti?: number;
+  /** Origin path inside the source (e.g. a file inside a zip). Enables per-file friction ranking. */
+  sourcePath?: string;
 }
 
 export interface FieldCluster {

@@ -142,6 +142,47 @@ export default function FieldSidebar({
         </div>
       </div>
 
+      {/* Per-file friction ranking (only when units carry sourcePath, e.g. zip) */}
+      {(() => {
+        const byFile = new Map<string, { sum: number; count: number; maxCti: number }>();
+        for (const u of field.units) {
+          if (!u.sourcePath) continue;
+          const e = byFile.get(u.sourcePath) ?? { sum: 0, count: 0, maxCti: 0 };
+          const c = u.cti ?? 0;
+          e.sum += c;
+          e.count += 1;
+          if (c > e.maxCti) e.maxCti = c;
+          byFile.set(u.sourcePath, e);
+        }
+        if (byFile.size < 2) return null;
+        const ranked = Array.from(byFile.entries())
+          .map(([path, e]) => ({ path, avgCti: e.sum / e.count, n: e.count, maxCti: e.maxCti }))
+          .sort((a, b) => b.avgCti - a.avgCti)
+          .slice(0, 10);
+        return (
+          <div className="p-4 border-b border-border">
+            <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-2">
+              Friction by file (avg CTI)
+            </label>
+            <ul className="flex flex-col gap-1">
+              {ranked.map((r) => (
+                <li key={r.path} className="flex items-center gap-2 text-[11px] font-mono">
+                  <div className="flex-1 truncate text-foreground" title={r.path}>{r.path}</div>
+                  <div className="w-16 h-1.5 rounded bg-secondary overflow-hidden">
+                    <div
+                      className="h-full bg-[hsl(320,80%,55%)]"
+                      style={{ width: `${Math.min(100, r.avgCti * 200)}%` }}
+                    />
+                  </div>
+                  <span className="w-10 text-right text-muted-foreground">{r.avgCti.toFixed(2)}</span>
+                  <span className="w-8 text-right text-muted-foreground/60">n={r.n}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
+
       {/* Clusters */}
       <div className="flex-1 overflow-y-auto p-4">
         <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-3">

@@ -3,6 +3,7 @@ import type { RawTextUnit } from "../chunker";
 import { extractFromText } from "./textAdapter";
 import { extractFromScript } from "./scriptAdapter";
 import { extractFromImage } from "./imageAdapter";
+import { extractFromNotebook } from "./notebookAdapter";
 
 /**
  * Zip adapter with dynamic context exclusion.
@@ -71,6 +72,15 @@ export async function extractFromZip(
         for (const u of nestedUnits) {
           units.push({ ...u, source: `${file instanceof File ? file.name : "archive"}/${path}::${u.source ?? ""}` });
         }
+        continue;
+      }
+
+      if (/\.ipynb$/i.test(path)) {
+        const blob = await entry.async("blob");
+        const sub = new File([blob], path, { type: "application/json" });
+        const subUnits = await extractFromNotebook(sub);
+        for (const u of subUnits) units.push({ ...u, source: path });
+        counter.count++;
         continue;
       }
 
