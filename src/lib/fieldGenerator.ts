@@ -295,10 +295,15 @@ async function persistFieldInBackground(
     };
   });
 
-  const { error: persistErr } = await supabase.functions.invoke("persist-field", {
+  // Document-level content hash = hash of all chunk hashes, in stable order.
+  // Detects byte-identical re-uploads (same content, possibly renamed file).
+  const docHash = await sha256Hex(hashes.slice().sort().join("|"));
+
+  const { data: persistData, error: persistErr } = await supabase.functions.invoke("persist-field", {
     body: {
       filename: file.name,
       source_type: sourceType,
+      content_hash: docHash,
       embedding_model: "openai/text-embedding-3-small",
       embedding_dim: dim,
       stats: field.stats,
@@ -308,5 +313,10 @@ async function persistFieldInBackground(
   });
   if (persistErr) throw persistErr;
 
-  console.info(`[persist] ${file.name} → vector DB (${chunkPayload.length} chunks)`);
+  const info = persistData as { reused?: boolean; persisted_chunks?: number };
+  if (info?.reused) {
+    console.info(`[persist] ${file.name} → reused existing document (dedup hit)`);
+  } else {
+    console.info(`[persist] ${file.name} → vector DB (${info?.persisted_chunks ?? chunkPayload.length} chunks)`);
+  }
 }
