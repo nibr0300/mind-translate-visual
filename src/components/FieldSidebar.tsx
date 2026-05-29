@@ -66,6 +66,20 @@ export default function FieldSidebar({
     reader.readAsText(file);
     e.target.value = "";
   };
+
+  const handleExportCorpusMap = async () => {
+    const { data } = await supabase
+      .from("clusters_summary")
+      .select("document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti");
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), clusters: data ?? [] }, null, 2)],
+      { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `corpus-map-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   return (
     <aside className="w-80 flex-shrink-0 h-full bg-card border-r border-border flex flex-col overflow-hidden">
       {/* Header */}
