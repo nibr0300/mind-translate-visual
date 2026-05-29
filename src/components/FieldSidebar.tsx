@@ -4,7 +4,7 @@ import type { GeometricField } from "@/lib/fieldData";
 import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
 import { supabase } from "@/integrations/supabase/client";
-import { Download, Upload, Map } from "lucide-react";
+import { Download, Upload, Map as MapIcon } from "lucide-react";
 
 const CLUSTER_COLORS = [
   "hsl(180, 70%, 50%)",
