@@ -51,9 +51,9 @@ export default function Index() {
         <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-card/50 backdrop-blur-sm">
           <div className="flex items-center gap-3">
             <span className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
-              RFA Geometric Field Translator
+              Geometric Vector — Tension Data
             </span>
-            <span className="font-mono text-[10px] text-muted-foreground/40">v1.0</span>
+            <span className="font-mono text-[10px] text-muted-foreground/40">v2.0</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="font-mono text-[10px] text-muted-foreground">
