@@ -116,6 +116,11 @@ Deno.serve(async (req) => {
       if (clErr) throw clErr;
     }
 
+    // Fire-and-forget refresh of the corpus CTI ranking view
+    supabase.rpc("refresh_document_cti_ranking").then(({ error }) => {
+      if (error) console.warn("[persist-field] refresh view failed:", error.message);
+    });
+
     return new Response(JSON.stringify({ document_id: documentId, persisted_chunks: chunkRows.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
