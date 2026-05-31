@@ -100,6 +100,7 @@ Deno.serve(async (req) => {
           embedding_dim: payload.embedding_dim ?? 3072,
           stats: payload.stats ?? {},
           user_id: userId,
+          share_to_global: payload.share_to_global ?? false,
         })
         .select("id")
         .single();
