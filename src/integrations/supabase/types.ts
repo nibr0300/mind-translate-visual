@@ -227,6 +227,75 @@ export type Database = {
         }
         Relationships: []
       }
+      global_clusters: {
+        Row: {
+          avg_cti: number | null
+          avg_fy: number | null
+          avg_fz: number | null
+          centroid_embedding: string | null
+          cluster_id: number
+          cohesion: number | null
+          contributed_at: string
+          description: string | null
+          id: string
+          label: string
+          noise_ratio: number | null
+          separation: number | null
+          source_document_id: string | null
+          source_user_id: string | null
+          unit_count: number
+        }
+        Insert: {
+          avg_cti?: number | null
+          avg_fy?: number | null
+          avg_fz?: number | null
+          centroid_embedding?: string | null
+          cluster_id: number
+          cohesion?: number | null
+          contributed_at?: string
+          description?: string | null
+          id?: string
+          label: string
+          noise_ratio?: number | null
+          separation?: number | null
+          source_document_id?: string | null
+          source_user_id?: string | null
+          unit_count?: number
+        }
+        Update: {
+          avg_cti?: number | null
+          avg_fy?: number | null
+          avg_fz?: number | null
+          centroid_embedding?: string | null
+          cluster_id?: number
+          cohesion?: number | null
+          contributed_at?: string
+          description?: string | null
+          id?: string
+          label?: string
+          noise_ratio?: number | null
+          separation?: number | null
+          source_document_id?: string | null
+          source_user_id?: string | null
+          unit_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_clusters_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "document_cti_ranking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_clusters_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       document_cti_ranking: {
@@ -337,6 +406,28 @@ export type Database = {
           hybrid_score: number
           id: string
           label: string
+          similarity: number
+          unit_count: number
+        }[]
+      }
+      match_global_clusters: {
+        Args: {
+          match_count?: number
+          min_cti?: number
+          min_similarity?: number
+          query_embedding: string
+        }
+        Returns: {
+          avg_cti: number
+          avg_fy: number
+          avg_fz: number
+          cohesion: number
+          contributed_at: string
+          description: string
+          id: string
+          label: string
+          noise_ratio: number
+          separation: number
           similarity: number
           unit_count: number
         }[]
