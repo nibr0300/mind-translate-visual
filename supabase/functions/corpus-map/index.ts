@@ -47,30 +47,50 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 1) Documents
+    // Identify caller (JWT) — corpus is scoped to that user only.
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+    if (authHeader) {
+      const token = authHeader.replace(/^Bearer\s+/i, "");
+      const { data: u } = await supabase.auth.getUser(token);
+      userId = u.user?.id ?? null;
+    }
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 1) Documents (owned by user)
     const { data: docs, error: dErr } = await supabase
       .from("documents")
-      .select("id, filename, source_type, uploaded_at, embedding_model, embedding_dim, stats");
+      .select("id, filename, source_type, uploaded_at, embedding_model, embedding_dim, stats")
+      .eq("user_id", userId);
     if (dErr) throw dErr;
+    const userDocIds = new Set((docs ?? []).map((d: any) => d.id));
 
     // 2) Cluster nodes — inkl. centroid_embedding för AI-konsumtion
     const { data: rawNodes, error: nErr } = await supabase
       .from("clusters_summary")
-      .select("id, document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding, embedding_dim");
+      .select("id, document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding, embedding_dim")
+      .in("document_id", Array.from(userDocIds));
     if (nErr) throw nErr;
 
-    // 3) Edges (hybrid score)
-    const { data: edges, error: eErr } = await supabase.rpc("corpus_cluster_edges", {
+    // 3) Edges (hybrid score) — filter to user's clusters only
+    const { data: rawEdges, error: eErr } = await supabase.rpc("corpus_cluster_edges", {
       min_similarity: minSim,
       max_edges: maxEdges,
     });
     if (eErr) throw eErr;
+    const edges = (rawEdges ?? []).filter((e: any) => userDocIds.has(e.src_doc) && userDocIds.has(e.dst_doc));
 
     // 4) Kvalitetsmetrik per kluster (cohesion / separation / noise)
-    const { data: quality, error: qErr } = await supabase.rpc("corpus_cluster_quality", {
+    const { data: rawQuality, error: qErr } = await supabase.rpc("corpus_cluster_quality", {
       noise_threshold: noiseThreshold,
     });
     if (qErr) throw qErr;
+    const quality = (rawQuality ?? []).filter((q: any) => userDocIds.has(q.document_id));
     const qMap = new Map<string, any>((quality ?? []).map((q: any) => [q.cluster_summary_id, q]));
 
     // 5) Normalisera noder: parsa centroid till number[], lägg på kvalitet
@@ -152,6 +172,7 @@ Deno.serve(async (req) => {
         const { data: page, error: cErr } = await supabase
           .from("chunks")
           .select("id, document_id, chunk_index, text, source_path, cluster_id, cluster_label, fz, fy, cti, triangulation, intention, embedding, embedding_dim")
+          .in("document_id", Array.from(userDocIds))
           .order("document_id", { ascending: true })
           .order("chunk_index", { ascending: true })
           .range(from, from + pageSize - 1);

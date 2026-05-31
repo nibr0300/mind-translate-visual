@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import type { GeometricField } from "@/lib/fieldData";
 import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
+import AccountPanel from "./AccountPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
 
@@ -298,6 +299,7 @@ export default function FieldSidebar({
             <span>FY = resonance</span>
           </div>
         </div>
+        <AccountPanel />
       </div>
     </aside>
   );
