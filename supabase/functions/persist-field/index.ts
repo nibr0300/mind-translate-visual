@@ -71,11 +71,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 1. Document-level dedup (scoped to this user)
+    let documentId: string | null = null;
+    let reused = false;
+
     if (payload.content_hash) {
       const { data: existing } = await supabase
         .from("documents")
         .select("id")
         .eq("content_hash", payload.content_hash)
+        .eq("user_id", userId)
         .maybeSingle();
       if (existing?.id) {
         documentId = existing.id;
@@ -90,9 +95,10 @@ Deno.serve(async (req) => {
           filename: payload.filename,
           source_type: payload.source_type,
           content_hash: payload.content_hash ?? null,
-          embedding_model: payload.embedding_model ?? "openai/text-embedding-3-small",
-          embedding_dim: payload.embedding_dim ?? 1536,
+          embedding_model: payload.embedding_model ?? "google/gemini-embedding-001",
+          embedding_dim: payload.embedding_dim ?? 3072,
           stats: payload.stats ?? {},
+          user_id: userId,
         })
         .select("id")
         .single();
