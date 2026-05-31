@@ -10,7 +10,7 @@ interface Body {
   match_count?: number;
 }
 
-const EMBED_MODEL = "openai/text-embedding-3-small";
+const EMBED_MODEL = "google/gemini-embedding-001";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
