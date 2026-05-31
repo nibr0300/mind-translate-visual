@@ -298,6 +298,7 @@ export default function FieldSidebar({
             <span>FY = resonance</span>
           </div>
         </div>
+        <AccountPanel />
       </div>
     </aside>
   );
