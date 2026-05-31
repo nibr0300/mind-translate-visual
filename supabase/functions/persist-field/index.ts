@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
         avg_fy: c.avg_fy,
         avg_cti: c.avg_cti,
         centroid_embedding: c.centroid_embedding,
-        embedding_dim: payload.embedding_dim ?? 1536,
+        embedding_dim: payload.embedding_dim ?? 3072,
       }));
       if (clusterRows.length) {
         const { error: clErr } = await supabase
