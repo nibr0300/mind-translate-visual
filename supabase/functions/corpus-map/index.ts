@@ -73,21 +73,24 @@ Deno.serve(async (req) => {
     // 2) Cluster nodes — inkl. centroid_embedding för AI-konsumtion
     const { data: rawNodes, error: nErr } = await supabase
       .from("clusters_summary")
-      .select("id, document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding, embedding_dim");
+      .select("id, document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding, embedding_dim")
+      .in("document_id", Array.from(userDocIds));
     if (nErr) throw nErr;
 
-    // 3) Edges (hybrid score)
-    const { data: edges, error: eErr } = await supabase.rpc("corpus_cluster_edges", {
+    // 3) Edges (hybrid score) — filter to user's clusters only
+    const { data: rawEdges, error: eErr } = await supabase.rpc("corpus_cluster_edges", {
       min_similarity: minSim,
       max_edges: maxEdges,
     });
     if (eErr) throw eErr;
+    const edges = (rawEdges ?? []).filter((e: any) => userDocIds.has(e.src_doc) && userDocIds.has(e.dst_doc));
 
     // 4) Kvalitetsmetrik per kluster (cohesion / separation / noise)
-    const { data: quality, error: qErr } = await supabase.rpc("corpus_cluster_quality", {
+    const { data: rawQuality, error: qErr } = await supabase.rpc("corpus_cluster_quality", {
       noise_threshold: noiseThreshold,
     });
     if (qErr) throw qErr;
+    const quality = (rawQuality ?? []).filter((q: any) => userDocIds.has(q.document_id));
     const qMap = new Map<string, any>((quality ?? []).map((q: any) => [q.cluster_summary_id, q]));
 
     // 5) Normalisera noder: parsa centroid till number[], lägg på kvalitet
