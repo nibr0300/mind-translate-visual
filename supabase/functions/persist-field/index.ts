@@ -56,9 +56,20 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 1. Document-level dedup
-    let documentId: string | null = null;
-    let reused = false;
+    // Identify the calling user from the Authorization bearer token.
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+    if (authHeader) {
+      const token = authHeader.replace(/^Bearer\s+/i, "");
+      const { data: userData } = await supabase.auth.getUser(token);
+      userId = userData.user?.id ?? null;
+    }
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (payload.content_hash) {
       const { data: existing } = await supabase
