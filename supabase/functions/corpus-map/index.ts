@@ -172,6 +172,7 @@ Deno.serve(async (req) => {
         const { data: page, error: cErr } = await supabase
           .from("chunks")
           .select("id, document_id, chunk_index, text, source_path, cluster_id, cluster_label, fz, fy, cti, triangulation, intention, embedding, embedding_dim")
+          .in("document_id", Array.from(userDocIds))
           .order("document_id", { ascending: true })
           .order("chunk_index", { ascending: true })
           .range(from, from + pageSize - 1);
