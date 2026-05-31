@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+          scopes: string[]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          revoked_at?: string | null
+          scopes?: string[]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          scopes?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       chunks: {
         Row: {
           chunk_index: number
@@ -159,9 +195,11 @@ export type Database = {
           embedding_model: string
           filename: string
           id: string
+          share_to_global: boolean
           source_type: string
           stats: Json
           uploaded_at: string
+          user_id: string | null
         }
         Insert: {
           content_hash?: string | null
@@ -169,9 +207,11 @@ export type Database = {
           embedding_model?: string
           filename: string
           id?: string
+          share_to_global?: boolean
           source_type: string
           stats?: Json
           uploaded_at?: string
+          user_id?: string | null
         }
         Update: {
           content_hash?: string | null
@@ -179,9 +219,11 @@ export type Database = {
           embedding_model?: string
           filename?: string
           id?: string
+          share_to_global?: boolean
           source_type?: string
           stats?: Json
           uploaded_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -204,6 +246,7 @@ export type Database = {
       }
     }
     Functions: {
+      claim_orphan_documents: { Args: never; Returns: number }
       corpus_cluster_edges: {
         Args: { max_edges?: number; min_similarity?: number }
         Returns: {
@@ -299,6 +342,7 @@ export type Database = {
         }[]
       }
       refresh_document_cti_ranking: { Args: never; Returns: undefined }
+      user_owns_document: { Args: { _doc_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
