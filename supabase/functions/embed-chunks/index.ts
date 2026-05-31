@@ -14,7 +14,8 @@ interface EmbedItem {
 
 const MAX_CHUNKS = 10_000;
 const BATCH = 50;
-const MODEL = "openai/text-embedding-3-small"; // 1536 dims, matches DB schema
+const MODEL = "google/gemini-embedding-001"; // 3072 dims
+const DIM = 3072;
 
 function augment(item: EmbedItem): string {
   const parts: string[] = [];
