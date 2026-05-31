@@ -299,6 +299,10 @@ async function persistFieldInBackground(
   // Detects byte-identical re-uploads (same content, possibly renamed file).
   const docHash = await sha256Hex(hashes.slice().sort().join("|"));
 
+  const shareToGlobal = (() => {
+    try { return localStorage.getItem("share_to_global_default") === "1"; } catch { return false; }
+  })();
+
   const { data: persistData, error: persistErr } = await supabase.functions.invoke("persist-field", {
     body: {
       filename: file.name,
@@ -309,6 +313,7 @@ async function persistFieldInBackground(
       stats: field.stats,
       chunks: chunkPayload,
       clusters: clusterPayload,
+      share_to_global: shareToGlobal,
     },
   });
   if (persistErr) throw persistErr;
