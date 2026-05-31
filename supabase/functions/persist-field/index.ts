@@ -41,6 +41,7 @@ interface PersistPayload {
   stats?: Record<string, unknown>;
   chunks: ChunkPayload[];
   clusters: ClusterPayload[];
+  share_to_global?: boolean;
 }
 
 Deno.serve(async (req) => {
