@@ -1,81 +1,61 @@
-# Etapp 2 — Corpus-navigering och friction similarity
+# Implementeringsplan
 
-Bygger på din specifikation. Tar in dina tre principer (similarity med kontext, geometriska positionen som information, kluster-first navigering) som styrande för UX.
+Tre stora ändringar i en ordning som minimerar omarbete. Varje steg är committable för sig.
 
-## 1. Databasmigration
+## Steg 1 — Embedding-uppgradering (gemini-embedding-001, 3072 dim)
 
-- `clusters_summary`: lägg till `custom_label TEXT` och `custom_label_updated_at TIMESTAMPTZ`.
-- Materialized view `document_cti_ranking` (filename, avg_cti, max_cti, chunk_count, cluster_count) sorterad fallande på avg_cti. Refreshas av `persist-field` efter varje upload.
-- SQL-funktion `match_clusters_hybrid(query_embedding, query_fz, query_fy, match_count, exclude_doc_id, min_similarity, fz_fy_weight)` enligt din spec. Returnerar similarity, fz_delta, fy_delta, hybrid_score, plus metadata.
-- SQL-funktion `match_chunks_hybrid(query_embedding, min_cti, min_similarity, match_count)` returnerar utökat result med matchProfile-fält (sharedSpeechAct härleds från intention.speechAct i `chunks`).
-- GRANT SELECT/UPDATE på custom_label-kolumnerna till authenticated; service_role som vanligt.
+**Varför först:** byte av vektor-dimension kräver migration av alla `vector(1536)` → `vector(3072)`. Allt som byggs efteråt (MCP, global field) lagras direkt i nya formatet och slipper en andra migration.
 
-## 2. Edge functions
+- Migration: ändra `chunks.embedding`, `clusters_summary.centroid_embedding` till `vector(3072)`. Sätt `embedding_dim` default = 3072. Behåll gamla rader men markera `embedding_model = 'openai/text-embedding-3-small'` så blandning är spårbar (eller töm dem — du väljer).
+- Uppdatera HNSW-index (drop + recreate på nya dim).
+- `embed-chunks/index.ts`: byt model-konstant till `google/gemini-embedding-001`.
+- `search-chunks/index.ts` + `search-clusters`: samma byte.
+- `fieldGenerator.ts`: skicka `embedding_model: "google/gemini-embedding-001"`, `embedding_dim: 3072` till `persist-field`.
+- En engångs-reembed-knapp (eller edge-funktion `reembed-all`) som kör om alla gamla dokument. Valfri; nya uppladdningar funkar direkt.
 
-- `update-cluster-label` (PATCH): zod-validering `{cluster_id, document_id, custom_label}`, max 60 tecken, strip HTML. Använder service_role.
-- `search-clusters` (POST): tar `{clusterId, documentId, fzFyWeight, minSimilarity, matchCount}`, hämtar valt klusters centroid+fz+fy, anropar `match_clusters_hybrid`, returnerar resultat med matchProfile.
-- Uppdatera `search-chunks`: lägg till hybrid-params och `matchProfile` i svar.
-- Uppdatera `persist-field`: kör `REFRESH MATERIALIZED VIEW CONCURRENTLY document_cti_ranking` async efter insert.
+## Steg 2 — Auth + RLS (förutsättning för MCP och global field)
 
-## 3. SearchPanel.tsx — tre sektioner
+**Varför nu:** MCP-anrop måste kunna sägas "denna användares data". Global field behöver "denna användare har gett samtycke". Båda kräver `user_id` på `documents`.
 
-### A. Corpus CTI-rankning (alltid synlig, ingångspunkt)
-Hämtas vid mount från `document_cti_ranking`, cachas i sessionStorage (5 min TTL). Lista med bar-chart för avg_cti, klick → "Ladda dokument" (prompt om byte).
+- Aktivera email + Google sign-in.
+- `documents`: lägg till `user_id uuid` (FK auth.users), `share_to_global boolean default false`.
+- RLS skrivs om: ersätt "readable by everyone (demo)" med `auth.uid() = user_id`. `chunks`/`clusters_summary` ärver via join på `documents.user_id` (security definer-funktion).
+- `persist-field`: läs `user_id` från JWT, skriv på documents.
+- En `api_keys`-tabell: `id, user_id, key_hash, name, scopes[], created_at, last_used_at, revoked_at`. Används av MCP för icke-browser-klienter.
+- Login/signup-sida + sidopanel visar inloggad användare.
 
-### B. Friction Cluster Similarity (aktiveras vid valt kluster)
-- Visar valt kluster med FZ/FY-badges.
-- Custom-label input (optimistic update via `update-cluster-label`).
-- Två slidrar: FZ/FY-vikt (0–1, default 0.3), Min similarity (default 0.65). Debounce 300ms.
-- Resultatlista med hybrid_score, Δfz/Δfy-badges, "Likhetsprofil"-mini-display, [Öppna dokument]-knapp.
+## Steg 3 — MCP-server (Edge Function via mcp-lite)
 
-### C. Semantisk fritextsökning (kollapsad default)
-Debounce 400ms, sessionStorage-cache på query. CTI-slider. Resultat med matchProfile och [Hoppa till nod].
+**Varför sist av kärnan:** kräver embedding-modell + auth färdiga.
 
-## 4. Notebook-adapter
-Redan implementerad i föregående etapp — verifierar och utökar med `output`-celler som separata units om de innehåller > 20 tecken text.
+- Ny edge function `mcp/index.ts` med Hono + `mcp-lite@^0.10.0`, StreamableHttpTransport.
+- Auth: Bearer = api_key (slå upp i `api_keys`, sätt RLS-context via service role + manuellt user_id-filter).
+- Tools som exponeras:
+  - `search_chunks(query, min_cti?, min_similarity?, k?)` → omsluter `match_chunks`
+  - `search_clusters(query, k?)` → omsluter `match_clusters_hybrid`
+  - `get_corpus_map(include_chunks?)` → omsluter `corpus-map`
+  - `find_friction(min_cti)` → top-CTI chunks
+  - `compare_clusters(cluster_a_id, cluster_b_id)` → cosine + fz/fy-delta
+  - `ingest_text(text, filename?)` → kör samma pipeline som upload
+  - `list_documents()` → användarens dokument
+- En "Generate MCP key"-knapp i sidopanelen som returnerar nyckel + URL en gång.
 
-## 5. Export-utökning
-Tre knappar i sidopanelen:
-- Exportera fält-JSON (befintlig)
-- Exportera embeddings (chunks + vektorer för aktivt dokument)
-- Exportera corpus-karta (alla clusters_summary från alla dokument)
+## Steg 4 — Global Field Friction Clusters (opt-in delat namnrum)
 
-## 6. Interaktion: kluster-first
-- Klick på nod i `FieldCanvas` → `selectedClusterId` propageras till SearchPanel sektion B.
-- Klick på "Liknande kluster"-resultat → om samma doc: pan/zoom till centroid; annars prompt + ladda dokumentets fält från DB (chunks → FieldUnits rekonstruktion).
-- Sektion A oberoende av valt kluster.
+- Ny tabell `global_clusters`: speglar `clusters_summary` men anonymiserad. `id, source_document_id, source_user_id (för audit, ej exponerat), label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding vector(3072), cohesion, separation, noise_ratio, contributed_at`.
+- RLS: SELECT öppen för authenticated. INSERT endast via security-definer-funktion som verifierar `documents.share_to_global = true`.
+- Trigger eller hook i `persist-field`: om `share_to_global` → kopiera kluster (inte chunks, inte text) till `global_clusters`.
+- Ny RPC `match_global_clusters(query_embedding, k)` för cross-user friction-sökning.
+- MCP-tool `search_global_friction(query, min_cti)`.
+- UI: checkbox "Bidra till Global Field Friction Clusters" per dokument + global toggle i user settings. Tydlig copy: "Endast kluster-centroider och metrik delas. Aldrig din text."
 
-## Teknisk struktur
+## Tekniska anteckningar
 
-```text
-src/components/
-  SearchPanel.tsx           (ny, 3 sektioner)
-  search/
-    CorpusCtiRanking.tsx
-    FrictionSimilarity.tsx
-    SemanticSearch.tsx
-src/lib/
-  searchClient.ts           (wrapper för edge functions + cache)
-supabase/functions/
-  update-cluster-label/
-  search-clusters/
-  search-chunks/            (uppdaterad)
-  persist-field/            (refresh view)
-supabase/migrations/
-  <ny>_etapp2_search.sql
-```
+- Steg 1 kräver `DROP INDEX` + `CREATE INDEX` på nya dimensionen — ta backup eller acceptera att gamla embeddings nollas.
+- Steg 2 bryter den nuvarande "demo readable by everyone"-modellen. All existerande data utan `user_id` blir oåtkomlig om vi inte assignar dem till en seed-user eller raderar.
+- `mcp-lite` körs som vanlig edge function — ingen extra infrastruktur.
+- Global field kräver inte att användaren själv har auth om vi exponerar den read-only via MCP, men för INSERT krävs auth.
 
-## Implementationsordning
-1. Migration (ALTER + view + två funktioner + GRANTs)
-2. `update-cluster-label` + `search-clusters` edge functions
-3. Uppdatera `search-chunks` och `persist-field`
-4. `searchClient.ts` + sektion A (CTI-rankning)
-5. Sektion B (friction similarity + custom label + slidrar)
-6. Sektion C (semantisk sökning)
-7. Export-knappar
-8. Pan/zoom + cross-document load
+## Förslag på första körning
 
-## Frågor innan jag kör
-1. **Cross-document load**: när användaren öppnar ett annat dokument via "Öppna dokument" — ska vi rekonstruera fältet från DB-chunks (full topologi inkl. spatial layout), eller bara visa en enkel preview av träffande kluster? Det första är dyrare men matchar utforsknings-paradigmen.
-2. **Materialized view refresh**: ska refresh vara synkron i `persist-field` (säkrare data, långsammare upload) eller bakgrund via `pg_notify` + trigger? Jag lutar mot bakgrund.
-3. Vill du att jag implementerar alla 8 steg i ett pass, eller stannar efter steg 4 (sektion A live) för en första visuell verifiering innan vi går vidare med similarity?
+Säg "kör steg 1" så börjar jag med embedding-migrationen. Steg 2 är det mest disruptiva (förändrar dataåtkomst för befintlig data) — vill du att jag wipear nuvarande dokument vid det steget eller migrerar dem till en "legacy public"-user?
