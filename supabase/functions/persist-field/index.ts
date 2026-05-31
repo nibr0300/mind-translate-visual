@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
       triangulation: c.triangulation,
       intention: c.intention,
       embedding: c.embedding,
-      embedding_dim: payload.embedding_dim ?? 1536,
+      embedding_dim: payload.embedding_dim ?? 3072,
     }));
 
     const CHUNK_BATCH = 200;
