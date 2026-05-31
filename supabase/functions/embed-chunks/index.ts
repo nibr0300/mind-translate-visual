@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       for (const v of vectors) embeddings[i + v.index] = v.embedding;
     }
 
-    return new Response(JSON.stringify({ embeddings, model: MODEL, dim: 1536 }), {
+    return new Response(JSON.stringify({ embeddings, model: MODEL, dim: DIM }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
