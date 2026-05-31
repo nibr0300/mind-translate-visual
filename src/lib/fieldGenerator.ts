@@ -304,7 +304,7 @@ async function persistFieldInBackground(
       filename: file.name,
       source_type: sourceType,
       content_hash: docHash,
-      embedding_model: "openai/text-embedding-3-small",
+      embedding_model: "google/gemini-embedding-001",
       embedding_dim: dim,
       stats: field.stats,
       chunks: chunkPayload,
