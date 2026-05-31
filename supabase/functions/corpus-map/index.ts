@@ -47,11 +47,28 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 1) Documents
+    // Identify caller (JWT) — corpus is scoped to that user only.
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+    if (authHeader) {
+      const token = authHeader.replace(/^Bearer\s+/i, "");
+      const { data: u } = await supabase.auth.getUser(token);
+      userId = u.user?.id ?? null;
+    }
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 1) Documents (owned by user)
     const { data: docs, error: dErr } = await supabase
       .from("documents")
-      .select("id, filename, source_type, uploaded_at, embedding_model, embedding_dim, stats");
+      .select("id, filename, source_type, uploaded_at, embedding_model, embedding_dim, stats")
+      .eq("user_id", userId);
     if (dErr) throw dErr;
+    const userDocIds = new Set((docs ?? []).map((d: any) => d.id));
 
     // 2) Cluster nodes — inkl. centroid_embedding för AI-konsumtion
     const { data: rawNodes, error: nErr } = await supabase
