@@ -221,6 +221,18 @@ export type Database = {
           src_label: string
         }[]
       }
+      corpus_cluster_quality: {
+        Args: { noise_threshold?: number }
+        Returns: {
+          cluster_id: number
+          cluster_summary_id: string
+          cohesion: number
+          document_id: string
+          member_count: number
+          noise_ratio: number
+          separation: number
+        }[]
+      }
       match_chunks: {
         Args: {
           match_count?: number
