@@ -1,8 +1,6 @@
-// Batch-embed chunks via Lovable AI Gateway.
-// - Caps total chunks per call (10_000) to protect budget.
-// - Batches of 50 to upstream endpoint.
-// - Augmentation: prepend [doc:..][cluster:..][act:..][certainty:..] for intentional-aware embeddings.
+// Batch-embed chunks via Lovable AI Gateway. Requires authenticated caller.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { requireUser } from "../_shared/auth.ts";
 
 interface EmbedItem {
   text: string;
@@ -14,7 +12,7 @@ interface EmbedItem {
 
 const MAX_CHUNKS = 10_000;
 const BATCH = 50;
-const MODEL = "google/gemini-embedding-001"; // 3072 dims
+const MODEL = "google/gemini-embedding-001";
 const DIM = 3072;
 
 function augment(item: EmbedItem): string {
@@ -29,6 +27,9 @@ function augment(item: EmbedItem): string {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const auth = await requireUser(req);
+  if ("error" in auth) return auth.error;
 
   try {
     const { items } = (await req.json()) as { items: EmbedItem[] };

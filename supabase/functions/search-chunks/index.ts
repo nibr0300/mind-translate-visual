@@ -1,7 +1,8 @@
-// Free-text semantic search across all stored chunks.
-// Embeds the query, then ranks chunks via match_chunks() with an optional CTI floor.
+// Free-text semantic search across the caller's stored chunks.
+// Embeds the query, ranks chunks via match_chunks(), then filters to caller-owned documents.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireUser } from "../_shared/auth.ts";
 
 interface Body {
   query: string;
@@ -14,6 +15,10 @@ const EMBED_MODEL = "google/gemini-embedding-001";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const auth = await requireUser(req);
+  if ("error" in auth) return auth.error;
+  const userId = auth.userId;
 
   try {
     const body = (await req.json()) as Body;
@@ -45,29 +50,32 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    // Fetch caller's documents first; restrict search to those.
+    const { data: userDocs, error: docsErr } = await supabase
+      .from("documents")
+      .select("id, filename")
+      .eq("user_id", userId);
+    if (docsErr) throw docsErr;
+    const userDocIds = new Set((userDocs ?? []).map((d: any) => d.id));
+    if (userDocIds.size === 0) {
+      return new Response(JSON.stringify({ matches: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: matches, error } = await supabase.rpc("match_chunks", {
       query_embedding: queryEmbedding,
-      match_count: body.match_count ?? 12,
+      match_count: (body.match_count ?? 12) * 4, // overshoot so post-filter has room
       min_similarity: body.min_similarity ?? 0.3,
       min_cti: body.min_cti ?? 0.0,
     });
     if (error) throw error;
 
-    // Join filenames in one extra query
-    const docIds = Array.from(new Set((matches ?? []).map((m: any) => m.document_id)));
-    let docMap = new Map<string, string>();
-    if (docIds.length) {
-      const { data: docs } = await supabase
-        .from("documents")
-        .select("id, filename")
-        .in("id", docIds);
-      docMap = new Map((docs ?? []).map((d: any) => [d.id, d.filename]));
-    }
-
-    const enriched = (matches ?? []).map((m: any) => ({
-      ...m,
-      filename: docMap.get(m.document_id) ?? null,
-    }));
+    const docMap = new Map((userDocs ?? []).map((d: any) => [d.id, d.filename]));
+    const enriched = (matches ?? [])
+      .filter((m: any) => userDocIds.has(m.document_id))
+      .slice(0, body.match_count ?? 12)
+      .map((m: any) => ({ ...m, filename: docMap.get(m.document_id) ?? null }));
 
     return new Response(JSON.stringify({ matches: enriched }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
