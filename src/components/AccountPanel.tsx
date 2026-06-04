@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsAdmin, claimAdminIfFirst } from "@/hooks/useIsAdmin";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,7 @@ async function sha256Hex(s: string): Promise<string> {
 
 export default function AccountPanel() {
   const { user, signOut } = useAuth();
+  const { isAdmin, refresh: refreshAdmin } = useIsAdmin();
   const [shareDefault, setShareDefault] = useState(getShareToGlobalDefault());
   const [keyName, setKeyName] = useState("");
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -80,6 +82,28 @@ export default function AccountPanel() {
       <Button size="sm" variant="outline" className="w-full" onClick={claimLegacy}>
         Claim legacy documents
       </Button>
+
+      {!isAdmin && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full"
+          onClick={async () => {
+            try {
+              const ok = await claimAdminIfFirst();
+              if (ok) { toast.success("Admin role granted"); await refreshAdmin(); }
+              else toast.error("An admin already exists");
+            } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+          }}
+        >
+          Claim admin role
+        </Button>
+      )}
+      {isAdmin && (
+        <div className="text-[10px] text-primary font-mono uppercase tracking-wider">
+          ● admin
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-2">
         <Label htmlFor="share-default" className="text-xs leading-snug">
