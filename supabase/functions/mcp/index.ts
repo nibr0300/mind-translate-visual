@@ -1,16 +1,13 @@
 // MCP server for the Geometric Field Translator.
-// Exposes the user's field data as MCP tools so an external AI can search,
-// inspect, and contribute via Bearer API key (table public.api_keys).
-//
-// Streamable HTTP transport via mcp-lite. verify_jwt=false in config — we
-// validate the Bearer token ourselves against the api_keys table.
+// Streamable HTTP via mcp-lite 0.10. Bearer = api_key (table public.api_keys).
 import { Hono } from "npm:hono@4";
 import { McpServer, StreamableHttpTransport } from "npm:mcp-lite@^0.10.0";
+import { z } from "npm:zod@3";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, mcp-session-id",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, mcp-session-id, accept",
   "Access-Control-Expose-Headers": "mcp-session-id",
 };
 
@@ -51,15 +48,40 @@ async function embedQuery(text: string): Promise<number[]> {
   return j.data[0].embedding;
 }
 
-// --- MCP server + tools (user is bound per request via captured closure) ---
+// Convert Zod schema -> JSON Schema (minimal — mcp-lite needs schemaAdapter).
+// We use a tiny converter rather than pulling zod-to-json-schema, since our
+// schemas are simple.
+function zodToJsonSchema(schema: z.ZodTypeAny): any {
+  if (schema instanceof z.ZodObject) {
+    const shape = schema.shape;
+    const properties: Record<string, any> = {};
+    const required: string[] = [];
+    for (const [k, v] of Object.entries(shape)) {
+      properties[k] = zodToJsonSchema(v as z.ZodTypeAny);
+      if (!(v instanceof z.ZodOptional) && !(v instanceof z.ZodDefault)) required.push(k);
+    }
+    return { type: "object", properties, ...(required.length ? { required } : {}) };
+  }
+  if (schema instanceof z.ZodOptional) return zodToJsonSchema(schema._def.innerType);
+  if (schema instanceof z.ZodDefault) return zodToJsonSchema(schema._def.innerType);
+  if (schema instanceof z.ZodString) return { type: "string" };
+  if (schema instanceof z.ZodNumber) return { type: "number" };
+  if (schema instanceof z.ZodBoolean) return { type: "boolean" };
+  if (schema instanceof z.ZodArray) return { type: "array", items: zodToJsonSchema(schema._def.type) };
+  return {};
+}
+
 function buildServer(userId: string) {
-  const server = new McpServer({ name: "geometric-field", version: "1.0.0" });
+  const server = new McpServer({
+    name: "geometric-field",
+    version: "1.0.0",
+    schemaAdapter: (s) => zodToJsonSchema(s as z.ZodTypeAny),
+  });
   const sb = supabaseAdmin();
 
-  server.tool({
-    name: "list_documents",
+  server.tool("list_documents", {
     description: "List all documents owned by the calling user.",
-    inputSchema: { type: "object", properties: {} },
+    inputSchema: z.object({}),
     handler: async () => {
       const { data, error } = await sb
         .from("documents")
@@ -71,45 +93,38 @@ function buildServer(userId: string) {
     },
   });
 
-  server.tool({
-    name: "search_chunks",
+  server.tool("search_chunks", {
     description: "Semantic search across the user's chunks. Returns top matches.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: { type: "string" },
-        match_count: { type: "number", default: 10 },
-        min_cti: { type: "number", default: 0 },
-        min_similarity: { type: "number", default: 0.3 },
-      },
-      required: ["query"],
-    },
-    handler: async ({ query, match_count, min_cti, min_similarity }: any) => {
-      const emb = await embedQuery(query);
+    inputSchema: z.object({
+      query: z.string(),
+      match_count: z.number().optional(),
+      min_cti: z.number().optional(),
+      min_similarity: z.number().optional(),
+    }),
+    handler: async (args) => {
+      const emb = await embedQuery(args.query);
       const { data, error } = await sb.rpc("match_chunks", {
         query_embedding: emb,
-        match_count: match_count ?? 10,
-        min_similarity: min_similarity ?? 0.3,
-        min_cti: min_cti ?? 0,
+        match_count: args.match_count ?? 10,
+        min_similarity: args.min_similarity ?? 0.3,
+        min_cti: args.min_cti ?? 0,
       });
       if (error) throw error;
-      // Filter to user's own documents
       const docIds = Array.from(new Set((data ?? []).map((m: any) => m.document_id)));
-      const { data: docs } = await sb.from("documents").select("id, filename, user_id").in("id", docIds);
+      const { data: docs } = await sb.from("documents").select("id, user_id").in("id", docIds);
       const mine = new Set((docs ?? []).filter((d: any) => d.user_id === userId).map((d: any) => d.id));
       const filtered = (data ?? []).filter((m: any) => mine.has(m.document_id));
       return { content: [{ type: "text", text: JSON.stringify(filtered, null, 2) }] };
     },
   });
 
-  server.tool({
-    name: "find_friction",
+  server.tool("find_friction", {
     description: "Return chunks above a CTI threshold (epistemic friction hotspots).",
-    inputSchema: {
-      type: "object",
-      properties: { min_cti: { type: "number", default: 0.5 }, limit: { type: "number", default: 20 } },
-    },
-    handler: async ({ min_cti, limit }: any) => {
+    inputSchema: z.object({
+      min_cti: z.number().optional(),
+      limit: z.number().optional(),
+    }),
+    handler: async (args) => {
       const { data: docs } = await sb.from("documents").select("id").eq("user_id", userId);
       const docIds = (docs ?? []).map((d: any) => d.id);
       if (!docIds.length) return { content: [{ type: "text", text: "[]" }] };
@@ -117,56 +132,46 @@ function buildServer(userId: string) {
         .from("chunks")
         .select("id, document_id, text, cluster_label, fz, fy, cti, triangulation")
         .in("document_id", docIds)
-        .gte("cti", min_cti ?? 0.5)
+        .gte("cti", args.min_cti ?? 0.5)
         .order("cti", { ascending: false })
-        .limit(limit ?? 20);
+        .limit(args.limit ?? 20);
       if (error) throw error;
       return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     },
   });
 
-  server.tool({
-    name: "get_corpus_map",
+  server.tool("get_corpus_map", {
     description: "Return the full corpus map (nodes, edges, quality, optional chunk embeddings) for the user.",
-    inputSchema: {
-      type: "object",
-      properties: { include_chunks: { type: "boolean", default: false } },
-    },
-    handler: async ({ include_chunks }: any) => {
-      // Reuse the corpus-map function via internal invoke
+    inputSchema: z.object({ include_chunks: z.boolean().optional() }),
+    handler: async (args) => {
       const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/corpus-map`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
         },
-        body: JSON.stringify({ include_chunks: include_chunks ?? false, user_id: userId }),
+        body: JSON.stringify({ include_chunks: args.include_chunks ?? false, user_id: userId }),
       });
       const text = await res.text();
       return { content: [{ type: "text", text }] };
     },
   });
 
-  server.tool({
-    name: "search_global_friction",
+  server.tool("search_global_friction", {
     description: "Search the shared Global Field Friction Clusters across all opted-in users.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: { type: "string" },
-        match_count: { type: "number", default: 10 },
-        min_cti: { type: "number", default: 0 },
-        min_similarity: { type: "number", default: 0.3 },
-      },
-      required: ["query"],
-    },
-    handler: async ({ query, match_count, min_cti, min_similarity }: any) => {
-      const emb = await embedQuery(query);
+    inputSchema: z.object({
+      query: z.string(),
+      match_count: z.number().optional(),
+      min_cti: z.number().optional(),
+      min_similarity: z.number().optional(),
+    }),
+    handler: async (args) => {
+      const emb = await embedQuery(args.query);
       const { data, error } = await sb.rpc("match_global_clusters", {
         query_embedding: emb,
-        match_count: match_count ?? 10,
-        min_similarity: min_similarity ?? 0.3,
-        min_cti: min_cti ?? 0,
+        match_count: args.match_count ?? 10,
+        min_similarity: args.min_similarity ?? 0.3,
+        min_cti: args.min_cti ?? 0,
       });
       if (error) throw error;
       return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
@@ -178,7 +183,7 @@ function buildServer(userId: string) {
 
 const app = new Hono();
 
-app.options("/*", (c) => new Response(null, { headers: corsHeaders }));
+app.options("/*", () => new Response(null, { headers: corsHeaders }));
 
 app.all("/*", async (c) => {
   const auth = c.req.header("authorization") ?? "";
@@ -192,8 +197,8 @@ app.all("/*", async (c) => {
   }
   const server = buildServer(userId);
   const transport = new StreamableHttpTransport();
-  const res = await transport.handleRequest(c.req.raw, server);
-  // Merge CORS headers
+  const httpHandler = transport.bind(server);
+  const res = await httpHandler(c.req.raw);
   const merged = new Headers(res.headers);
   for (const [k, v] of Object.entries(corsHeaders)) merged.set(k, v);
   return new Response(res.body, { status: res.status, headers: merged });
