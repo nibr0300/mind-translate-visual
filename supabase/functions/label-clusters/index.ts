@@ -1,14 +1,12 @@
 // Re-label clusters with LLM-generated semantic labels + descriptions.
-// Replaces token-frequency labels like "Path · Print · File" with meaningful
-// labels derived from the actual content of representative chunks.
+// Auth: requires JWT; caller must own the target document.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireUser } from "../_shared/auth.ts";
 
 interface Body {
   document_id: string;
-  // optional: only re-label these cluster_ids
   cluster_ids?: number[];
-  // max representative texts per cluster sent to LLM (default 6)
   samples_per_cluster?: number;
 }
 
@@ -16,6 +14,10 @@ const MODEL = "google/gemini-2.5-flash";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const auth = await requireUser(req);
+  if ("error" in auth) return auth.error;
+  const userId = auth.userId;
 
   try {
     const body = (await req.json()) as Body;
@@ -29,7 +31,18 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Pull clusters (skip those already user-relabeled — custom_label wins)
+    const { data: doc } = await supabase
+      .from("documents")
+      .select("user_id")
+      .eq("id", body.document_id)
+      .maybeSingle();
+    if (!doc || doc.user_id !== userId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     let cq = supabase
       .from("clusters_summary")
       .select("cluster_id, label, custom_label, unit_count, avg_fz, avg_cti")
@@ -47,10 +60,9 @@ Deno.serve(async (req) => {
     const updates: { cluster_id: number; label: string; description: string }[] = [];
 
     for (const cl of clusters) {
-      if (cl.custom_label) continue;                  // never overwrite user labels
-      if ((cl.unit_count ?? 0) === 0) continue;       // skip empty placeholders
+      if (cl.custom_label) continue;
+      if ((cl.unit_count ?? 0) === 0) continue;
 
-      // Sample highest-tension chunks first; they tend to be the most contentful
       const { data: chunks } = await supabase
         .from("chunks")
         .select("text, cti, fz")
@@ -100,7 +112,6 @@ Avoid generic words like "Text", "Content", "Document", "Cluster". Prefer concre
       });
     }
 
-    // Persist
     for (const u of updates) {
       const { error } = await supabase
         .from("clusters_summary")

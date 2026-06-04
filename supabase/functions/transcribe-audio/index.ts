@@ -1,9 +1,13 @@
 // Audio transcription via Lovable AI (Gemini multimodal).
 // Asks model for timestamped output so audioAdapter can chunk by time.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { requireUser } from "../_shared/auth.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const auth = await requireUser(req);
+  if ("error" in auth) return auth.error;
 
   try {
     const { audioBase64, mimeType } = await req.json();
