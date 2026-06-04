@@ -2,6 +2,8 @@ import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateFieldFromFile } from "@/lib/fieldGenerator";
 import type { GeometricField } from "@/lib/fieldData";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import DrivePicker from "./DrivePicker";
 
 interface FileUploaderProps {
   onFieldGenerated: (field: GeometricField, fileName: string) => void;
@@ -21,7 +23,9 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   const [progress, setProgress] = useState({ stage: "", value: 0 });
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [drivePickerOpen, setDrivePickerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { isAdmin } = useIsAdmin();
 
   const processFile = useCallback(
     async (file: File) => {
@@ -121,7 +125,22 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
         </AnimatePresence>
       </div>
 
+      {isAdmin && !isProcessing && (
+        <button
+          onClick={() => setDrivePickerOpen(true)}
+          className="mt-2 w-full font-mono text-[10px] uppercase tracking-widest text-primary border border-primary/30 hover:bg-primary/10 rounded py-1.5 transition-colors"
+        >
+          + Google Drive
+        </button>
+      )}
+
       {error && <p className="font-mono text-[10px] text-destructive mt-2">{error}</p>}
+
+      <DrivePicker
+        open={drivePickerOpen}
+        onClose={() => setDrivePickerOpen(false)}
+        onPicked={(f) => processFile(f)}
+      />
     </div>
   );
 }

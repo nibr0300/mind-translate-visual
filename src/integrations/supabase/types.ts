@@ -296,6 +296,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       document_cti_ranking: {
@@ -315,6 +336,7 @@ export type Database = {
       }
     }
     Functions: {
+      claim_admin_if_first: { Args: never; Returns: boolean }
       claim_orphan_documents: { Args: never; Returns: number }
       corpus_cluster_edges: {
         Args: { max_edges?: number; min_similarity?: number }
@@ -344,6 +366,13 @@ export type Database = {
           noise_ratio: number
           separation: number
         }[]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
       }
       match_chunks: {
         Args: {
@@ -436,7 +465,7 @@ export type Database = {
       user_owns_document: { Args: { _doc_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -563,6 +592,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
