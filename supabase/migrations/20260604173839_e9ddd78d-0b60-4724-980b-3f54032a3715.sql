@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.claim_orphan_documents() TO authenticated;
