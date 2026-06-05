@@ -47,12 +47,28 @@ export default function FieldSidebar({
   const [corpusMapDownload, setCorpusMapDownload] = useState<{ url: string; name: string } | null>(null);
   const [isExportingCorpusMap, setIsExportingCorpusMap] = useState(false);
 
+  const slugify = (s: string, max = 60) =>
+    s
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9\-_ ]+/g, "")
+      .trim()
+      .replace(/\s+/g, "-")
+      .slice(0, max) || "untitled";
+
+  const today = () => new Date().toISOString().slice(0, 10);
+
   const handleExport = () => {
     const blob = new Blob([JSON.stringify(field, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
+    const base = uploadedFileName
+      ? uploadedFileName.replace(/\.[^.]+$/, "")
+      : field.useCase || "field";
+    const topCluster = [...field.clusters].sort((a, b) => b.unitCount - a.unitCount)[0]?.label;
+    const label = topCluster ? `${base}__${topCluster}` : base;
     a.href = url;
-    a.download = `geometric-field-${field.useCase}-${Date.now()}.json`;
+    a.download = `field_${slugify(label)}_${today()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -112,7 +128,12 @@ export default function FieldSidebar({
 
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const name = `corpus-map-${Date.now()}.json`;
+      const docCount = Array.isArray(data?.documents) ? data.documents.length : 0;
+      const topTheme = data?.cross_doc_clusters?.[0]?.label
+        ?? data?.nodes?.slice().sort((a: any, b: any) => (b.unit_count ?? 0) - (a.unit_count ?? 0))[0]?.custom_label
+        ?? data?.nodes?.slice().sort((a: any, b: any) => (b.unit_count ?? 0) - (a.unit_count ?? 0))[0]?.label
+        ?? "corpus";
+      const name = `corpus-map_${slugify(topTheme)}_${docCount}docs_${today()}.json`;
       setCorpusMapDownload({ url, name });
 
       const a = document.createElement("a");
