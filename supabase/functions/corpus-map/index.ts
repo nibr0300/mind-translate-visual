@@ -15,6 +15,8 @@ interface Body {
   max_edges?: number;
   include_chunks?: boolean;
   noise_threshold?: number;
+  /** Service-role callers (e.g. MCP server) may pass the target user_id explicitly. */
+  user_id?: string;
 }
 
 /** pgvector returnerar centroid_embedding som sträng "[0.1,0.2,...]". Parse till number[]. */
@@ -47,11 +49,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Identify caller (JWT) — corpus is scoped to that user only.
-    const authHeader = req.headers.get("Authorization");
+    // Identify caller. Accept either a user JWT (Authorization: Bearer <jwt>)
+    // or a service-role token + explicit body.user_id (used by the MCP server).
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
     let userId: string | null = null;
-    if (authHeader) {
-      const token = authHeader.replace(/^Bearer\s+/i, "");
+    if (token && token === serviceKey && body.user_id) {
+      userId = body.user_id;
+    } else if (token) {
       const { data: u } = await supabase.auth.getUser(token);
       userId = u.user?.id ?? null;
     }
