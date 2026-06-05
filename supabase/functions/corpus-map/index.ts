@@ -36,6 +36,20 @@ function parseVector(v: unknown): number[] | null {
   return null;
 }
 
+function cosineSimilarity(a: number[] | null, b: number[] | null): number | null {
+  if (!a || !b || a.length === 0 || a.length !== b.length) return null;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (!normA || !normB) return null;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -80,28 +94,84 @@ Deno.serve(async (req) => {
     if (dErr) throw dErr;
     const userDocIds = new Set((docs ?? []).map((d: any) => d.id));
 
-    // 2) Cluster nodes — inkl. centroid_embedding för AI-konsumtion
+    if (userDocIds.size === 0) {
+      return new Response(JSON.stringify({
+        schema_version: "corpus-map/2.1",
+        exportedAt: new Date().toISOString(),
+        params: {
+          min_similarity: minSim,
+          max_edges: maxEdges,
+          include_chunks: includeChunks,
+          include_embeddings: includeEmbeddings,
+          noise_threshold: noiseThreshold,
+        },
+        corpus_summary: {
+          cluster_count: 0,
+          avg_cohesion: null,
+          avg_separation: null,
+          avg_noise_ratio: null,
+          edge_count: 0,
+          cross_doc_group_count: 0,
+        },
+        documents: [],
+        nodes: [],
+        edges: [],
+        cross_doc_clusters: [],
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 2) Cluster nodes — fetched only for this user. Edge/quality metrics are
+    // computed in-process to avoid corpus-wide DB vector joins that can timeout.
     const { data: rawNodes, error: nErr } = await supabase
       .from("clusters_summary")
       .select("id, document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding, embedding_dim")
       .in("document_id", Array.from(userDocIds));
     if (nErr) throw nErr;
 
-    // 3) Edges (hybrid score) — filter to user's clusters only
-    const { data: rawEdges, error: eErr } = await supabase.rpc("corpus_cluster_edges", {
-      min_similarity: minSim,
-      max_edges: maxEdges,
-    });
-    if (eErr) throw eErr;
-    const edges = (rawEdges ?? []).filter((e: any) => userDocIds.has(e.src_doc) && userDocIds.has(e.dst_doc));
+    const vectors = new Map<string, number[] | null>();
+    for (const n of rawNodes ?? []) vectors.set(n.id, parseVector((n as any).centroid_embedding));
 
-    // 4) Kvalitetsmetrik per kluster (cohesion / separation / noise)
-    const { data: rawQuality, error: qErr } = await supabase.rpc("corpus_cluster_quality", {
-      noise_threshold: noiseThreshold,
-    });
-    if (qErr) throw qErr;
-    const quality = (rawQuality ?? []).filter((q: any) => userDocIds.has(q.document_id));
-    const qMap = new Map<string, any>((quality ?? []).map((q: any) => [q.cluster_summary_id, q]));
+    const edgeCandidates: any[] = [];
+    const nearestDistance = new Map<string, number>();
+    const sourceNodes = rawNodes ?? [];
+    for (let i = 0; i < sourceNodes.length; i++) {
+      for (let j = i + 1; j < sourceNodes.length; j++) {
+        const a: any = sourceNodes[i];
+        const b: any = sourceNodes[j];
+        const sim = cosineSimilarity(vectors.get(a.id) ?? null, vectors.get(b.id) ?? null);
+        if (sim == null) continue;
+        const distance = 1 - sim;
+        nearestDistance.set(a.id, Math.min(nearestDistance.get(a.id) ?? Number.POSITIVE_INFINITY, distance));
+        nearestDistance.set(b.id, Math.min(nearestDistance.get(b.id) ?? Number.POSITIVE_INFINITY, distance));
+        if (sim < minSim) continue;
+        const fzDelta = Math.abs((a.avg_fz ?? 0) - (b.avg_fz ?? 0));
+        const fyDelta = Math.abs((a.avg_fy ?? 0) - (b.avg_fy ?? 0));
+        edgeCandidates.push({
+          src_id: a.id,
+          dst_id: b.id,
+          src_doc: a.document_id,
+          dst_doc: b.document_id,
+          src_cluster: a.cluster_id,
+          dst_cluster: b.cluster_id,
+          src_label: a.custom_label ?? a.label,
+          dst_label: b.custom_label ?? b.label,
+          similarity: sim,
+          fz_delta: fzDelta,
+          fy_delta: fyDelta,
+          hybrid: 0.7 * sim + 0.3 * (1 - Math.min(fzDelta + fyDelta, 1)),
+        });
+      }
+    }
+    const edges = edgeCandidates.sort((a, b) => b.hybrid - a.hybrid).slice(0, maxEdges);
+    const qMap = new Map<string, any>(sourceNodes.map((n: any) => {
+      const nearest = nearestDistance.get(n.id);
+      return [n.id, {
+        separation: typeof nearest === "number" && Number.isFinite(nearest) ? nearest : 1,
+        member_count: n.unit_count ?? 0,
+      }];
+    }));
 
     // 5) Normalisera noder: parsa centroid till number[], lägg på kvalitet
     const nodes = (rawNodes ?? []).map((n: any) => {
@@ -198,7 +268,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      schema_version: "corpus-map/2.0",
+      schema_version: "corpus-map/2.1",
       exportedAt: new Date().toISOString(),
       params: {
         min_similarity: minSim,
