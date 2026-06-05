@@ -51,7 +51,7 @@ export async function generateFieldFromFile(
     }));
   } else {
     onProgress?.(`Extracting ${sourceType}…`, 0.08);
-    const { units: rawUnits } = await extractFromFile(file);
+    const { units: rawUnits } = await extractFromFile(file, onProgress);
 
     if (rawUnits.length === 0) {
       throw new Error(`No text could be extracted from this ${sourceType} file.`);
