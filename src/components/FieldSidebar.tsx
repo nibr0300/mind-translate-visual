@@ -42,6 +42,7 @@ export default function FieldSidebar({
   onUploadField,
 }: FieldSidebarProps) {
   const importRef = useRef<HTMLInputElement>(null);
+  const corpusMapAbortRef = useRef<AbortController | null>(null);
   const [corpusMapDownload, setCorpusMapDownload] = useState<{ url: string; name: string } | null>(null);
   const [isExportingCorpusMap, setIsExportingCorpusMap] = useState(false);
 
@@ -72,12 +73,21 @@ export default function FieldSidebar({
   };
 
   const handleExportCorpusMap = async () => {
+    if (isExportingCorpusMap) {
+      corpusMapAbortRef.current?.abort();
+      toast.info("Stopping corpus map export…");
+      return;
+    }
+
     // Use the topology edge function so the export contains nodes + edges +
     // cross-document cluster groups — not chunk-level embeddings by default.
     setIsExportingCorpusMap(true);
     if (corpusMapDownload) URL.revokeObjectURL(corpusMapDownload.url);
     setCorpusMapDownload(null);
     toast.info("Building corpus map…");
+    const controller = new AbortController();
+    corpusMapAbortRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 60_000);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
@@ -91,6 +101,7 @@ export default function FieldSidebar({
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({ min_similarity: 0.55, max_edges: 500, include_chunks: false, include_embeddings: false }),
+        signal: controller.signal,
       });
 
       const raw = await response.text();
@@ -109,8 +120,11 @@ export default function FieldSidebar({
       toast.success("Corpus map ready");
     } catch (err: any) {
       console.warn("[corpus-map] export failed:", err);
-      toast.error(`Corpus map failed: ${err?.message ?? "Unknown error"}`);
+      const message = err?.name === "AbortError" ? "Corpus map stopped or timed out" : (err?.message ?? "Unknown error");
+      toast.error(`Corpus map failed: ${message}`);
     } finally {
+      window.clearTimeout(timeoutId);
+      if (corpusMapAbortRef.current === controller) corpusMapAbortRef.current = null;
       setIsExportingCorpusMap(false);
     }
   };
@@ -307,11 +321,10 @@ export default function FieldSidebar({
         </button>
         <button
           onClick={handleExportCorpusMap}
-          disabled={isExportingCorpusMap}
           className="basis-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
           title="Export all cluster summaries across the corpus"
         >
-          <MapIcon className="w-3 h-3" /> {isExportingCorpusMap ? "Building map…" : "Corpus map (JSON)"}
+          <MapIcon className="w-3 h-3" /> {isExportingCorpusMap ? "Stop map build" : "Corpus map (JSON)"}
         </button>
         {corpusMapDownload && (
           <a
