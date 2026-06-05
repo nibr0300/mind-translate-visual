@@ -4,7 +4,7 @@ import type { GeometricField } from "@/lib/fieldData";
 import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
 import AccountPanel from "./AccountPanel";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,6 +41,7 @@ export default function FieldSidebar({
   uploadedFileName,
   onUploadField,
 }: FieldSidebarProps) {
+  const { session } = useAuth();
   const importRef = useRef<HTMLInputElement>(null);
   const corpusMapAbortRef = useRef<AbortController | null>(null);
   const [corpusMapDownload, setCorpusMapDownload] = useState<{ url: string; name: string } | null>(null);
@@ -75,6 +76,8 @@ export default function FieldSidebar({
   const handleExportCorpusMap = async () => {
     if (isExportingCorpusMap) {
       corpusMapAbortRef.current?.abort();
+      corpusMapAbortRef.current = null;
+      setIsExportingCorpusMap(false);
       toast.info("Stopping corpus map export…");
       return;
     }
@@ -89,8 +92,7 @@ export default function FieldSidebar({
     corpusMapAbortRef.current = controller;
     const timeoutId = window.setTimeout(() => controller.abort(), 60_000);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
+      const accessToken = session?.access_token;
       if (!accessToken) throw new Error("No active session. Please sign in again.");
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/corpus-map`, {
