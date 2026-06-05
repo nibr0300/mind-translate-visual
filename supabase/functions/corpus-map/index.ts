@@ -6,6 +6,7 @@
 //   min_similarity?: number  (edge threshold, default 0.55)
 //   max_edges?:      number  (default 500)
 //   include_chunks?: boolean (default false) — chunk-level embeddings + metrik
+//   include_embeddings?: boolean (default false) — include vector arrays in nodes/chunks
 //   noise_threshold?: number (default 0.5)  — sim-tröskel för noise_ratio
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -14,6 +15,7 @@ interface Body {
   min_similarity?: number;
   max_edges?: number;
   include_chunks?: boolean;
+  include_embeddings?: boolean;
   noise_threshold?: number;
   /** Service-role callers (e.g. MCP server) may pass the target user_id explicitly. */
   user_id?: string;
@@ -42,6 +44,7 @@ Deno.serve(async (req) => {
     const minSim   = body.min_similarity ?? 0.55;
     const maxEdges = body.max_edges      ?? 500;
     const includeChunks  = body.include_chunks  ?? false;
+    const includeEmbeddings = body.include_embeddings ?? false;
     const noiseThreshold = body.noise_threshold ?? 0.5;
 
     const supabase = createClient(
@@ -115,7 +118,7 @@ Deno.serve(async (req) => {
         avg_fy: n.avg_fy,
         avg_cti: n.avg_cti,
         embedding_dim: n.embedding_dim,
-        centroid_embedding: parseVector(n.centroid_embedding),
+        ...(includeEmbeddings ? { centroid_embedding: parseVector(n.centroid_embedding) } : {}),
         quality: q ? {
           cohesion: q.cohesion,
           separation: q.separation,
@@ -186,7 +189,8 @@ Deno.serve(async (req) => {
         if (cErr) throw cErr;
         if (!page || page.length === 0) break;
         for (const c of page) {
-          chunks.push({ ...c, embedding: parseVector(c.embedding) });
+          const { embedding, ...rest } = c as any;
+          chunks.push(includeEmbeddings ? { ...rest, embedding: parseVector(embedding) } : rest);
         }
         if (page.length < pageSize) break;
         from += pageSize;
@@ -200,6 +204,7 @@ Deno.serve(async (req) => {
         min_similarity: minSim,
         max_edges: maxEdges,
         include_chunks: includeChunks,
+        include_embeddings: includeEmbeddings,
         noise_threshold: noiseThreshold,
       },
       corpus_summary: corpusSummary,
