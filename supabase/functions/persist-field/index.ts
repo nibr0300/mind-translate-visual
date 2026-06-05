@@ -119,20 +119,33 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Postgres text/jsonb cannot store \u0000. Strip null bytes everywhere.
+    const stripNulls = (s: unknown): unknown => {
+      if (typeof s === "string") return s.replace(/\u0000/g, "");
+      if (Array.isArray(s)) return s.map(stripNulls);
+      if (s && typeof s === "object") {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(s as Record<string, unknown>)) out[k] = stripNulls(v);
+        return out;
+      }
+      return s;
+    };
+    const clean = (s?: string) => (typeof s === "string" ? s.replace(/\u0000/g, "") : s);
+
     // 2. Upsert chunks (per-chunk dedup via UNIQUE (document_id, content_hash))
     const chunkRows = payload.chunks.map((c) => ({
       document_id: documentId,
       chunk_index: c.chunk_index,
-      text: c.text,
+      text: clean(c.text),
       content_hash: c.content_hash,
-      source_path: c.source_path,
+      source_path: clean(c.source_path),
       cluster_id: c.cluster_id,
-      cluster_label: c.cluster_label,
+      cluster_label: clean(c.cluster_label),
       fz: c.fz,
       fy: c.fy,
       cti: c.cti,
-      triangulation: c.triangulation,
-      intention: c.intention,
+      triangulation: stripNulls(c.triangulation),
+      intention: stripNulls(c.intention),
       embedding: c.embedding,
       embedding_dim: payload.embedding_dim ?? 3072,
     }));
