@@ -128,7 +128,12 @@ export default function FieldSidebar({
 
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const name = `corpus-map-${Date.now()}.json`;
+      const docCount = Array.isArray(data?.documents) ? data.documents.length : 0;
+      const topTheme = data?.cross_doc_clusters?.[0]?.label
+        ?? data?.nodes?.slice().sort((a: any, b: any) => (b.unit_count ?? 0) - (a.unit_count ?? 0))[0]?.custom_label
+        ?? data?.nodes?.slice().sort((a: any, b: any) => (b.unit_count ?? 0) - (a.unit_count ?? 0))[0]?.label
+        ?? "corpus";
+      const name = `corpus-map_${slugify(topTheme)}_${docCount}docs_${today()}.json`;
       setCorpusMapDownload({ url, name });
 
       const a = document.createElement("a");
