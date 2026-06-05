@@ -61,11 +61,7 @@ export async function fetchCorpusRanking(force = false): Promise<CorpusDocument[
     const cached = getCache<CorpusDocument[]>("corpus-ranking");
     if (cached) return cached;
   }
-  const { data, error } = await supabase
-    .from("document_cti_ranking" as any)
-    .select("*")
-    .order("avg_cti", { ascending: false })
-    .limit(50);
+  const { data, error } = await supabase.rpc("user_document_cti_ranking" as any, { limit_count: 50 });
   if (error) {
     console.warn("[searchClient] corpus ranking failed:", error.message);
     return [];

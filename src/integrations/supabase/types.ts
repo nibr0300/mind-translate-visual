@@ -462,6 +462,21 @@ export type Database = {
         }[]
       }
       refresh_document_cti_ranking: { Args: never; Returns: undefined }
+      user_document_cti_ranking: {
+        Args: { limit_count?: number }
+        Returns: {
+          avg_cti: number
+          avg_fy: number
+          avg_fz: number
+          chunk_count: number
+          cluster_count: number
+          filename: string
+          id: string
+          max_cti: number
+          source_type: string
+          uploaded_at: string
+        }[]
+      }
       user_owns_document: { Args: { _doc_id: string }; Returns: boolean }
     }
     Enums: {
