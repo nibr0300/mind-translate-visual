@@ -47,12 +47,28 @@ export default function FieldSidebar({
   const [corpusMapDownload, setCorpusMapDownload] = useState<{ url: string; name: string } | null>(null);
   const [isExportingCorpusMap, setIsExportingCorpusMap] = useState(false);
 
+  const slugify = (s: string, max = 60) =>
+    s
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9\-_ ]+/g, "")
+      .trim()
+      .replace(/\s+/g, "-")
+      .slice(0, max) || "untitled";
+
+  const today = () => new Date().toISOString().slice(0, 10);
+
   const handleExport = () => {
     const blob = new Blob([JSON.stringify(field, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
+    const base = uploadedFileName
+      ? uploadedFileName.replace(/\.[^.]+$/, "")
+      : field.useCase || "field";
+    const topCluster = [...field.clusters].sort((a, b) => b.unitCount - a.unitCount)[0]?.label;
+    const label = topCluster ? `${base}__${topCluster}` : base;
     a.href = url;
-    a.download = `geometric-field-${field.useCase}-${Date.now()}.json`;
+    a.download = `field_${slugify(label)}_${today()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
