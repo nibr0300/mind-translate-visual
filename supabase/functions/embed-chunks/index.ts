@@ -50,27 +50,53 @@ Deno.serve(async (req) => {
       const batch = items.slice(i, i + BATCH);
       const input = batch.map(augment);
 
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ model: MODEL, input }),
-      });
+      let res: Response | null = null;
+      let lastErr = "";
+      const maxAttempts = 5;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({ model: MODEL, input }),
+        });
 
-      if (!res.ok) {
-        const errText = await res.text();
+        if (res.ok) break;
+
+        lastErr = await res.text();
+        if (res.status === 429 || res.status >= 500) {
+          // Exponential backoff with jitter: ~1s, 2s, 4s, 8s, 16s
+          const wait = Math.min(16000, 1000 * 2 ** attempt) + Math.floor(Math.random() * 500);
+          await new Promise((r) => setTimeout(r, wait));
+          continue;
+        }
+        break;
+      }
+
+      if (!res || !res.ok) {
+        const status = res?.status ?? 500;
+        const retryable = status === 429 || status >= 500;
         return new Response(
-          JSON.stringify({ error: `Embedding batch ${i / BATCH} failed: ${errText}` }),
-          { status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({
+            error: `Embedding batch ${i / BATCH} failed after retries: ${lastErr}`,
+            retryable,
+          }),
+          { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       const data = await res.json();
       const vectors: { embedding: number[]; index: number }[] = data.data ?? [];
       for (const v of vectors) embeddings[i + v.index] = v.embedding;
+
+      // Small pacing delay between batches to reduce rate-limit pressure
+      if (i + BATCH < items.length) {
+        await new Promise((r) => setTimeout(r, 250));
+      }
     }
+
 
     return new Response(JSON.stringify({ embeddings, model: MODEL, dim: DIM }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
