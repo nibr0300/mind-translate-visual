@@ -133,6 +133,43 @@ Deno.serve(async (req) => {
     const vectors = new Map<string, number[] | null>();
     for (const n of rawNodes ?? []) vectors.set(n.id, parseVector((n as any).centroid_embedding));
 
+    const edgeCandidates: any[] = [];
+    const nearestDistance = new Map<string, number>();
+    const sourceNodes = rawNodes ?? [];
+    for (let i = 0; i < sourceNodes.length; i++) {
+      for (let j = i + 1; j < sourceNodes.length; j++) {
+        const a: any = sourceNodes[i];
+        const b: any = sourceNodes[j];
+        const sim = cosineSimilarity(vectors.get(a.id) ?? null, vectors.get(b.id) ?? null);
+        if (sim == null) continue;
+        const distance = 1 - sim;
+        nearestDistance.set(a.id, Math.min(nearestDistance.get(a.id) ?? Number.POSITIVE_INFINITY, distance));
+        nearestDistance.set(b.id, Math.min(nearestDistance.get(b.id) ?? Number.POSITIVE_INFINITY, distance));
+        if (sim < minSim) continue;
+        const fzDelta = Math.abs((a.avg_fz ?? 0) - (b.avg_fz ?? 0));
+        const fyDelta = Math.abs((a.avg_fy ?? 0) - (b.avg_fy ?? 0));
+        edgeCandidates.push({
+          src_id: a.id,
+          dst_id: b.id,
+          src_doc: a.document_id,
+          dst_doc: b.document_id,
+          src_cluster: a.cluster_id,
+          dst_cluster: b.cluster_id,
+          src_label: a.custom_label ?? a.label,
+          dst_label: b.custom_label ?? b.label,
+          similarity: sim,
+          fz_delta: fzDelta,
+          fy_delta: fyDelta,
+          hybrid: 0.7 * sim + 0.3 * (1 - Math.min(fzDelta + fyDelta, 1)),
+        });
+      }
+    }
+    const edges = edgeCandidates.sort((a, b) => b.hybrid - a.hybrid).slice(0, maxEdges);
+    const qMap = new Map<string, any>(sourceNodes.map((n: any) => [n.id, {
+      separation: Number.isFinite(nearestDistance.get(n.id)) ? nearestDistance.get(n.id) : 1,
+      member_count: n.unit_count ?? 0,
+    }]));
+
     // 5) Normalisera noder: parsa centroid till number[], lägg på kvalitet
     const nodes = (rawNodes ?? []).map((n: any) => {
       const q = qMap.get(n.id);
