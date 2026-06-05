@@ -189,7 +189,8 @@ Deno.serve(async (req) => {
         if (cErr) throw cErr;
         if (!page || page.length === 0) break;
         for (const c of page) {
-          chunks.push({ ...c, embedding: parseVector(c.embedding) });
+          const { embedding, ...rest } = c as any;
+          chunks.push(includeEmbeddings ? { ...rest, embedding: parseVector(embedding) } : rest);
         }
         if (page.length < pageSize) break;
         from += pageSize;
@@ -203,6 +204,7 @@ Deno.serve(async (req) => {
         min_similarity: minSim,
         max_edges: maxEdges,
         include_chunks: includeChunks,
+        include_embeddings: includeEmbeddings,
         noise_threshold: noiseThreshold,
       },
       corpus_summary: corpusSummary,
