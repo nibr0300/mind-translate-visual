@@ -165,10 +165,13 @@ Deno.serve(async (req) => {
       }
     }
     const edges = edgeCandidates.sort((a, b) => b.hybrid - a.hybrid).slice(0, maxEdges);
-    const qMap = new Map<string, any>(sourceNodes.map((n: any) => [n.id, {
-      separation: Number.isFinite(nearestDistance.get(n.id)) ? nearestDistance.get(n.id) : 1,
-      member_count: n.unit_count ?? 0,
-    }]));
+    const qMap = new Map<string, any>(sourceNodes.map((n: any) => {
+      const nearest = nearestDistance.get(n.id);
+      return [n.id, {
+        separation: typeof nearest === "number" && Number.isFinite(nearest) ? nearest : 1,
+        member_count: n.unit_count ?? 0,
+      }];
+    }));
 
     // 5) Normalisera noder: parsa centroid till number[], lägg på kvalitet
     const nodes = (rawNodes ?? []).map((n: any) => {
@@ -265,7 +268,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      schema_version: "corpus-map/2.0",
+      schema_version: "corpus-map/2.1",
       exportedAt: new Date().toISOString(),
       params: {
         min_similarity: minSim,
