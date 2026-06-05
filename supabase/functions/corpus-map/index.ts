@@ -5,7 +5,7 @@
 // Body params:
 //   min_similarity?: number  (edge threshold, default 0.55)
 //   max_edges?:      number  (default 500)
-//   include_chunks?: boolean (default true) — chunk-level embeddings + metrik
+//   include_chunks?: boolean (default false) — chunk-level embeddings + metrik
 //   noise_threshold?: number (default 0.5)  — sim-tröskel för noise_ratio
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) as Body;
     const minSim   = body.min_similarity ?? 0.55;
     const maxEdges = body.max_edges      ?? 500;
-    const includeChunks  = body.include_chunks  ?? true;
+    const includeChunks  = body.include_chunks  ?? false;
     const noiseThreshold = body.noise_threshold ?? 0.5;
 
     const supabase = createClient(

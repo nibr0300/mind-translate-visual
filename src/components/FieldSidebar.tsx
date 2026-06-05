@@ -6,6 +6,7 @@ import SearchPanel from "./SearchPanel";
 import AccountPanel from "./AccountPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
+import { toast } from "sonner";
 
 const CLUSTER_COLORS = [
   "hsl(180, 70%, 50%)",
@@ -70,12 +71,18 @@ export default function FieldSidebar({
 
   const handleExportCorpusMap = async () => {
     // Use the topology edge function so the export contains nodes + edges +
-    // cross-document cluster groups — not just a flat inventory.
+    // cross-document cluster groups — not chunk-level embeddings by default.
+    toast.info("Building corpus map…");
     const { data, error } = await supabase.functions.invoke("corpus-map", {
-      body: { min_similarity: 0.55, max_edges: 500 },
+      body: { min_similarity: 0.55, max_edges: 500, include_chunks: false },
     });
     if (error) {
       console.warn("[corpus-map] export failed:", error.message);
+      toast.error(`Corpus map failed: ${error.message}`);
+      return;
+    }
+    if ((data as any)?.error) {
+      toast.error(`Corpus map failed: ${(data as any).error}`);
       return;
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -85,6 +92,7 @@ export default function FieldSidebar({
     a.download = `corpus-map-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success("Corpus map exported");
   };
   return (
     <aside className="w-80 flex-shrink-0 h-full bg-card border-r border-border flex flex-col overflow-hidden">

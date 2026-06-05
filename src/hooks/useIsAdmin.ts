@@ -1,22 +1,24 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const ADMIN_EVENT = "admin-role-changed";
 
 export function useIsAdmin() {
+  const { user, loading: authLoading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refresh = async () => {
+    if (authLoading) return;
     setLoading(true);
-    const { data: userRes } = await supabase.auth.getUser();
-    if (!userRes?.user) {
+    if (!user) {
       setIsAdmin(false);
       setLoading(false);
       return;
     }
     const { data } = await supabase.rpc("has_role", {
-      _user_id: userRes.user.id,
+      _user_id: user.id,
       _role: "admin",
     });
     setIsAdmin(Boolean(data));
@@ -24,18 +26,13 @@ export function useIsAdmin() {
   };
 
   useEffect(() => {
-    refresh();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+    void refresh();
     const onChange = () => refresh();
-    const onFocus = () => refresh();
     window.addEventListener(ADMIN_EVENT, onChange);
-    window.addEventListener("focus", onFocus);
     return () => {
-      sub.subscription.unsubscribe();
       window.removeEventListener(ADMIN_EVENT, onChange);
-      window.removeEventListener("focus", onFocus);
     };
-  }, []);
+  }, [user?.id, authLoading]);
 
   return { isAdmin, loading, refresh };
 }
