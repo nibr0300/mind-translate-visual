@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import type { GeometricField } from "@/lib/fieldData";
 import PdfUploader from "./PdfUploader";
@@ -42,6 +42,8 @@ export default function FieldSidebar({
   onUploadField,
 }: FieldSidebarProps) {
   const importRef = useRef<HTMLInputElement>(null);
+  const [corpusMapDownload, setCorpusMapDownload] = useState<{ url: string; name: string } | null>(null);
+  const [isExportingCorpusMap, setIsExportingCorpusMap] = useState(false);
 
   const handleExport = () => {
     const blob = new Blob([JSON.stringify(field, null, 2)], { type: "application/json" });
@@ -72,27 +74,45 @@ export default function FieldSidebar({
   const handleExportCorpusMap = async () => {
     // Use the topology edge function so the export contains nodes + edges +
     // cross-document cluster groups — not chunk-level embeddings by default.
+    setIsExportingCorpusMap(true);
+    if (corpusMapDownload) URL.revokeObjectURL(corpusMapDownload.url);
+    setCorpusMapDownload(null);
     toast.info("Building corpus map…");
-    const { data, error } = await supabase.functions.invoke("corpus-map", {
-      body: { min_similarity: 0.55, max_edges: 500, include_chunks: false },
-    });
-    if (error) {
-      console.warn("[corpus-map] export failed:", error.message);
-      toast.error(`Corpus map failed: ${error.message}`);
-      return;
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error("No active session. Please sign in again.");
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/corpus-map`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ min_similarity: 0.55, max_edges: 500, include_chunks: false, include_embeddings: false }),
+      });
+
+      const raw = await response.text();
+      const data = raw ? JSON.parse(raw) : null;
+      if (!response.ok || data?.error) throw new Error(data?.error ?? `Function failed: ${response.status}`);
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const name = `corpus-map-${Date.now()}.json`;
+      setCorpusMapDownload({ url, name });
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      toast.success("Corpus map ready");
+    } catch (err: any) {
+      console.warn("[corpus-map] export failed:", err);
+      toast.error(`Corpus map failed: ${err?.message ?? "Unknown error"}`);
+    } finally {
+      setIsExportingCorpusMap(false);
     }
-    if ((data as any)?.error) {
-      toast.error(`Corpus map failed: ${(data as any).error}`);
-      return;
-    }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `corpus-map-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Corpus map exported");
   };
   return (
     <aside className="w-80 flex-shrink-0 h-full bg-card border-r border-border flex flex-col overflow-hidden">
