@@ -307,11 +307,21 @@ export default function FieldSidebar({
         </button>
         <button
           onClick={handleExportCorpusMap}
+          disabled={isExportingCorpusMap}
           className="basis-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
           title="Export all cluster summaries across the corpus"
         >
-          <MapIcon className="w-3 h-3" /> Corpus map (JSON)
+          <MapIcon className="w-3 h-3" /> {isExportingCorpusMap ? "Building map…" : "Corpus map (JSON)"}
         </button>
+        {corpusMapDownload && (
+          <a
+            href={corpusMapDownload.url}
+            download={corpusMapDownload.name}
+            className="basis-full text-center font-mono text-[10px] text-primary underline underline-offset-2"
+          >
+            Download ready corpus-map
+          </a>
+        )}
         <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
       </div>
 
