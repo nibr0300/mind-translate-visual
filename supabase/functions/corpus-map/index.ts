@@ -36,6 +36,20 @@ function parseVector(v: unknown): number[] | null {
   return null;
 }
 
+function cosineSimilarity(a: number[] | null, b: number[] | null): number | null {
+  if (!a || !b || a.length === 0 || a.length !== b.length) return null;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (!normA || !normB) return null;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -80,28 +94,44 @@ Deno.serve(async (req) => {
     if (dErr) throw dErr;
     const userDocIds = new Set((docs ?? []).map((d: any) => d.id));
 
-    // 2) Cluster nodes — inkl. centroid_embedding för AI-konsumtion
+    if (userDocIds.size === 0) {
+      return new Response(JSON.stringify({
+        schema_version: "corpus-map/2.1",
+        exportedAt: new Date().toISOString(),
+        params: {
+          min_similarity: minSim,
+          max_edges: maxEdges,
+          include_chunks: includeChunks,
+          include_embeddings: includeEmbeddings,
+          noise_threshold: noiseThreshold,
+        },
+        corpus_summary: {
+          cluster_count: 0,
+          avg_cohesion: null,
+          avg_separation: null,
+          avg_noise_ratio: null,
+          edge_count: 0,
+          cross_doc_group_count: 0,
+        },
+        documents: [],
+        nodes: [],
+        edges: [],
+        cross_doc_clusters: [],
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 2) Cluster nodes — fetched only for this user. Edge/quality metrics are
+    // computed in-process to avoid corpus-wide DB vector joins that can timeout.
     const { data: rawNodes, error: nErr } = await supabase
       .from("clusters_summary")
       .select("id, document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding, embedding_dim")
       .in("document_id", Array.from(userDocIds));
     if (nErr) throw nErr;
 
-    // 3) Edges (hybrid score) — filter to user's clusters only
-    const { data: rawEdges, error: eErr } = await supabase.rpc("corpus_cluster_edges", {
-      min_similarity: minSim,
-      max_edges: maxEdges,
-    });
-    if (eErr) throw eErr;
-    const edges = (rawEdges ?? []).filter((e: any) => userDocIds.has(e.src_doc) && userDocIds.has(e.dst_doc));
-
-    // 4) Kvalitetsmetrik per kluster (cohesion / separation / noise)
-    const { data: rawQuality, error: qErr } = await supabase.rpc("corpus_cluster_quality", {
-      noise_threshold: noiseThreshold,
-    });
-    if (qErr) throw qErr;
-    const quality = (rawQuality ?? []).filter((q: any) => userDocIds.has(q.document_id));
-    const qMap = new Map<string, any>((quality ?? []).map((q: any) => [q.cluster_summary_id, q]));
+    const vectors = new Map<string, number[] | null>();
+    for (const n of rawNodes ?? []) vectors.set(n.id, parseVector((n as any).centroid_embedding));
 
     // 5) Normalisera noder: parsa centroid till number[], lägg på kvalitet
     const nodes = (rawNodes ?? []).map((n: any) => {
