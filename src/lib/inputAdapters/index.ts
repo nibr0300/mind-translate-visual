@@ -23,14 +23,17 @@ export function detectSourceType(file: File): SourceType {
   return "text";
 }
 
-export async function extractFromFile(file: File): Promise<{ units: RawTextUnit[]; sourceType: SourceType }> {
+export async function extractFromFile(
+  file: File,
+  onProgress?: (msg: string, value: number) => void,
+): Promise<{ units: RawTextUnit[]; sourceType: SourceType }> {
   const sourceType = detectSourceType(file);
 
   switch (sourceType) {
     case "pdf":     return { units: await extractFromPdf(file), sourceType };
     case "audio":   return { units: await extractFromAudio(file), sourceType };
     case "image":   return { units: await extractFromImage(file), sourceType };
-    case "zip":     return { units: await extractFromZip(file), sourceType };
+    case "zip":     return { units: await extractFromZip(file, { onProgress }), sourceType };
     case "script":  return { units: await extractFromScript(file), sourceType };
     case "notebook":return { units: await extractFromNotebook(file), sourceType };
     case "json":
