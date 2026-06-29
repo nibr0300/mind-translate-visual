@@ -128,12 +128,25 @@ export default function FieldSidebar({
 
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const docCount = Array.isArray(data?.documents) ? data.documents.length : 0;
-      const topTheme = data?.cross_doc_clusters?.[0]?.label
-        ?? data?.nodes?.slice().sort((a: any, b: any) => (b.unit_count ?? 0) - (a.unit_count ?? 0))[0]?.custom_label
-        ?? data?.nodes?.slice().sort((a: any, b: any) => (b.unit_count ?? 0) - (a.unit_count ?? 0))[0]?.label
-        ?? "corpus";
-      const name = `corpus-map_${slugify(topTheme)}_${docCount}docs_${today()}.json`;
+      const docs: Array<{ filename?: string; uploaded_at?: string }> = Array.isArray(data?.documents) ? data.documents : [];
+      const docCount = docs.length;
+
+      // Build filename from the actual documents in the corpus, not a top theme.
+      // - 1 doc:  corpus-map_<filename>_<date>.json
+      // - 2-3:    corpus-map_<a>+<b>(+<c>)_<date>.json
+      // - many:   corpus-map_<newestFile>+N-more_<Ndocs>_<date>.json
+      const baseName = (fn?: string) => (fn ?? "doc").replace(/\.[^.]+$/, "");
+      const uniqueBases = Array.from(new Set(docs.map((d) => baseName(d.filename))));
+      const sortedByDate = [...docs].sort((a, b) =>
+        (b.uploaded_at ?? "").localeCompare(a.uploaded_at ?? "")
+      );
+      let label: string;
+      if (uniqueBases.length === 0) label = "corpus";
+      else if (uniqueBases.length === 1) label = uniqueBases[0];
+      else if (uniqueBases.length <= 3) label = uniqueBases.join("+");
+      else label = `${baseName(sortedByDate[0]?.filename)}+${uniqueBases.length - 1}-more`;
+
+      const name = `corpus-map_${slugify(label)}_${docCount}docs_${today()}.json`;
       setCorpusMapDownload({ url, name });
 
       const a = document.createElement("a");
