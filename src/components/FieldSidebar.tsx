@@ -234,12 +234,15 @@ export default function FieldSidebar({
         const byFile = new Map<string, { sum: number; count: number; maxCti: number }>();
         for (const u of field.units) {
           if (!u.sourcePath) continue;
-          const e = byFile.get(u.sourcePath) ?? { sum: 0, count: 0, maxCti: 0 };
+          // Normalize: strip "@timestamp" segment-suffix added by audio adapter
+          // so all chunks of one .mp3 aggregate as one file.
+          const key = u.sourcePath.split("@")[0];
+          const e = byFile.get(key) ?? { sum: 0, count: 0, maxCti: 0 };
           const c = u.cti ?? 0;
           e.sum += c;
           e.count += 1;
           if (c > e.maxCti) e.maxCti = c;
-          byFile.set(u.sourcePath, e);
+          byFile.set(key, e);
         }
         if (byFile.size < 2) return null;
         const ranked = Array.from(byFile.entries())
