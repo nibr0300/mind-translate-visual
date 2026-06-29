@@ -69,7 +69,7 @@ export default function Index() {
           </div>
         </header>
 
-        <div className="flex-1 relative p-4">
+        <div className="flex-1 relative p-4 min-h-[85vh] md:min-h-0">
           <FieldCanvas
             field={field}
             activeCluster={activeCluster}
