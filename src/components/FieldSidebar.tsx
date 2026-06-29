@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import type { GeometricField } from "@/lib/fieldData";
+import type { GeometricField, FieldUnit } from "@/lib/fieldData";
+import { distanceFromAnchor } from "@/lib/anchorMath";
 import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
 import AccountPanel from "./AccountPanel";
