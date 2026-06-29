@@ -36,6 +36,7 @@ export default function FieldCanvas({
   const [hoveredUnit, setHoveredUnit] = useState<FieldUnit | null>(null);
 
   // Map vector2d to canvas coordinates
+
   const mapToCanvas = useCallback(
     (v: [number, number]) => {
       const padding = 60;
