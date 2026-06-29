@@ -184,16 +184,20 @@ export default function FieldCanvas({
     const prev = pointers.current.get(e.pointerId);
     if (!prev) return;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.current.size === 2 && pinchRef.current) {
-      const [a, b] = Array.from(pointers.current.values());
+    if (pointers.current.size >= 2 && pinchRef.current) {
+      const pts = Array.from(pointers.current.values()).slice(0, 2);
+      const [a, b] = pts;
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (dist < 4) return; // ignore noise on weak touch digitizers
       const p = pinchRef.current;
-      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, p.scale * (dist / p.dist)));
+      const rawScale = p.scale * (dist / p.dist);
+      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, rawScale));
+      // Use the *clamped* ratio so position doesn't drift past zoom limits
       const k = newScale / p.scale;
       setScale(newScale);
       setTx(p.cx - (p.cx - p.tx) * k);
       setTy(p.cy - (p.cy - p.ty) * k);
-    } else if (pointers.current.size === 1) {
+    } else if (pointers.current.size === 1 && !pinchRef.current) {
       setTx((v) => v + (e.clientX - prev.x));
       setTy((v) => v + (e.clientY - prev.y));
     }
