@@ -37,7 +37,7 @@ export default function Index() {
   }, []);
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-background">
+    <div className="flex flex-col md:flex-row min-h-screen md:h-screen w-screen md:overflow-hidden bg-background">
       <FieldSidebar
         field={field}
         activeCluster={activeCluster}
