@@ -287,7 +287,7 @@ export default function FieldCanvas({
         return (
           <motion.button
             key={unit.id}
-            className="absolute rounded-full border-0 cursor-pointer focus:outline-none"
+            className="absolute rounded-full border-0 cursor-pointer focus:outline-none transition-[left,top] duration-700 ease-out"
             style={{
               left: pos.x,
               top: pos.y,
