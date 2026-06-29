@@ -25,7 +25,10 @@ interface FieldSidebarProps {
   onChangeUseCase: (uc: "didactics" | "truth-seeking" | "negotiation" | "uploaded") => void;
   uploadedFileName?: string | null;
   onUploadField: (field: GeometricField, fileName: string) => void;
+  anchorUnit?: FieldUnit | null;
+  onClearAnchor?: () => void;
 }
+
 
 const USE_CASE_LABELS = {
   didactics: "Didactic Material",
