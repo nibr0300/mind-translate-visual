@@ -7,7 +7,7 @@ import FieldInfoPanel from "@/components/FieldInfoPanel";
 type UseCase = "didactics" | "truth-seeking" | "negotiation" | "uploaded";
 
 export default function Index() {
-  const [useCase, setUseCase] = useState<UseCase>("therapy");
+  const [useCase, setUseCase] = useState<UseCase>("didactics");
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<FieldUnit | null>(null);
   const [showInfo, setShowInfo] = useState(false);
@@ -15,7 +15,7 @@ export default function Index() {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   const demoField = useMemo(
-    () => (useCase !== "uploaded" ? generateDemoField(useCase as "therapy" | "didactics" | "research") : null),
+    () => (useCase !== "uploaded" ? generateDemoField(useCase as "didactics" | "truth-seeking" | "negotiation") : null),
     [useCase]
   );
 
