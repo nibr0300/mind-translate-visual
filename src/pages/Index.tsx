@@ -21,7 +21,8 @@ export default function Index() {
 
   const field = useCase === "uploaded" && uploadedField ? uploadedField : demoField!;
 
-  const handleChangeUseCase = (uc: "therapy" | "didactics" | "research") => {
+  const handleChangeUseCase = (uc: UseCase) => {
+    if (uc === "uploaded" && !uploadedField) return;
     setUseCase(uc);
     setActiveCluster(null);
     setSelectedUnit(null);
