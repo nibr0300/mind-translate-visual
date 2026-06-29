@@ -301,23 +301,39 @@ export default function FieldCanvas({
               <span className="text-xs tracking-wider uppercase text-muted-foreground">
                 {field.clusters[displayUnit.clusterId]?.label} · {displayUnit.id}
               </span>
-              {onSetAnchor && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const isAnchor = anchorUnit?.id === displayUnit.id;
-                    onSetAnchor(isAnchor ? null : displayUnit);
-                  }}
-                  className={`ml-auto px-2 py-1 rounded text-[10px] tracking-wider uppercase border transition-colors ${
-                    anchorUnit?.id === displayUnit.id
-                      ? "border-rose-400/60 text-rose-300 bg-rose-500/10"
-                      : "border-border text-muted-foreground hover:text-rose-300 hover:border-rose-400/40"
-                  }`}
-                  title="Use this unit as the rotation axis for the field"
-                >
-                  {anchorUnit?.id === displayUnit.id ? "✕ Clear anchor" : "⊕ Set as anchor"}
-                </button>
-              )}
+              <div className="ml-auto flex items-center gap-2">
+                {onSetAnchor && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const isAnchor = anchorUnit?.id === displayUnit.id;
+                      onSetAnchor(isAnchor ? null : displayUnit);
+                    }}
+                    className={`px-2 py-1 rounded text-[10px] tracking-wider uppercase border transition-colors ${
+                      anchorUnit?.id === displayUnit.id
+                        ? "border-rose-400/60 text-rose-300 bg-rose-500/10"
+                        : "border-border text-muted-foreground hover:text-rose-300 hover:border-rose-400/40"
+                    }`}
+                    title="Use this unit as the rotation axis for the field"
+                  >
+                    {anchorUnit?.id === displayUnit.id ? "✕ Clear anchor" : "⊕ Set as anchor"}
+                  </button>
+                )}
+                {selectedUnit && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectUnit(null);
+                      setHoveredUnit(null);
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+                    title="Close info panel"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
 
             <p className="text-sm text-foreground mb-3 italic">"{displayUnit.text}"</p>
