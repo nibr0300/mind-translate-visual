@@ -4,7 +4,7 @@ import FieldCanvas from "@/components/FieldCanvas";
 import FieldSidebar from "@/components/FieldSidebar";
 import FieldInfoPanel from "@/components/FieldInfoPanel";
 
-type UseCase = "therapy" | "didactics" | "research" | "uploaded";
+type UseCase = "didactics" | "truth-seeking" | "negotiation" | "uploaded";
 
 export default function Index() {
   const [useCase, setUseCase] = useState<UseCase>("therapy");
