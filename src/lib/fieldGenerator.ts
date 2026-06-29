@@ -92,7 +92,7 @@ export async function generateFieldFromFile(
       chunks = balanced;
     }
 
-    field = await buildFieldFromChunks(capped, sourceType, onProgress);
+    field = await buildFieldFromChunks(chunks, sourceType, onProgress);
   }
 
   // Background: embed + persist. Don't block UI on it.
