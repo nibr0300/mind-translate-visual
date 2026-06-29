@@ -5,6 +5,8 @@ import { extractFromScript } from "./scriptAdapter";
 import { extractFromImage } from "./imageAdapter";
 import { extractFromNotebook } from "./notebookAdapter";
 import { extractFromPdf } from "./pdfAdapter";
+import { extractFromAudio } from "./audioAdapter";
+
 
 /**
  * Zip adapter with dynamic context exclusion + per-file timeout so a single
@@ -42,17 +44,22 @@ const DEFAULT_EXCLUDES = [
 const TEXT_EXT = /\.(txt|md|markdown|rst|csv|tsv|json|yaml|yml|toml|xml|html|htm|tex)$/i;
 const SCRIPT_EXT = /\.(js|jsx|ts|tsx|py|rb|go|rs|java|kt|swift|c|cc|cpp|h|hpp|cs|php|sh|bash|zsh|sql|r|lua|dart|scala|clj|ex|exs)$/i;
 const IMAGE_EXT = /\.(png|jpg|jpeg|webp|gif)$/i;
+const AUDIO_EXT = /\.(mp3|wav|m4a|flac|ogg|aac|opus|webm)$/i;
 const PDF_EXT = /\.pdf$/i;
 const UNSUPPORTED_DOC_EXT = /\.(docx?|xlsx?|pptx?|odt|ods|odp|pages|numbers|key|rtf|epub)$/i;
 
 const PER_FILE_TIMEOUT_MS = 45_000;
+const PER_AUDIO_TIMEOUT_MS = 240_000;
+
 
 export interface ZipOptions {
   maxDepth?: number;
   maxFiles?: number;
   includeImages?: boolean;
+  includeAudio?: boolean;
   onProgress?: (msg: string, value: number) => void;
 }
+
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -73,7 +80,9 @@ export async function extractFromZip(
   const maxDepth = opts.maxDepth ?? 3;
   const maxFiles = opts.maxFiles ?? 300;
   const includeImages = opts.includeImages ?? false;
+  const includeAudio = opts.includeAudio ?? true;
   const onProgress = opts.onProgress;
+
 
   if (depth > maxDepth) return [];
 
@@ -155,6 +164,21 @@ export async function extractFromZip(
         counter.count++;
         continue;
       }
+
+      if (includeAudio && AUDIO_EXT.test(path)) {
+        if (depth === 0 && onProgress) {
+          onProgress(`Transcribing ${path.split("/").pop()} (${idx + 1}/${total})`, 0.05 + 0.15 * (idx / total));
+        }
+        const ext = path.split(".").pop()!.toLowerCase();
+        const mime = ext === "mp3" ? "audio/mpeg" : `audio/${ext}`;
+        const blob = await entry.async("blob");
+        const sub = new File([blob], path, { type: mime });
+        const subUnits = await withTimeout(extractFromAudio(sub), PER_AUDIO_TIMEOUT_MS, path);
+        for (const u of subUnits) units.push({ ...u, source: `${path}${u.source?.includes("@") ? "@" + u.source.split("@")[1] : ""}` });
+        counter.count++;
+        continue;
+      }
+
 
       // Unknown extension — record but don't crash
       counter.skipped.push(path);
