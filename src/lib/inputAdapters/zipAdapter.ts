@@ -49,7 +49,8 @@ const PDF_EXT = /\.pdf$/i;
 const UNSUPPORTED_DOC_EXT = /\.(docx?|xlsx?|pptx?|odt|ods|odp|pages|numbers|key|rtf|epub)$/i;
 
 const PER_FILE_TIMEOUT_MS = 45_000;
-const PER_AUDIO_TIMEOUT_MS = 240_000;
+const PER_AUDIO_TIMEOUT_MS = 480_000;
+const AUDIO_MAX_ATTEMPTS = 5;
 
 
 export interface ZipOptions {
