@@ -44,10 +44,13 @@ const DEFAULT_EXCLUDES = [
 const TEXT_EXT = /\.(txt|md|markdown|rst|csv|tsv|json|yaml|yml|toml|xml|html|htm|tex)$/i;
 const SCRIPT_EXT = /\.(js|jsx|ts|tsx|py|rb|go|rs|java|kt|swift|c|cc|cpp|h|hpp|cs|php|sh|bash|zsh|sql|r|lua|dart|scala|clj|ex|exs)$/i;
 const IMAGE_EXT = /\.(png|jpg|jpeg|webp|gif)$/i;
+const AUDIO_EXT = /\.(mp3|wav|m4a|flac|ogg|aac|opus|webm)$/i;
 const PDF_EXT = /\.pdf$/i;
 const UNSUPPORTED_DOC_EXT = /\.(docx?|xlsx?|pptx?|odt|ods|odp|pages|numbers|key|rtf|epub)$/i;
 
 const PER_FILE_TIMEOUT_MS = 45_000;
+const PER_AUDIO_TIMEOUT_MS = 240_000;
+
 
 export interface ZipOptions {
   maxDepth?: number;
