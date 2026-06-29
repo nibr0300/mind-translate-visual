@@ -20,16 +20,16 @@ interface FieldSidebarProps {
   field: GeometricField;
   activeCluster: number | null;
   onSelectCluster: (id: number | null) => void;
-  useCase: "therapy" | "didactics" | "research" | "uploaded";
-  onChangeUseCase: (uc: "therapy" | "didactics" | "research" | "uploaded") => void;
+  useCase: "didactics" | "truth-seeking" | "negotiation" | "uploaded";
+  onChangeUseCase: (uc: "didactics" | "truth-seeking" | "negotiation" | "uploaded") => void;
   uploadedFileName?: string | null;
   onUploadField: (field: GeometricField, fileName: string) => void;
 }
 
 const USE_CASE_LABELS = {
-  therapy: "Therapy Journal",
   didactics: "Didactic Material",
-  research: "Research Paper",
+  "truth-seeking": "Truth-Seeking",
+  negotiation: "Negotiation",
 };
 
 export default function FieldSidebar({
@@ -188,7 +188,7 @@ export default function FieldSidebar({
           </button>
         )}
         <div className="flex flex-col gap-1">
-          {(["therapy", "didactics", "research"] as const).map((uc) => (
+          {(["didactics", "truth-seeking", "negotiation"] as const).map((uc) => (
             <button
               key={uc}
               onClick={() => onChangeUseCase(uc)}
