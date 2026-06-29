@@ -49,7 +49,8 @@ const PDF_EXT = /\.pdf$/i;
 const UNSUPPORTED_DOC_EXT = /\.(docx?|xlsx?|pptx?|odt|ods|odp|pages|numbers|key|rtf|epub)$/i;
 
 const PER_FILE_TIMEOUT_MS = 45_000;
-const PER_AUDIO_TIMEOUT_MS = 240_000;
+const PER_AUDIO_TIMEOUT_MS = 480_000;
+const AUDIO_MAX_ATTEMPTS = 5;
 
 
 export interface ZipOptions {
@@ -176,20 +177,26 @@ export async function extractFromZip(
 
         let subUnits: RawTextUnit[] = [];
         let lastErr: Error | null = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < AUDIO_MAX_ATTEMPTS; attempt++) {
           try {
             subUnits = await withTimeout(extractFromAudio(sub), PER_AUDIO_TIMEOUT_MS, path);
-            lastErr = null;
-            break;
+            if (subUnits.length > 0) {
+              lastErr = null;
+              break;
+            }
+            lastErr = new Error("empty transcript");
           } catch (e) {
             lastErr = e as Error;
-            const msg = lastErr.message || "";
-            // Retry on rate-limit or transient gateway errors
-            if (/429|rate|timeout|503|502|temporarily/i.test(msg) && attempt < 2) {
-              await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
-              continue;
+          }
+          // Retry on any error/empty — wait with exponential backoff (5s, 10s, 20s, 40s)
+          if (attempt < AUDIO_MAX_ATTEMPTS - 1) {
+            const msg = lastErr?.message || "";
+            const isRateLimit = /429|rate|quota/i.test(msg);
+            const base = isRateLimit ? 8000 : 5000;
+            await new Promise((r) => setTimeout(r, base * Math.pow(2, attempt)));
+            if (depth === 0 && onProgress) {
+              onProgress(`Retrying ${path.split("/").pop()} (attempt ${attempt + 2}/${AUDIO_MAX_ATTEMPTS})`, 0.05 + 0.15 * (idx / total));
             }
-            break;
           }
         }
 
@@ -205,8 +212,8 @@ export async function extractFromZip(
           for (const u of subUnits) units.push({ ...u, source: `${path}${u.source?.includes("@") ? "@" + u.source.split("@")[1] : ""}` });
         }
         counter.count++;
-        // Small breather between songs to avoid hammering the AI gateway
-        await new Promise((r) => setTimeout(r, 800));
+        // Larger breather between songs to let rate-limit windows reset
+        await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
 
