@@ -48,8 +48,9 @@ export default function FieldInfoPanel({ isOpen, onClose }: FieldInfoPanelProps)
                 <p className="text-muted-foreground">
                   FZ measures <span className="text-field-fz">density gradient</span> — the boundary
                   signal between clusters. High FZ units sit at the edges of understanding, where
-                  concepts collide and new meaning emerges. In therapy: where breakthroughs happen. In
-                  didactics: where misconceptions cluster.
+                  concepts collide and new meaning emerges. In truth-seeking: where claims meet
+                  counter-evidence. In didactics: where misconceptions cluster. In negotiation: where
+                  positions conflict.
                 </p>
               </section>
 
