@@ -152,7 +152,7 @@ export default function FieldSidebar({
     }
   };
   return (
-    <aside className="w-80 flex-shrink-0 h-full bg-card border-r border-border flex flex-col overflow-hidden">
+    <aside className="w-full md:w-80 md:flex-shrink-0 md:h-full max-h-[50vh] md:max-h-none bg-card border-b md:border-b-0 md:border-r border-border flex flex-col overflow-y-auto md:overflow-hidden">
       {/* Header */}
       <div className="p-5 border-b border-border">
         <div className="flex items-center gap-2 mb-1">
