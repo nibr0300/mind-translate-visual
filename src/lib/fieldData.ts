@@ -181,11 +181,11 @@ function seededRandom(seed: number) {
   };
 }
 
-export function generateDemoField(useCase: "therapy" | "didactics" | "research"): GeometricField {
+export function generateDemoField(useCase: "didactics" | "truth-seeking" | "negotiation"): GeometricField {
   const rand = seededRandom(42 + useCase.length);
   const defs = CLUSTER_DEFS[useCase];
   const units: FieldUnit[] = [];
-  const texts = THERAPY_TEXTS; // reuse for all modes in demo
+  const texts = DEMO_TEXTS[useCase] ?? DEMO_TEXTS["didactics"];
 
   for (let i = 0; i < 30; i++) {
     const clusterId = Math.floor(rand() * 5);
