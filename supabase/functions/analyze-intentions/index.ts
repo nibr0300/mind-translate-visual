@@ -49,15 +49,19 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: `You are a multilingual speech-act and epistemic analyst. Text units may be in ANY language (commonly Swedish, English, or mixed). Analyze semantic intent directly in the source language — do NOT translate first. For each numbered text unit, analyze:
+              content: `You are a multilingual relational-field analyst. Text units may be in ANY language (commonly Swedish, English, or mixed). Analyze directly in the source language — do NOT translate. Treat each unit as a point in a tension field; do not flatten metaphor, lyric, or narrative voice into neutral description.
 
-1. **Speech act type** (assertive, directive, commissive, expressive, declarative)
-2. **Epistemic certainty** (0.0 = highly uncertain/speculative, 1.0 = definitive/factual)
-3. **Intentional force** (0.0 = neutral/descriptive, 1.0 = strong persuasive/transformative intent)
-4. **Truth-seeking tension** (0.0 = settled/accepted, 1.0 = actively questioning/challenging)
+For each numbered unit, return:
 
-For sung lyrics or poetry, treat metaphor and imagery as expressive speech acts unless they make explicit claims. Respond ONLY with the tool call. Analyze the actual semantic intent, not just surface words.`,
+1. **speechAct** — assertive | directive | commissive | expressive | declarative
+2. **epistemicCertainty** (0.0 speculative ↔ 1.0 definitive)
+3. **intentionalForce** (0.0 neutral/descriptive ↔ 1.0 strongly persuasive/transformative)
+4. **truthTension** (0.0 settled ↔ 1.0 actively questioning/challenging an accepted frame)
+5. **moralTension** (0.0 morally neutral ↔ 1.0 high friction: cowardice, denial, blame-shifting, self-exoneration, religious or ideological absolution of harm, complicity dressed as innocence, shame/guilt being deflected)
+6. **narrativeTension** (0.0 no inter-subject friction ↔ 1.0 strong conflict between characters/voices/positions: betrayal, abandonment, accusation, unresolved harm, silenced witness)
+7. **denialMarker** (0.0 owns reality ↔ 1.0 actively refuses or rewrites what is plainly the case)
 
+Lyrics, prose, and dialogue can score high on moral/narrative tension even when the speech act is "expressive" and the hedging is zero — that is exactly the friction we are hunting. A line that piously absolves a perpetrator, blames the victim, or invokes fate/God to avoid responsibility is HIGH moralTension even if it sounds calm. A line where one character is wrongly accused, or where a voice silences another, is HIGH narrativeTension. Do not score moralTension on the mere presence of religious or dark vocabulary — score it on the *function* of the line in the field. Respond ONLY with the tool call.`,
             },
             {
               role: "user",
@@ -86,8 +90,11 @@ For sung lyrics or poetry, treat metaphor and imagery as expressive speech acts 
                           epistemicCertainty: { type: "number", description: "0.0-1.0" },
                           intentionalForce: { type: "number", description: "0.0-1.0" },
                           truthTension: { type: "number", description: "0.0-1.0" },
+                          moralTension: { type: "number", description: "0.0-1.0" },
+                          narrativeTension: { type: "number", description: "0.0-1.0" },
+                          denialMarker: { type: "number", description: "0.0-1.0" },
                         },
-                        required: ["index", "speechAct", "epistemicCertainty", "intentionalForce", "truthTension"],
+                        required: ["index", "speechAct", "epistemicCertainty", "intentionalForce", "truthTension", "moralTension", "narrativeTension", "denialMarker"],
                         additionalProperties: false,
                       },
                     },

@@ -11,6 +11,12 @@ export interface IntentionAnalysis {
   epistemicCertainty: number;
   intentionalForce: number;
   truthTension: number;
+  /** 0-1: cowardice, denial, blame-shifting, religious/ideological self-exoneration */
+  moralTension?: number;
+  /** 0-1: inter-subject friction — betrayal, accusation, silenced witness */
+  narrativeTension?: number;
+  /** 0-1: actively refusing or rewriting plain reality */
+  denialMarker?: number;
 }
 
 export interface TriangulatedTension {
@@ -53,31 +59,50 @@ export async function analyzeIntentions(
 }
 
 /**
- * Triangulate truthTension from four independent sources:
+ * Content-tension: moral + narrative friction surfaced by the LLM.
+ * This is the "lyric/prose can be calm on the surface but morally on fire"
+ * signal — cowardice, denial, blame-shifting, inter-character harm.
+ */
+export function contentTension(intention: IntentionAnalysis | null | undefined): number {
+  if (!intention) return 0;
+  const moral = intention.moralTension ?? 0;
+  const narrative = intention.narrativeTension ?? 0;
+  const denial = intention.denialMarker ?? 0;
+  return clamp(moral * 0.5 + narrative * 0.35 + denial * 0.15);
+}
+
+/**
+ * Triangulate truthTension from independent sources:
  *
- * 1. LLM judgment (0.35 weight) — holistic semantic analysis
- * 2. Lexical hedging (0.20 weight) — client-side marker detection
- * 3. SpeechAct–content discrepancy (0.25 weight) — asserting while hedging etc.
- * 4. Intra-cluster intention deviation (0.20 weight) — structural tension
+ * 1. LLM judgment (holistic semantic analysis)
+ * 2. Lexical hedging (client-side marker detection)
+ * 3. SpeechAct–content discrepancy (asserting while hedging etc.)
+ * 4. Moral/narrative content tension (cowardice, denial, inter-character harm)
+ * 5. Intra-cluster intention deviation (structural tension)
  *
- * If LLM analysis is unavailable, sources 2-4 are reweighted.
+ * Discrepancy is now the MAX of speech-act discrepancy and content tension —
+ * lyrics/prose can be morally hot without lexical hedging.
  */
 export function triangulateTruthTension(
   llmTension: number | null,
   hedging: HedgingScore,
   speechAct: "assertive" | "directive" | "commissive" | "expressive" | "declarative" | null,
-  clusterDeviation: number
+  clusterDeviation: number,
+  intention?: IntentionAnalysis | null
 ): TriangulatedTension {
   const lexicalTension = hedging.lexicalTruthTension;
-  const discrepancy = speechAct ? speechActDiscrepancy(speechAct, hedging) : 0;
+  const speechActDisc = speechAct ? speechActDiscrepancy(speechAct, hedging) : 0;
+  const content = contentTension(intention);
+  // Internal discrepancy = whichever axis is hottest (speech-act vs. moral/narrative)
+  const discrepancy = clamp(Math.max(speechActDisc, content));
 
   if (llmTension !== null && speechAct !== null) {
-    // Full triangulation — all 4 sources
     const triangulated =
-      llmTension * 0.35 +
-      lexicalTension * 0.20 +
+      llmTension * 0.30 +
+      lexicalTension * 0.15 +
       discrepancy * 0.25 +
-      clusterDeviation * 0.20;
+      content * 0.15 +
+      clusterDeviation * 0.15;
 
     return {
       llmTension,
@@ -88,11 +113,11 @@ export function triangulateTruthTension(
     };
   }
 
-  // Graceful degradation: no LLM data, use lexical + cluster only
+  // Graceful degradation
   const triangulated =
-    lexicalTension * 0.45 +
-    clusterDeviation * 0.35 +
-    discrepancy * 0.20;
+    lexicalTension * 0.40 +
+    clusterDeviation * 0.30 +
+    discrepancy * 0.30;
 
   return {
     llmTension: llmTension ?? 0,
@@ -105,9 +130,8 @@ export function triangulateTruthTension(
 
 /**
  * Compute intra-cluster intention deviation for a unit.
- *
- * Measures how much a unit's intentional profile deviates from
- * its cluster's average intentional profile.
+ * Now spans a 5D intention space including moral and narrative axes,
+ * so morally distinctive lines stand out from a thematically homogenous cluster.
  */
 export function computeClusterDeviation(
   unitIntention: IntentionAnalysis,
@@ -115,19 +139,25 @@ export function computeClusterDeviation(
 ): number {
   if (clusterIntentions.length <= 1) return 0;
 
-  const avgCertainty = clusterIntentions.reduce((s, i) => s + i.epistemicCertainty, 0) / clusterIntentions.length;
-  const avgForce = clusterIntentions.reduce((s, i) => s + i.intentionalForce, 0) / clusterIntentions.length;
-  const avgTension = clusterIntentions.reduce((s, i) => s + i.truthTension, 0) / clusterIntentions.length;
+  const avg = (pick: (i: IntentionAnalysis) => number) =>
+    clusterIntentions.reduce((s, i) => s + pick(i), 0) / clusterIntentions.length;
 
-  // Euclidean distance in 3D intention space
+  const aC = avg((i) => i.epistemicCertainty);
+  const aF = avg((i) => i.intentionalForce);
+  const aT = avg((i) => i.truthTension);
+  const aM = avg((i) => i.moralTension ?? 0);
+  const aN = avg((i) => i.narrativeTension ?? 0);
+
   const dist = Math.sqrt(
-    (unitIntention.epistemicCertainty - avgCertainty) ** 2 +
-    (unitIntention.intentionalForce - avgForce) ** 2 +
-    (unitIntention.truthTension - avgTension) ** 2
+    (unitIntention.epistemicCertainty - aC) ** 2 +
+    (unitIntention.intentionalForce - aF) ** 2 +
+    (unitIntention.truthTension - aT) ** 2 +
+    ((unitIntention.moralTension ?? 0) - aM) ** 2 +
+    ((unitIntention.narrativeTension ?? 0) - aN) ** 2
   );
 
-  // Normalize: max possible dist in [0,1]³ is √3 ≈ 1.73
-  return Math.min(1, dist / 1.73);
+  // Max possible dist in [0,1]⁵ is √5 ≈ 2.236
+  return Math.min(1, dist / 2.236);
 }
 
 /**
@@ -167,8 +197,11 @@ export function blendFZWithIntention(
  * CTI > 0.4 → genuinely problematic node (not just a statistical outlier)
  */
 export function computeCTI(discrepancy: number, clusterDeviation: number): number {
-  // Geometric mean: √(d × c) — both must be high for high CTI
-  const raw = Math.sqrt(discrepancy * clusterDeviation);
+  // Geometric mean with a small floor on cluster deviation so a morally hot
+  // line in a thematically homogeneous source (e.g. a whole album about one
+  // event) still surfaces — internal tension alone is enough to register.
+  const externalFloor = Math.max(clusterDeviation, 0.15);
+  const raw = Math.sqrt(discrepancy * externalFloor);
   return Math.round(Math.min(1, raw) * 100) / 100;
 }
 

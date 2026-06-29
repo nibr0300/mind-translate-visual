@@ -14,6 +14,9 @@ export interface FieldUnit {
     epistemicCertainty: number;
     intentionalForce: number;
     truthTension: number;
+    moralTension?: number;
+    narrativeTension?: number;
+    denialMarker?: number;
   };
   triangulation?: {
     llmTension: number;

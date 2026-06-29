@@ -166,7 +166,8 @@ async function buildFieldFromChunks(
       intention?.truthTension ?? null,
       hedging,
       intention?.speechAct ?? null,
-      clusterDeviation
+      clusterDeviation,
+      intention ?? null
     );
 
     const fz = intention
@@ -198,6 +199,9 @@ async function buildFieldFromChunks(
           epistemicCertainty: intention.epistemicCertainty,
           intentionalForce: intention.intentionalForce,
           truthTension: intention.truthTension,
+          moralTension: intention.moralTension,
+          narrativeTension: intention.narrativeTension,
+          denialMarker: intention.denialMarker,
         },
       }),
       triangulation: {
