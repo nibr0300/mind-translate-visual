@@ -197,8 +197,11 @@ export function blendFZWithIntention(
  * CTI > 0.4 → genuinely problematic node (not just a statistical outlier)
  */
 export function computeCTI(discrepancy: number, clusterDeviation: number): number {
-  // Geometric mean: √(d × c) — both must be high for high CTI
-  const raw = Math.sqrt(discrepancy * clusterDeviation);
+  // Geometric mean with a small floor on cluster deviation so a morally hot
+  // line in a thematically homogeneous source (e.g. a whole album about one
+  // event) still surfaces — internal tension alone is enough to register.
+  const externalFloor = Math.max(clusterDeviation, 0.15);
+  const raw = Math.sqrt(discrepancy * externalFloor);
   return Math.round(Math.min(1, raw) * 100) / 100;
 }
 
