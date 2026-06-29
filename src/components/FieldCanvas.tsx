@@ -205,7 +205,10 @@ export default function FieldCanvas({
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) pinchRef.current = null;
+    // After a pinch, ignore any leftover single-finger drag until all fingers are up
+    if (pinchRef.current && pointers.current.size === 0) {
+      pinchRef.current = null;
+    }
   }, []);
 
   const zoomBy = (factor: number) => {
