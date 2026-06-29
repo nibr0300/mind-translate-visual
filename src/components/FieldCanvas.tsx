@@ -30,7 +30,7 @@ interface FieldCanvasProps {
   onSetAnchor?: (unit: FieldUnit | null) => void;
 }
 
-const MIN_SCALE = 0.5;
+const MIN_SCALE = 0.3;
 const MAX_SCALE = 6;
 
 export default function FieldCanvas({
