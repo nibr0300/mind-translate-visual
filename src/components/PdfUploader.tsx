@@ -42,8 +42,24 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
         const field = await generateFieldFromFile(file, (stage, value) =>
           setProgress({ stage, value })
         );
+        const badCoords = field.units.filter(
+          (u) => !Number.isFinite(u.vector2d?.[0]) || !Number.isFinite(u.vector2d?.[1])
+        ).length;
+        console.info("[upload] field built", {
+          file: file.name,
+          units: field.units.length,
+          clusters: field.clusters.length,
+          badCoords,
+          firstUnit: field.units[0],
+          stats: field.stats,
+        });
+        if (field.units.length === 0) {
+          setError("Field was built but contains 0 units — nothing to render. Check console.");
+          return;
+        }
         onFieldGenerated(field, file.name);
       } catch (err: any) {
+        console.error("[upload] failed", err);
         setError(err.message || "Failed to process file");
       } finally {
         setIsProcessing(false);
