@@ -86,7 +86,10 @@ export default function Index() {
             onSelectCluster={setActiveCluster}
             onSelectUnit={setSelectedUnit}
             selectedUnit={selectedUnit}
+            anchorUnit={anchorUnit}
+            onSetAnchor={(u) => setAnchorUnitId(u ? u.id : null)}
           />
+
           <FieldInfoPanel isOpen={showInfo} onClose={() => setShowInfo(false)} />
         </div>
       </main>
