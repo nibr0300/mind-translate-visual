@@ -10,6 +10,7 @@ export default function Index() {
   const [useCase, setUseCase] = useState<UseCase>("didactics");
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<FieldUnit | null>(null);
+  const [anchorUnitId, setAnchorUnitId] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [uploadedField, setUploadedField] = useState<GeometricField | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
@@ -20,12 +21,17 @@ export default function Index() {
   );
 
   const field = useCase === "uploaded" && uploadedField ? uploadedField : demoField!;
+  const anchorUnit = useMemo(
+    () => (anchorUnitId ? field.units.find((u) => u.id === anchorUnitId) ?? null : null),
+    [anchorUnitId, field.units]
+  );
 
   const handleChangeUseCase = (uc: UseCase) => {
     if (uc === "uploaded" && !uploadedField) return;
     setUseCase(uc);
     setActiveCluster(null);
     setSelectedUnit(null);
+    setAnchorUnitId(null);
   };
 
   const handleUploadField = useCallback((newField: GeometricField, fileName: string) => {
@@ -34,6 +40,7 @@ export default function Index() {
     setUseCase("uploaded");
     setActiveCluster(null);
     setSelectedUnit(null);
+    setAnchorUnitId(null);
   }, []);
 
   return (
@@ -46,7 +53,10 @@ export default function Index() {
         onChangeUseCase={handleChangeUseCase}
         uploadedFileName={uploadedFileName}
         onUploadField={handleUploadField}
+        anchorUnit={anchorUnit}
+        onClearAnchor={() => setAnchorUnitId(null)}
       />
+
 
       <main className="flex-1 relative flex flex-col min-h-screen md:min-h-0">
         <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-card/50 backdrop-blur-sm">
@@ -76,7 +86,10 @@ export default function Index() {
             onSelectCluster={setActiveCluster}
             onSelectUnit={setSelectedUnit}
             selectedUnit={selectedUnit}
+            anchorUnit={anchorUnit}
+            onSetAnchor={(u) => setAnchorUnitId(u ? u.id : null)}
           />
+
           <FieldInfoPanel isOpen={showInfo} onClose={() => setShowInfo(false)} />
         </div>
       </main>

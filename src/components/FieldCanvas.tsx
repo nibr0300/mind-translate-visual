@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
+import { distanceFromAnchor } from "@/lib/anchorMath";
+
 
 const CLUSTER_COLORS = [
   "hsl(180, 70%, 50%)",
@@ -24,6 +26,8 @@ interface FieldCanvasProps {
   onSelectCluster: (id: number | null) => void;
   onSelectUnit: (unit: FieldUnit | null) => void;
   selectedUnit: FieldUnit | null;
+  anchorUnit?: FieldUnit | null;
+  onSetAnchor?: (unit: FieldUnit | null) => void;
 }
 
 export default function FieldCanvas({
@@ -32,7 +36,10 @@ export default function FieldCanvas({
   onSelectCluster,
   onSelectUnit,
   selectedUnit,
+  anchorUnit = null,
+  onSetAnchor,
 }: FieldCanvasProps) {
+
   const [hoveredUnit, setHoveredUnit] = useState<FieldUnit | null>(null);
 
   // Map vector2d to canvas coordinates
@@ -182,7 +189,62 @@ export default function FieldCanvas({
         )}
       </svg>
 
+      {/* Rotate-frame: rays from anchor to every unit, opacity ∝ intention-space proximity */}
+      {anchorUnit && (() => {
+        const anchorIdx = field.units.findIndex((u) => u.id === anchorUnit.id);
+        if (anchorIdx < 0) return null;
+        const aPos = unitPositions[anchorIdx];
+        return (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+            {field.units.map((u, i) => {
+              if (u.id === anchorUnit.id) return null;
+              const d = distanceFromAnchor(anchorUnit, u);
+              // Strong rays only for genuinely contrasting units (far in intention space).
+              const opacity = Math.max(0.05, Math.min(0.55, d * 0.7));
+              const pos = unitPositions[i];
+              return (
+                <line
+                  key={`anchor-ray-${u.id}`}
+                  x1={aPos.x}
+                  y1={aPos.y}
+                  x2={pos.x}
+                  y2={pos.y}
+                  stroke="hsl(340, 90%, 60%)"
+                  strokeWidth={d > 0.5 ? 1 : 0.5}
+                  opacity={opacity}
+                />
+              );
+            })}
+          </svg>
+        );
+      })()}
+
+      {/* Anchor ring */}
+      {anchorUnit && (() => {
+        const idx = field.units.findIndex((u) => u.id === anchorUnit.id);
+        if (idx < 0) return null;
+        const pos = unitPositions[idx];
+        return (
+          <div
+            key="anchor-ring"
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              left: pos.x,
+              top: pos.y,
+              width: 44,
+              height: 44,
+              transform: "translate(-50%, -50%)",
+              border: "2px dashed hsl(340, 90%, 65%)",
+              boxShadow: "0 0 18px hsl(340, 90%, 60%, 0.6)",
+              animation: "tension-ripple 3s ease-in-out infinite",
+              zIndex: 3,
+            }}
+          />
+        );
+      })()}
+
       {/* Unit nodes */}
+
       {field.units.map((unit, i) => {
         const pos = unitPositions[i];
         const size = 8 + unit.fz * 16;
@@ -239,7 +301,25 @@ export default function FieldCanvas({
               <span className="text-xs tracking-wider uppercase text-muted-foreground">
                 {field.clusters[displayUnit.clusterId]?.label} · {displayUnit.id}
               </span>
+              {onSetAnchor && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const isAnchor = anchorUnit?.id === displayUnit.id;
+                    onSetAnchor(isAnchor ? null : displayUnit);
+                  }}
+                  className={`ml-auto px-2 py-1 rounded text-[10px] tracking-wider uppercase border transition-colors ${
+                    anchorUnit?.id === displayUnit.id
+                      ? "border-rose-400/60 text-rose-300 bg-rose-500/10"
+                      : "border-border text-muted-foreground hover:text-rose-300 hover:border-rose-400/40"
+                  }`}
+                  title="Use this unit as the rotation axis for the field"
+                >
+                  {anchorUnit?.id === displayUnit.id ? "✕ Clear anchor" : "⊕ Set as anchor"}
+                </button>
+              )}
             </div>
+
             <p className="text-sm text-foreground mb-3 italic">"{displayUnit.text}"</p>
             <div className="flex gap-6 text-[11px] flex-wrap">
               <div>

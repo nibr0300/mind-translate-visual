@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import type { GeometricField } from "@/lib/fieldData";
+import type { GeometricField, FieldUnit } from "@/lib/fieldData";
+import { distanceFromAnchor } from "@/lib/anchorMath";
 import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
 import AccountPanel from "./AccountPanel";
@@ -24,7 +25,10 @@ interface FieldSidebarProps {
   onChangeUseCase: (uc: "didactics" | "truth-seeking" | "negotiation" | "uploaded") => void;
   uploadedFileName?: string | null;
   onUploadField: (field: GeometricField, fileName: string) => void;
+  anchorUnit?: FieldUnit | null;
+  onClearAnchor?: () => void;
 }
+
 
 const USE_CASE_LABELS = {
   didactics: "Didactic Material",
@@ -40,7 +44,10 @@ export default function FieldSidebar({
   onChangeUseCase,
   uploadedFileName,
   onUploadField,
+  anchorUnit = null,
+  onClearAnchor,
 }: FieldSidebarProps) {
+
   const { session } = useAuth();
   const importRef = useRef<HTMLInputElement>(null);
   const corpusMapAbortRef = useRef<AbortController | null>(null);
@@ -217,7 +224,89 @@ export default function FieldSidebar({
         </div>
       </div>
 
+      {/* Rotated frame (anchor mode) — top-N units most distant in intention space */}
+      {anchorUnit && (() => {
+        const ranked = field.units
+          .filter((u) => u.id !== anchorUnit.id)
+          .map((u) => ({ u, d: distanceFromAnchor(anchorUnit, u) }))
+          .sort((a, b) => b.d - a.d)
+          .slice(0, 8);
+        // Per-file distance avg under rotated frame
+        const byFile = new Map<string, { sum: number; count: number }>();
+        for (const u of field.units) {
+          if (!u.sourcePath || u.id === anchorUnit.id) continue;
+          const key = u.sourcePath.split("@")[0];
+          const e = byFile.get(key) ?? { sum: 0, count: 0 };
+          e.sum += distanceFromAnchor(anchorUnit, u);
+          e.count += 1;
+          byFile.set(key, e);
+        }
+        const fileRanked = Array.from(byFile.entries())
+          .map(([path, e]) => ({ path, avg: e.sum / e.count, n: e.count }))
+          .sort((a, b) => b.avg - a.avg)
+          .slice(0, 6);
+        return (
+          <div className="p-4 border-b border-border bg-rose-500/5">
+            <div className="flex items-center justify-between mb-2">
+              <label className="font-mono text-[10px] tracking-widest uppercase text-rose-300">
+                ⊕ Rotated frame
+              </label>
+              <button
+                onClick={() => onClearAnchor?.()}
+                className="font-mono text-[10px] text-muted-foreground hover:text-rose-300"
+              >
+                ✕ clear
+              </button>
+            </div>
+            <p className="text-[11px] text-foreground italic mb-2 line-clamp-3">
+              "{anchorUnit.text}"
+            </p>
+            <p className="text-[10px] text-muted-foreground font-mono mb-3">
+              Avstånd i intentionsrum (FZ, FY, moral, narrativ, denial)
+            </p>
+            <div className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground mb-1">
+              Mest motsatta enheter
+            </div>
+            <ul className="flex flex-col gap-1 mb-3">
+              {ranked.map(({ u, d }) => (
+                <li
+                  key={u.id}
+                  className="flex items-center gap-2 text-[11px] font-mono cursor-pointer hover:bg-secondary/40 rounded px-1"
+                  title={u.text}
+                  onClick={() => onSelectCluster(u.clusterId)}
+                >
+                  <div className="flex-1 truncate text-foreground">{u.text}</div>
+                  <div className="w-14 h-1.5 rounded bg-secondary overflow-hidden">
+                    <div className="h-full bg-rose-400" style={{ width: `${d * 100}%` }} />
+                  </div>
+                  <span className="w-10 text-right text-muted-foreground">{d.toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+            {fileRanked.length >= 2 && (
+              <>
+                <div className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground mb-1">
+                  Avstånd per fil
+                </div>
+                <ul className="flex flex-col gap-1">
+                  {fileRanked.map((r) => (
+                    <li key={r.path} className="flex items-center gap-2 text-[11px] font-mono">
+                      <div className="flex-1 truncate text-foreground" title={r.path}>{r.path}</div>
+                      <div className="w-14 h-1.5 rounded bg-secondary overflow-hidden">
+                        <div className="h-full bg-rose-400/70" style={{ width: `${r.avg * 100}%` }} />
+                      </div>
+                      <span className="w-10 text-right text-muted-foreground">{r.avg.toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Field Stats */}
+
       <div className="p-4 border-b border-border">
         <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-3">
           Field Statistics
