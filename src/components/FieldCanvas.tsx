@@ -352,20 +352,18 @@ export default function FieldCanvas({
                     {anchorUnit?.id === displayUnit.id ? "✕ Clear anchor" : "⊕ Set as anchor"}
                   </button>
                 )}
-                {selectedUnit && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectUnit(null);
-                      setHoveredUnit(null);
-                    }}
-                    className="w-7 h-7 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
-                    title="Close info panel"
-                    aria-label="Close"
-                  >
-                    ✕
-                  </button>
-                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectUnit(null);
+                    setHoveredUnit(null);
+                  }}
+                  className="w-7 h-7 flex shrink-0 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+                  title="Close info panel"
+                  aria-label="Close info panel"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
