@@ -21,7 +21,7 @@ interface FieldSidebarProps {
   activeCluster: number | null;
   onSelectCluster: (id: number | null) => void;
   useCase: "therapy" | "didactics" | "research" | "uploaded";
-  onChangeUseCase: (uc: "therapy" | "didactics" | "research") => void;
+  onChangeUseCase: (uc: "therapy" | "didactics" | "research" | "uploaded") => void;
   uploadedFileName?: string | null;
   onUploadField: (field: GeometricField, fileName: string) => void;
 }
@@ -181,7 +181,7 @@ export default function FieldSidebar({
                 ? "bg-primary/10 text-primary border border-primary/20"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
             }`}
-            onClick={() => onChangeUseCase("therapy")} // triggers re-select of uploaded
+            onClick={() => onChangeUseCase("uploaded")}
             disabled={useCase === "uploaded"}
           >
             📄 {uploadedFileName}
