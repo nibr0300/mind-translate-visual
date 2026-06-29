@@ -64,8 +64,33 @@ export async function generateFieldFromFile(
       throw new Error("Content too short to build a meaningful field (min 3 chunks).");
     }
 
-    const capped = chunks.length > 200 ? chunks.slice(0, 200) : chunks;
-    chunks = capped;
+    // Fair per-source cap: when a zip/album has many sources (e.g. 10 songs),
+    // a naive slice(0, 200) drops every track after the first few. Instead,
+    // distribute a larger budget proportionally across sources so every file
+    // is represented in the field.
+    const HARD_CAP = 600;
+    if (chunks.length > HARD_CAP) {
+      const bySource = new Map<string, Chunk[]>();
+      for (const c of chunks) {
+        const key = (c.source ?? "").split("@")[0] || "_";
+        if (!bySource.has(key)) bySource.set(key, []);
+        bySource.get(key)!.push(c);
+      }
+      const sources = [...bySource.values()];
+      const perSource = Math.max(3, Math.floor(HARD_CAP / sources.length));
+      const balanced: Chunk[] = [];
+      for (const arr of sources) {
+        if (arr.length <= perSource) {
+          balanced.push(...arr);
+        } else {
+          // Evenly sample across the source so we keep beginning, middle, end
+          const step = arr.length / perSource;
+          for (let i = 0; i < perSource; i++) balanced.push(arr[Math.floor(i * step)]);
+        }
+      }
+      console.info(`[field] balanced cap: ${chunks.length} → ${balanced.length} chunks across ${sources.length} sources`);
+      chunks = balanced;
+    }
 
     field = await buildFieldFromChunks(capped, sourceType, onProgress);
   }
