@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
+import { distanceFromAnchor } from "@/lib/anchorMath";
+
 
 const CLUSTER_COLORS = [
   "hsl(180, 70%, 50%)",
