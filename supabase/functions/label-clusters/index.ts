@@ -83,7 +83,10 @@ ${texts}
 Return STRICT JSON with this shape:
 {"label": "<2-4 word semantic label, Title Case, no punctuation>", "description": "<one sentence (≤140 chars) describing the cluster's theme, register or function>"}
 
-Avoid generic words like "Text", "Content", "Document", "Cluster". Prefer concrete topical or relational concepts. If the cluster looks like code or system prompt, name the operational role (e.g. "Operator Logic", "Ethical Guard", "Counter Loop").`;
+IMPORTANT: Write the label AND the description in the SAME LANGUAGE that dominates the passages (e.g. if passages are in Swedish, return Swedish label and description; if English, English; if mixed, pick the majority language). Do NOT translate to English by default.
+
+Avoid generic words like "Text", "Content", "Document", "Cluster" (or "Text", "Innehåll", "Dokument" in Swedish). Prefer concrete topical or relational concepts. If the cluster looks like code or system prompt, name the operational role (e.g. "Operator Logic" / "Operatörslogik", "Ethical Guard" / "Etisk Vakt").`;
+
 
       const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",

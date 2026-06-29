@@ -31,7 +31,8 @@ Deno.serve(async (req) => {
               {
                 type: "text",
                 text:
-                  "Transcribe this audio verbatim. Prefix each new paragraph or speaker turn with a [MM:SS] or [HH:MM:SS] timestamp. Detect language automatically. Output only the transcript, no commentary.",
+                  "Transcribe this audio verbatim in its ORIGINAL language — do NOT translate. The audio may be sung lyrics, spoken word, or a mix; common languages include Swedish (sv) and English (en), but auto-detect any language. Preserve original spelling, including å/ä/ö and other diacritics. Prefix each new paragraph, verse, or speaker turn with a [MM:SS] or [HH:MM:SS] timestamp. Output only the transcript, no commentary, no translation, no language tags.",
+
               },
               {
                 type: "input_audio",

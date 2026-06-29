@@ -15,18 +15,31 @@ export function tokenize(text: string): string[] {
     .filter((w) => w.length > 2);
 }
 
-/** Stopwords to ignore */
+/** Stopwords to ignore (multilingual: EN + SV; harmless cross-language overlap is OK) */
 export const STOPWORDS = new Set([
+  // English
   "the", "and", "for", "are", "but", "not", "you", "all", "can", "had",
   "her", "was", "one", "our", "out", "has", "have", "been", "from",
   "this", "that", "with", "they", "will", "each", "make", "like",
   "into", "over", "such", "than", "them", "then", "these", "some",
   "would", "other", "about", "which", "their", "there", "could",
   "more", "very", "when", "what", "your", "also", "most", "only",
-  "after", "being", "those", "does", "were", "where", "been", "just",
+  "after", "being", "those", "does", "were", "where", "just",
   "should", "through", "between", "before", "because", "while",
   "during", "without", "within", "upon", "both", "its", "own",
+  // Swedish
+  "och", "att", "det", "som", "för", "till", "med", "den", "ett", "har",
+  "inte", "men", "var", "han", "hon", "den", "denna", "detta", "dessa",
+  "vid", "från", "under", "över", "efter", "innan", "mellan", "utan",
+  "vara", "blir", "blev", "blivit", "kan", "ska", "skall", "skulle",
+  "måste", "borde", "vill", "ville", "samt", "eller", "också", "redan",
+  "när", "där", "här", "hur", "varför", "vilken", "vilket", "vilka",
+  "någon", "något", "några", "alla", "andra", "annan", "annat",
+  "min", "mitt", "mina", "din", "ditt", "dina", "sin", "sitt", "sina",
+  "jag", "mig", "du", "dig", "vi", "oss", "ni", "er", "de", "dem",
+  "är", "var", "varit", "själv", "själva", "samma", "sådan", "sådant",
 ]);
+
 
 /** Compute TF-IDF vectors for sentences */
 export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab: string[] } {
