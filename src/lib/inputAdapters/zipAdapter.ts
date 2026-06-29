@@ -56,8 +56,10 @@ export interface ZipOptions {
   maxDepth?: number;
   maxFiles?: number;
   includeImages?: boolean;
+  includeAudio?: boolean;
   onProgress?: (msg: string, value: number) => void;
 }
+
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
