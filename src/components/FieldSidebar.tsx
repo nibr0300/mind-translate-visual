@@ -44,7 +44,10 @@ export default function FieldSidebar({
   onChangeUseCase,
   uploadedFileName,
   onUploadField,
+  anchorUnit = null,
+  onClearAnchor,
 }: FieldSidebarProps) {
+
   const { session } = useAuth();
   const importRef = useRef<HTMLInputElement>(null);
   const corpusMapAbortRef = useRef<AbortController | null>(null);
