@@ -189,7 +189,62 @@ export default function FieldCanvas({
         )}
       </svg>
 
+      {/* Rotate-frame: rays from anchor to every unit, opacity ∝ intention-space proximity */}
+      {anchorUnit && (() => {
+        const anchorIdx = field.units.findIndex((u) => u.id === anchorUnit.id);
+        if (anchorIdx < 0) return null;
+        const aPos = unitPositions[anchorIdx];
+        return (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+            {field.units.map((u, i) => {
+              if (u.id === anchorUnit.id) return null;
+              const d = distanceFromAnchor(anchorUnit, u);
+              // Strong rays only for genuinely contrasting units (far in intention space).
+              const opacity = Math.max(0.05, Math.min(0.55, d * 0.7));
+              const pos = unitPositions[i];
+              return (
+                <line
+                  key={`anchor-ray-${u.id}`}
+                  x1={aPos.x}
+                  y1={aPos.y}
+                  x2={pos.x}
+                  y2={pos.y}
+                  stroke="hsl(340, 90%, 60%)"
+                  strokeWidth={d > 0.5 ? 1 : 0.5}
+                  opacity={opacity}
+                />
+              );
+            })}
+          </svg>
+        );
+      })()}
+
+      {/* Anchor ring */}
+      {anchorUnit && (() => {
+        const idx = field.units.findIndex((u) => u.id === anchorUnit.id);
+        if (idx < 0) return null;
+        const pos = unitPositions[idx];
+        return (
+          <div
+            key="anchor-ring"
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              left: pos.x,
+              top: pos.y,
+              width: 44,
+              height: 44,
+              transform: "translate(-50%, -50%)",
+              border: "2px dashed hsl(340, 90%, 65%)",
+              boxShadow: "0 0 18px hsl(340, 90%, 60%, 0.6)",
+              animation: "tension-ripple 3s ease-in-out infinite",
+              zIndex: 3,
+            }}
+          />
+        );
+      })()}
+
       {/* Unit nodes */}
+
       {field.units.map((unit, i) => {
         const pos = unitPositions[i];
         const size = 8 + unit.fz * 16;
