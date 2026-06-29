@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
 import { distanceFromAnchor } from "@/lib/anchorMath";
@@ -30,6 +30,9 @@ interface FieldCanvasProps {
   onSetAnchor?: (unit: FieldUnit | null) => void;
 }
 
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 6;
+
 export default function FieldCanvas({
   field,
   activeCluster,
@@ -42,49 +45,48 @@ export default function FieldCanvas({
 
   const [hoveredUnit, setHoveredUnit] = useState<FieldUnit | null>(null);
 
-  // Map vector2d to canvas coordinates
+  // View transform (pan + zoom). Applied to inner content wrapper.
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(1);
+  const [tx, setTx] = useState(0);
+  const [ty, setTy] = useState(0);
 
-  const mapToCanvas = useCallback(
-    (v: [number, number]) => {
-      const padding = 60;
-      const xMin = -4, xMax = 4, yMin = -4, yMax = 4;
-      return {
-        cx: padding + ((v[0] - xMin) / (xMax - xMin)) * (100 - padding * 2 / 10) + "%",
-        cy: padding + ((v[1] - yMin) / (yMax - yMin)) * (100 - padding * 2 / 10) + "%",
-      };
-    },
-    []
-  );
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const matches = useMemo(() => {
+    if (!normalizedQuery) return new Set<string>();
+    const out = new Set<string>();
+    for (const u of field.units) {
+      if (u.text?.toLowerCase().includes(normalizedQuery)) out.add(u.id);
+    }
+    return out;
+  }, [normalizedQuery, field.units]);
 
-  // Compute positions as percentages.
-  // When an anchor is set, we WARP the layout: keep each unit's angular direction
-  // from the anchor (in the original 2D map), but rewrite its radial distance to
-  // the 5D intention-space distance from the anchor. Units that look close on the
-  // original map but are morally/narratively far slide outward, exposing layers
-  // that pointed in a completely different direction.
+  // Compute positions as percentages (in untransformed content space).
   const unitPositions = useMemo(() => {
     if (!anchorUnit) {
       return field.units.map((u) => {
         const x = ((u.vector2d[0] + 4) / 8) * 100;
         const y = ((u.vector2d[1] + 4) / 8) * 100;
-        return { x: `${Math.max(5, Math.min(95, x))}%`, y: `${Math.max(5, Math.min(95, y))}%` };
+        return { x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) };
       });
     }
     const ax = anchorUnit.vector2d[0];
     const ay = anchorUnit.vector2d[1];
-    const RADIUS_SCALE = 3.6; // distance 1.0 in intention space → ~3.6 units on the 8-wide map
+    const RADIUS_SCALE = 3.6;
     return field.units.map((u, idx) => {
       if (u.id === anchorUnit.id) {
         const x = ((ax + 4) / 8) * 100;
         const y = ((ay + 4) / 8) * 100;
-        return { x: `${Math.max(5, Math.min(95, x))}%`, y: `${Math.max(5, Math.min(95, y))}%` };
+        return { x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) };
       }
       let dx = u.vector2d[0] - ax;
       let dy = u.vector2d[1] - ay;
       let len = Math.sqrt(dx * dx + dy * dy);
       if (len < 1e-6) {
-        // Co-located in original 2D — fan out by stable hash of id.
-        const theta = (idx * 2.399963); // golden-angle-ish
+        const theta = idx * 2.399963;
         dx = Math.cos(theta);
         dy = Math.sin(theta);
         len = 1;
@@ -96,9 +98,12 @@ export default function FieldCanvas({
       const ny = ay + dirY * newLen;
       const x = ((nx + 4) / 8) * 100;
       const y = ((ny + 4) / 8) * 100;
-      return { x: `${Math.max(5, Math.min(95, x))}%`, y: `${Math.max(5, Math.min(95, y))}%` };
+      return { x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) };
     });
   }, [field.units, anchorUnit]);
+
+  const pctX = (i: number) => `${unitPositions[i].x}%`;
+  const pctY = (i: number) => `${unitPositions[i].y}%`;
 
   const clusterCenterPositions = useMemo(
     () =>
@@ -110,214 +115,381 @@ export default function FieldCanvas({
     [field.clusters]
   );
 
+  // Center the view on a percentage point in content space, at a target scale.
+  const centerOn = useCallback((px: number, py: number, targetScale?: number) => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const s = targetScale ?? Math.max(scale, 2.2);
+    const cx = (px / 100) * rect.width;
+    const cy = (py / 100) * rect.height;
+    setScale(s);
+    setTx(rect.width / 2 - cx * s);
+    setTy(rect.height / 2 - cy * s);
+  }, [scale]);
+
+  const resetView = useCallback(() => {
+    setScale(1);
+    setTx(0);
+    setTy(0);
+  }, []);
+
+  // Jump to the first search match whenever query changes
+  useEffect(() => {
+    if (!normalizedQuery) return;
+    const idx = field.units.findIndex((u) => matches.has(u.id));
+    if (idx >= 0) centerOn(unitPositions[idx].x, unitPositions[idx].y, 2.6);
+  }, [normalizedQuery, matches, field.units, unitPositions, centerOn]);
+
+  // Wheel zoom around cursor
+  const onWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const el = viewportRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor));
+    // keep mouse point fixed
+    const k = newScale / scale;
+    setTx(mx - (mx - tx) * k);
+    setTy(my - (my - ty) * k);
+    setScale(newScale);
+  }, [scale, tx, ty]);
+
+  // Pan via pointer drag + pinch via two pointers
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{ dist: number; cx: number; cy: number; scale: number; tx: number; ty: number } | null>(null);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2) {
+      const [a, b] = Array.from(pointers.current.values());
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const rect = viewportRef.current!.getBoundingClientRect();
+      pinchRef.current = {
+        dist,
+        cx: (a.x + b.x) / 2 - rect.left,
+        cy: (a.y + b.y) / 2 - rect.top,
+        scale,
+        tx,
+        ty,
+      };
+    }
+  }, [scale, tx, ty]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    const prev = pointers.current.get(e.pointerId);
+    if (!prev) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2 && pinchRef.current) {
+      const [a, b] = Array.from(pointers.current.values());
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const p = pinchRef.current;
+      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, p.scale * (dist / p.dist)));
+      const k = newScale / p.scale;
+      setScale(newScale);
+      setTx(p.cx - (p.cx - p.tx) * k);
+      setTy(p.cy - (p.cy - p.ty) * k);
+    } else if (pointers.current.size === 1) {
+      setTx((v) => v + (e.clientX - prev.x));
+      setTy((v) => v + (e.clientY - prev.y));
+    }
+  }, []);
+
+  const onPointerUp = useCallback((e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinchRef.current = null;
+  }, []);
+
+  const zoomBy = (factor: number) => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor));
+    const k = newScale / scale;
+    setTx(cx - (cx - tx) * k);
+    setTy(cy - (cy - ty) * k);
+    setScale(newScale);
+  };
+
   const displayUnit = hoveredUnit || selectedUnit;
 
   return (
     <div className="relative w-full h-full field-grid overflow-hidden rounded-lg border border-border bg-field-void">
-      {/* Tension gradient background blobs */}
-      {field.units
-        .filter((u) => u.fz > 0.65)
-        .map((u, i) => {
-          const pos = unitPositions[field.units.indexOf(u)];
-          return (
-            <div
-              key={`fz-${i}`}
-              className="absolute rounded-full pointer-events-none"
-              style={{
-                left: pos.x,
-                top: pos.y,
-                width: `${u.fz * 120}px`,
-                height: `${u.fz * 120}px`,
-                transform: "translate(-50%, -50%)",
-                background: `radial-gradient(circle, hsl(25, 90%, 55%, ${u.fz * 0.2}) 0%, transparent 70%)`,
-                animation: `tension-ripple ${3 + i * 0.5}s ease-in-out infinite`,
-              }}
-            />
-          );
-        })}
-
-      {/* CTI critical node markers — double ring pulse for genuinely problematic nodes */}
-      {field.units
-        .filter((u) => (u.cti ?? 0) > 0.35)
-        .map((u) => {
-          const idx = field.units.indexOf(u);
-          const pos = unitPositions[idx];
-          const cti = u.cti ?? 0;
-          const ringSize = 28 + cti * 30;
-          return (
-            <div
-              key={`cti-${u.id}`}
-              className="absolute rounded-full pointer-events-none"
-              style={{
-                left: pos.x,
-                top: pos.y,
-                width: `${ringSize}px`,
-                height: `${ringSize}px`,
-                transform: "translate(-50%, -50%)",
-                border: `1.5px solid hsl(340, 80%, 60%, ${0.3 + cti * 0.5})`,
-                boxShadow: `0 0 ${cti * 20}px hsl(340, 80%, 60%, ${cti * 0.3}), inset 0 0 ${cti * 12}px hsl(340, 80%, 60%, ${cti * 0.15})`,
-                animation: `tension-ripple ${2 + cti * 2}s ease-in-out infinite`,
-                zIndex: 1,
-              }}
-            />
-          );
-        })}
-
-      {/* Cluster center labels */}
-      {field.clusters.map((cluster, i) => {
-        const pos = clusterCenterPositions[i];
-        const isActive = activeCluster === null || activeCluster === i;
-        return (
-          <motion.div
-            key={`cl-${i}`}
-            className="absolute pointer-events-none select-none"
-            style={{ left: pos.x, top: pos.y, transform: "translate(-50%, -50%)" }}
-            animate={{ opacity: isActive ? 0.5 : 0.1 }}
-          >
-            <div
-              className="rounded-full"
-              style={{
-                width: `${cluster.unitCount * 25 + 60}px`,
-                height: `${cluster.unitCount * 25 + 60}px`,
-                background: CLUSTER_COLORS_DIM[i],
-                border: `1px solid ${CLUSTER_COLORS[i]}22`,
-              }}
-            />
-            <span
-              className="absolute left-1/2 -translate-x-1/2 -bottom-5 font-mono text-[10px] tracking-widest uppercase whitespace-nowrap"
-              style={{ color: CLUSTER_COLORS[i] }}
-            >
-              {cluster.label}
-            </span>
-          </motion.div>
-        );
-      })}
-
-      {/* Connection lines between nearby units */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
-        {field.units.map((u, i) =>
-          field.units.slice(i + 1).map((v, j) => {
-            const dist = Math.sqrt(
-              (u.vector2d[0] - v.vector2d[0]) ** 2 + (u.vector2d[1] - v.vector2d[1]) ** 2
-            );
-            if (dist > 2.0) return null;
-            const opacity = Math.max(0.02, 0.12 - dist * 0.05);
-            const posA = unitPositions[i];
-            const posB = unitPositions[i + 1 + j];
-            const isActive =
-              activeCluster === null || u.clusterId === activeCluster || v.clusterId === activeCluster;
-            return (
-              <line
-                key={`l-${i}-${j}`}
-                x1={posA.x}
-                y1={posA.y}
-                x2={posB.x}
-                y2={posB.y}
-                stroke={u.clusterId === v.clusterId ? CLUSTER_COLORS[u.clusterId] : "hsl(200,10%,30%)"}
-                strokeWidth={0.5}
-                opacity={isActive ? opacity : 0.01}
+      {/* Toolbar overlay (not transformed) */}
+      <div className="absolute top-2 left-2 right-2 z-40 flex items-center gap-2 pointer-events-none">
+        <div className="flex items-center gap-1 pointer-events-auto bg-card/80 backdrop-blur-sm border border-border rounded-md px-1 py-1">
+          <button
+            onClick={() => zoomBy(0.75)}
+            className="w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-secondary text-sm font-mono"
+            title="Zoom out"
+            aria-label="Zoom out"
+          >−</button>
+          <button
+            onClick={() => zoomBy(1.33)}
+            className="w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-secondary text-sm font-mono"
+            title="Zoom in"
+            aria-label="Zoom in"
+          >+</button>
+          <button
+            onClick={resetView}
+            className="px-2 h-7 rounded text-[10px] tracking-wider uppercase text-muted-foreground hover:text-foreground hover:bg-secondary font-mono"
+            title="Reset view"
+          >Reset</button>
+          <span className="px-1 text-[10px] text-muted-foreground font-mono tabular-nums">{scale.toFixed(1)}×</span>
+        </div>
+        <div className="pointer-events-auto flex-1 max-w-xs">
+          {searchOpen ? (
+            <div className="flex items-center gap-1 bg-card/80 backdrop-blur-sm border border-border rounded-md px-2 py-1">
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Sök nod (t.ex. Malin, Conny)…"
+                className="flex-1 bg-transparent outline-none text-xs font-mono text-foreground placeholder:text-muted-foreground/60"
               />
-            );
-          })
-        )}
-      </svg>
+              {matches.size > 0 && (
+                <span className="text-[10px] font-mono text-muted-foreground">{matches.size}</span>
+              )}
+              <button
+                onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
+                className="text-muted-foreground hover:text-foreground text-xs px-1"
+                aria-label="Close search"
+              >✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="bg-card/80 backdrop-blur-sm border border-border rounded-md px-2 h-7 text-[10px] tracking-wider uppercase font-mono text-muted-foreground hover:text-foreground"
+              title="Search nodes"
+            >🔍 Sök</button>
+          )}
+        </div>
+      </div>
 
-      {/* Rotate-frame: rays from anchor to every unit, opacity ∝ intention-space proximity */}
-      {anchorUnit && (() => {
-        const anchorIdx = field.units.findIndex((u) => u.id === anchorUnit.id);
-        if (anchorIdx < 0) return null;
-        const aPos = unitPositions[anchorIdx];
-        return (
-          <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
-            {field.units.map((u, i) => {
-              if (u.id === anchorUnit.id) return null;
-              const d = distanceFromAnchor(anchorUnit, u);
-              // Strong rays only for genuinely contrasting units (far in intention space).
-              const opacity = Math.max(0.05, Math.min(0.55, d * 0.7));
-              const pos = unitPositions[i];
+      {/* Pan/zoom viewport */}
+      <div
+        ref={viewportRef}
+        className="absolute inset-0 touch-none"
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ cursor: pointers.current.size > 0 ? "grabbing" : "grab" }}
+      >
+        <div
+          className="absolute inset-0 origin-top-left"
+          style={{ transform: `translate(${tx}px, ${ty}px) scale(${scale})` }}
+        >
+          {/* Tension gradient background blobs */}
+          {field.units
+            .filter((u) => u.fz > 0.65)
+            .map((u, i) => {
+              const idx = field.units.indexOf(u);
               return (
-                <line
-                  key={`anchor-ray-${u.id}`}
-                  x1={aPos.x}
-                  y1={aPos.y}
-                  x2={pos.x}
-                  y2={pos.y}
-                  stroke="hsl(340, 90%, 60%)"
-                  strokeWidth={d > 0.5 ? 1 : 0.5}
-                  opacity={opacity}
+                <div
+                  key={`fz-${i}`}
+                  className="absolute rounded-full pointer-events-none"
+                  style={{
+                    left: pctX(idx),
+                    top: pctY(idx),
+                    width: `${u.fz * 120}px`,
+                    height: `${u.fz * 120}px`,
+                    transform: "translate(-50%, -50%)",
+                    background: `radial-gradient(circle, hsl(25, 90%, 55%, ${u.fz * 0.2}) 0%, transparent 70%)`,
+                    animation: `tension-ripple ${3 + i * 0.5}s ease-in-out infinite`,
+                  }}
                 />
               );
             })}
+
+          {/* CTI critical node markers */}
+          {field.units
+            .filter((u) => (u.cti ?? 0) > 0.35)
+            .map((u) => {
+              const idx = field.units.indexOf(u);
+              const cti = u.cti ?? 0;
+              const ringSize = 28 + cti * 30;
+              return (
+                <div
+                  key={`cti-${u.id}`}
+                  className="absolute rounded-full pointer-events-none"
+                  style={{
+                    left: pctX(idx),
+                    top: pctY(idx),
+                    width: `${ringSize}px`,
+                    height: `${ringSize}px`,
+                    transform: "translate(-50%, -50%)",
+                    border: `1.5px solid hsl(340, 80%, 60%, ${0.3 + cti * 0.5})`,
+                    boxShadow: `0 0 ${cti * 20}px hsl(340, 80%, 60%, ${cti * 0.3}), inset 0 0 ${cti * 12}px hsl(340, 80%, 60%, ${cti * 0.15})`,
+                    animation: `tension-ripple ${2 + cti * 2}s ease-in-out infinite`,
+                    zIndex: 1,
+                  }}
+                />
+              );
+            })}
+
+          {/* Cluster centers */}
+          {field.clusters.map((cluster, i) => {
+            const pos = clusterCenterPositions[i];
+            const isActive = activeCluster === null || activeCluster === i;
+            return (
+              <motion.div
+                key={`cl-${i}`}
+                className="absolute pointer-events-none select-none"
+                style={{ left: pos.x, top: pos.y, transform: "translate(-50%, -50%)" }}
+                animate={{ opacity: isActive ? 0.5 : 0.1 }}
+              >
+                <div
+                  className="rounded-full"
+                  style={{
+                    width: `${cluster.unitCount * 25 + 60}px`,
+                    height: `${cluster.unitCount * 25 + 60}px`,
+                    background: CLUSTER_COLORS_DIM[i],
+                    border: `1px solid ${CLUSTER_COLORS[i]}22`,
+                  }}
+                />
+                <span
+                  className="absolute left-1/2 -translate-x-1/2 -bottom-5 font-mono text-[10px] tracking-widest uppercase whitespace-nowrap"
+                  style={{ color: CLUSTER_COLORS[i] }}
+                >
+                  {cluster.label}
+                </span>
+              </motion.div>
+            );
+          })}
+
+          {/* Connection lines */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+            {field.units.map((u, i) =>
+              field.units.slice(i + 1).map((v, j) => {
+                const dist = Math.sqrt(
+                  (u.vector2d[0] - v.vector2d[0]) ** 2 + (u.vector2d[1] - v.vector2d[1]) ** 2
+                );
+                if (dist > 2.0) return null;
+                const opacity = Math.max(0.02, 0.12 - dist * 0.05);
+                const isActive =
+                  activeCluster === null || u.clusterId === activeCluster || v.clusterId === activeCluster;
+                return (
+                  <line
+                    key={`l-${i}-${j}`}
+                    x1={pctX(i)}
+                    y1={pctY(i)}
+                    x2={pctX(i + 1 + j)}
+                    y2={pctY(i + 1 + j)}
+                    stroke={u.clusterId === v.clusterId ? CLUSTER_COLORS[u.clusterId] : "hsl(200,10%,30%)"}
+                    strokeWidth={0.5 / scale}
+                    opacity={isActive ? opacity : 0.01}
+                  />
+                );
+              })
+            )}
           </svg>
-        );
-      })()}
 
-      {/* Anchor ring */}
-      {anchorUnit && (() => {
-        const idx = field.units.findIndex((u) => u.id === anchorUnit.id);
-        if (idx < 0) return null;
-        const pos = unitPositions[idx];
-        return (
-          <div
-            key="anchor-ring"
-            className="absolute rounded-full pointer-events-none"
-            style={{
-              left: pos.x,
-              top: pos.y,
-              width: 44,
-              height: 44,
-              transform: "translate(-50%, -50%)",
-              border: "2px dashed hsl(340, 90%, 65%)",
-              boxShadow: "0 0 18px hsl(340, 90%, 60%, 0.6)",
-              animation: "tension-ripple 3s ease-in-out infinite",
-              zIndex: 3,
-            }}
-          />
-        );
-      })()}
+          {/* Anchor rays */}
+          {anchorUnit && (() => {
+            const anchorIdx = field.units.findIndex((u) => u.id === anchorUnit.id);
+            if (anchorIdx < 0) return null;
+            return (
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+                {field.units.map((u, i) => {
+                  if (u.id === anchorUnit.id) return null;
+                  const d = distanceFromAnchor(anchorUnit, u);
+                  const opacity = Math.max(0.05, Math.min(0.55, d * 0.7));
+                  return (
+                    <line
+                      key={`anchor-ray-${u.id}`}
+                      x1={pctX(anchorIdx)}
+                      y1={pctY(anchorIdx)}
+                      x2={pctX(i)}
+                      y2={pctY(i)}
+                      stroke="hsl(340, 90%, 60%)"
+                      strokeWidth={(d > 0.5 ? 1 : 0.5) / scale}
+                      opacity={opacity}
+                    />
+                  );
+                })}
+              </svg>
+            );
+          })()}
 
-      {/* Unit nodes */}
+          {/* Anchor ring */}
+          {anchorUnit && (() => {
+            const idx = field.units.findIndex((u) => u.id === anchorUnit.id);
+            if (idx < 0) return null;
+            return (
+              <div
+                key="anchor-ring"
+                className="absolute rounded-full pointer-events-none"
+                style={{
+                  left: pctX(idx),
+                  top: pctY(idx),
+                  width: 44,
+                  height: 44,
+                  transform: "translate(-50%, -50%)",
+                  border: "2px dashed hsl(340, 90%, 65%)",
+                  boxShadow: "0 0 18px hsl(340, 90%, 60%, 0.6)",
+                  animation: "tension-ripple 3s ease-in-out infinite",
+                  zIndex: 3,
+                }}
+              />
+            );
+          })()}
 
-      {field.units.map((unit, i) => {
-        const pos = unitPositions[i];
-        const size = 8 + unit.fz * 16;
-        const isActive = activeCluster === null || unit.clusterId === activeCluster;
-        const isSelected = selectedUnit?.id === unit.id;
-        const isHovered = hoveredUnit?.id === unit.id;
-        return (
-          <motion.button
-            key={unit.id}
-            className="absolute rounded-full border-0 cursor-pointer focus:outline-none transition-[left,top] duration-700 ease-out"
-            style={{
-              left: pos.x,
-              top: pos.y,
-              width: size,
-              height: size,
-              transform: "translate(-50%, -50%)",
-              background: CLUSTER_COLORS[unit.clusterId],
-              boxShadow: isSelected || isHovered
-                ? `0 0 ${unit.fz * 25 + 10}px ${CLUSTER_COLORS[unit.clusterId]}`
-                : unit.fz > 0.65
-                ? `0 0 ${unit.fz * 15}px hsl(25, 90%, 55%, 0.5)`
-                : `0 0 ${unit.fy * 8}px ${CLUSTER_COLORS[unit.clusterId]}44`,
-              zIndex: isSelected || isHovered ? 20 : 2,
-            }}
-            animate={{
-              opacity: isActive ? 0.7 + unit.fy * 0.3 : 0.1,
-              scale: isSelected ? 1.6 : isHovered ? 1.3 : 1,
-            }}
-            transition={{ duration: 0.2 }}
-            onMouseEnter={() => setHoveredUnit(unit)}
-            onMouseLeave={() => setHoveredUnit(null)}
-            onClick={() => {
-              onSelectUnit(isSelected ? null : unit);
-              onSelectCluster(isSelected ? null : unit.clusterId);
-            }}
-          />
-        );
-      })}
+          {/* Unit nodes */}
+          {field.units.map((unit, i) => {
+            const size = 8 + unit.fz * 16;
+            const isActive = activeCluster === null || unit.clusterId === activeCluster;
+            const isSelected = selectedUnit?.id === unit.id;
+            const isHovered = hoveredUnit?.id === unit.id;
+            const isMatch = matches.has(unit.id);
+            return (
+              <motion.button
+                key={unit.id}
+                className="absolute rounded-full border-0 cursor-pointer focus:outline-none transition-[left,top] duration-700 ease-out"
+                style={{
+                  left: pctX(i),
+                  top: pctY(i),
+                  width: size,
+                  height: size,
+                  transform: "translate(-50%, -50%)",
+                  background: CLUSTER_COLORS[unit.clusterId],
+                  boxShadow: isMatch
+                    ? `0 0 ${18}px hsl(48, 100%, 60%), 0 0 0 2px hsl(48, 100%, 60%)`
+                    : isSelected || isHovered
+                    ? `0 0 ${unit.fz * 25 + 10}px ${CLUSTER_COLORS[unit.clusterId]}`
+                    : unit.fz > 0.65
+                    ? `0 0 ${unit.fz * 15}px hsl(25, 90%, 55%, 0.5)`
+                    : `0 0 ${unit.fy * 8}px ${CLUSTER_COLORS[unit.clusterId]}44`,
+                  zIndex: isMatch ? 15 : isSelected || isHovered ? 20 : 2,
+                }}
+                animate={{
+                  opacity: normalizedQuery
+                    ? isMatch ? 1 : 0.15
+                    : isActive ? 0.7 + unit.fy * 0.3 : 0.1,
+                  scale: isSelected ? 1.6 : isHovered ? 1.3 : isMatch ? 1.4 : 1,
+                }}
+                transition={{ duration: 0.2 }}
+                onMouseEnter={() => setHoveredUnit(unit)}
+                onMouseLeave={() => setHoveredUnit(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectUnit(isSelected ? null : unit);
+                  onSelectCluster(isSelected ? null : unit.clusterId);
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
 
-      {/* Hover tooltip */}
+      {/* Hover tooltip (not transformed) */}
       <AnimatePresence>
         {displayUnit && (
           <motion.div
