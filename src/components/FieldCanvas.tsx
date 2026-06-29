@@ -56,16 +56,49 @@ export default function FieldCanvas({
     []
   );
 
-  // Compute positions as percentages
-  const unitPositions = useMemo(
-    () =>
-      field.units.map((u) => {
+  // Compute positions as percentages.
+  // When an anchor is set, we WARP the layout: keep each unit's angular direction
+  // from the anchor (in the original 2D map), but rewrite its radial distance to
+  // the 5D intention-space distance from the anchor. Units that look close on the
+  // original map but are morally/narratively far slide outward, exposing layers
+  // that pointed in a completely different direction.
+  const unitPositions = useMemo(() => {
+    if (!anchorUnit) {
+      return field.units.map((u) => {
         const x = ((u.vector2d[0] + 4) / 8) * 100;
         const y = ((u.vector2d[1] + 4) / 8) * 100;
         return { x: `${Math.max(5, Math.min(95, x))}%`, y: `${Math.max(5, Math.min(95, y))}%` };
-      }),
-    [field.units]
-  );
+      });
+    }
+    const ax = anchorUnit.vector2d[0];
+    const ay = anchorUnit.vector2d[1];
+    const RADIUS_SCALE = 3.6; // distance 1.0 in intention space → ~3.6 units on the 8-wide map
+    return field.units.map((u, idx) => {
+      if (u.id === anchorUnit.id) {
+        const x = ((ax + 4) / 8) * 100;
+        const y = ((ay + 4) / 8) * 100;
+        return { x: `${Math.max(5, Math.min(95, x))}%`, y: `${Math.max(5, Math.min(95, y))}%` };
+      }
+      let dx = u.vector2d[0] - ax;
+      let dy = u.vector2d[1] - ay;
+      let len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1e-6) {
+        // Co-located in original 2D — fan out by stable hash of id.
+        const theta = (idx * 2.399963); // golden-angle-ish
+        dx = Math.cos(theta);
+        dy = Math.sin(theta);
+        len = 1;
+      }
+      const dirX = dx / len;
+      const dirY = dy / len;
+      const newLen = distanceFromAnchor(anchorUnit, u) * RADIUS_SCALE;
+      const nx = ax + dirX * newLen;
+      const ny = ay + dirY * newLen;
+      const x = ((nx + 4) / 8) * 100;
+      const y = ((ny + 4) / 8) * 100;
+      return { x: `${Math.max(5, Math.min(95, x))}%`, y: `${Math.max(5, Math.min(95, y))}%` };
+    });
+  }, [field.units, anchorUnit]);
 
   const clusterCenterPositions = useMemo(
     () =>
