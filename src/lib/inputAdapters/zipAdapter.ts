@@ -5,6 +5,8 @@ import { extractFromScript } from "./scriptAdapter";
 import { extractFromImage } from "./imageAdapter";
 import { extractFromNotebook } from "./notebookAdapter";
 import { extractFromPdf } from "./pdfAdapter";
+import { extractFromAudio } from "./audioAdapter";
+
 
 /**
  * Zip adapter with dynamic context exclusion + per-file timeout so a single
