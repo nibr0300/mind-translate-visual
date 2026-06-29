@@ -80,7 +80,9 @@ export async function extractFromZip(
   const maxDepth = opts.maxDepth ?? 3;
   const maxFiles = opts.maxFiles ?? 300;
   const includeImages = opts.includeImages ?? false;
+  const includeAudio = opts.includeAudio ?? true;
   const onProgress = opts.onProgress;
+
 
   if (depth > maxDepth) return [];
 
