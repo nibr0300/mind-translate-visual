@@ -11,6 +11,12 @@ export interface IntentionAnalysis {
   epistemicCertainty: number;
   intentionalForce: number;
   truthTension: number;
+  /** 0-1: cowardice, denial, blame-shifting, religious/ideological self-exoneration */
+  moralTension?: number;
+  /** 0-1: inter-subject friction — betrayal, accusation, silenced witness */
+  narrativeTension?: number;
+  /** 0-1: actively refusing or rewriting plain reality */
+  denialMarker?: number;
 }
 
 export interface TriangulatedTension {
