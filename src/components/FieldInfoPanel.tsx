@@ -71,18 +71,18 @@ export default function FieldInfoPanel({ isOpen, onClose }: FieldInfoPanelProps)
                 </h3>
                 <ul className="space-y-3 text-muted-foreground">
                   <li>
-                    <span className="text-foreground font-medium">Psychiatry & Therapy:</span> Map
-                    emotional patterns in journals. FZ spikes reveal subconscious triggers. Clusters
-                    become therapeutic actors.
+                    <span className="text-foreground font-medium">Truth-Seeking:</span> Map claims,
+                    evidence, and open questions. FZ spikes reveal where verification is incomplete and
+                    a model is under pressure.
                   </li>
                   <li>
                     <span className="text-foreground font-medium">Didactics:</span> Visualize knowledge
                     structure. Identify misconception zones. Track comprehension topology.
                   </li>
                   <li>
-                    <span className="text-foreground font-medium">AI Translation:</span> Convert
-                    documents to geometric prompts for stateless AI. Clusters act as persistent
-                    short-term memory anchors.
+                    <span className="text-foreground font-medium">Negotiation:</span> Render positions,
+                    conflicts, trade-offs, and emerging agreement zones. Clusters become parties and
+                    pressure points in a dialogue.
                   </li>
                 </ul>
               </section>
