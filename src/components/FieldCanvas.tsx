@@ -24,6 +24,8 @@ interface FieldCanvasProps {
   onSelectCluster: (id: number | null) => void;
   onSelectUnit: (unit: FieldUnit | null) => void;
   selectedUnit: FieldUnit | null;
+  anchorUnit?: FieldUnit | null;
+  onSetAnchor?: (unit: FieldUnit | null) => void;
 }
 
 export default function FieldCanvas({
@@ -32,7 +34,10 @@ export default function FieldCanvas({
   onSelectCluster,
   onSelectUnit,
   selectedUnit,
+  anchorUnit = null,
+  onSetAnchor,
 }: FieldCanvasProps) {
+
   const [hoveredUnit, setHoveredUnit] = useState<FieldUnit | null>(null);
 
   // Map vector2d to canvas coordinates
