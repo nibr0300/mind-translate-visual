@@ -165,6 +165,21 @@ export async function extractFromZip(
         continue;
       }
 
+      if (includeAudio && AUDIO_EXT.test(path)) {
+        if (depth === 0 && onProgress) {
+          onProgress(`Transcribing ${path.split("/").pop()} (${idx + 1}/${total})`, 0.05 + 0.15 * (idx / total));
+        }
+        const ext = path.split(".").pop()!.toLowerCase();
+        const mime = ext === "mp3" ? "audio/mpeg" : `audio/${ext}`;
+        const blob = await entry.async("blob");
+        const sub = new File([blob], path, { type: mime });
+        const subUnits = await withTimeout(extractFromAudio(sub), PER_AUDIO_TIMEOUT_MS, path);
+        for (const u of subUnits) units.push({ ...u, source: `${path}${u.source?.includes("@") ? "@" + u.source.split("@")[1] : ""}` });
+        counter.count++;
+        continue;
+      }
+
+
       // Unknown extension — record but don't crash
       counter.skipped.push(path);
     } catch (err) {
