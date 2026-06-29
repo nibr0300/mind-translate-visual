@@ -173,9 +173,40 @@ export async function extractFromZip(
         const mime = ext === "mp3" ? "audio/mpeg" : `audio/${ext}`;
         const blob = await entry.async("blob");
         const sub = new File([blob], path, { type: mime });
-        const subUnits = await withTimeout(extractFromAudio(sub), PER_AUDIO_TIMEOUT_MS, path);
-        for (const u of subUnits) units.push({ ...u, source: `${path}${u.source?.includes("@") ? "@" + u.source.split("@")[1] : ""}` });
+
+        let subUnits: RawTextUnit[] = [];
+        let lastErr: Error | null = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            subUnits = await withTimeout(extractFromAudio(sub), PER_AUDIO_TIMEOUT_MS, path);
+            lastErr = null;
+            break;
+          } catch (e) {
+            lastErr = e as Error;
+            const msg = lastErr.message || "";
+            // Retry on rate-limit or transient gateway errors
+            if (/429|rate|timeout|503|502|temporarily/i.test(msg) && attempt < 2) {
+              await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
+              continue;
+            }
+            break;
+          }
+        }
+
+        if (lastErr || subUnits.length === 0) {
+          // Surface the failure as a marker unit so the song still appears in the field
+          units.push({
+            text: `[AUDIO FAILED: ${path}] ${lastErr?.message ?? "empty transcript"} — try uploading this track on its own, or as a smaller/shorter file.`,
+            source: path,
+            position: counter.count,
+          });
+          counter.skipped.push(`${path} (${lastErr?.message ?? "empty"})`);
+        } else {
+          for (const u of subUnits) units.push({ ...u, source: `${path}${u.source?.includes("@") ? "@" + u.source.split("@")[1] : ""}` });
+        }
         counter.count++;
+        // Small breather between songs to avoid hammering the AI gateway
+        await new Promise((r) => setTimeout(r, 800));
         continue;
       }
 
