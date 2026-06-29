@@ -49,14 +49,15 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: `You are a speech-act and epistemic analyst. For each numbered text unit, analyze:
+              content: `You are a multilingual speech-act and epistemic analyst. Text units may be in ANY language (commonly Swedish, English, or mixed). Analyze semantic intent directly in the source language — do NOT translate first. For each numbered text unit, analyze:
 
 1. **Speech act type** (assertive, directive, commissive, expressive, declarative)
 2. **Epistemic certainty** (0.0 = highly uncertain/speculative, 1.0 = definitive/factual)
 3. **Intentional force** (0.0 = neutral/descriptive, 1.0 = strong persuasive/transformative intent)
 4. **Truth-seeking tension** (0.0 = settled/accepted, 1.0 = actively questioning/challenging)
 
-Respond ONLY with the tool call. Analyze the actual semantic intent, not just surface words.`,
+For sung lyrics or poetry, treat metaphor and imagery as expressive speech acts unless they make explicit claims. Respond ONLY with the tool call. Analyze the actual semantic intent, not just surface words.`,
+
             },
             {
               role: "user",
