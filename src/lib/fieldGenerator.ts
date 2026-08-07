@@ -9,6 +9,7 @@
  */
 import type { GeometricField, FieldUnit, FieldCluster } from "./fieldData";
 import { extractFromFile, detectSourceType, type SourceType } from "./inputAdapters";
+import { lastMarkupRatio } from "./inputAdapters/textAdapter";
 import { chunkUnits, type Chunk } from "./chunker";
 import { sha256Hex } from "./contentHash";
 import { generateFieldFromPDF } from "./pdfFieldGenerator";
@@ -17,6 +18,10 @@ import {
   kMeans,
   projectTo2D,
   generateClusterLabels,
+  spreadCollisions,
+  degenerateFlags,
+  computeKnnEdges,
+  edgeCentrality,
 } from "./textAnalyzer";
 import {
   analyzeIntentions,
@@ -39,6 +44,8 @@ export async function generateFieldFromFile(
 
   let field: GeometricField;
   let chunks: Chunk[];
+  const notes: string[] = [];
+  let totalFound = 0;
 
   if (sourceType === "pdf") {
     field = await generateFieldFromPDF(file, onProgress);
@@ -59,6 +66,13 @@ export async function generateFieldFromFile(
 
     onProgress?.("Chunking content…", 0.2);
     chunks = chunkUnits(rawUnits);
+    totalFound = chunks.length;
+
+    if (lastMarkupRatio > 0.3) {
+      notes.push(
+        `${Math.round(lastMarkupRatio * 100)}% of the source was HTML/CSS markup and was stripped before analysis.`
+      );
+    }
 
     if (chunks.length < 3) {
       throw new Error("Content too short to build a meaningful field (min 3 chunks).");
@@ -90,9 +104,14 @@ export async function generateFieldFromFile(
       }
       console.info(`[field] balanced cap: ${chunks.length} → ${balanced.length} chunks across ${sources.length} sources`);
       chunks = balanced;
+      notes.push(
+        `Source capped: ${chunks.length} of ${totalFound} units analyzed (evenly sampled across ${sources.length} source${sources.length === 1 ? "" : "s"}).`
+      );
     }
 
     field = await buildFieldFromChunks(chunks, sourceType, onProgress);
+    field.stats.analyzedOf = { analyzed: chunks.length, total: totalFound };
+    if (notes.length) field.stats.notes = [...(field.stats.notes ?? []), ...notes];
   }
 
   // Background: embed + persist. Don't block UI on it.
@@ -126,7 +145,14 @@ async function buildFieldFromChunks(
   ]);
 
   onProgress?.("Projecting to 2D field…", 0.78);
-  const coords2D = projectTo2D(vectors);
+  const rawCoords = projectTo2D(vectors);
+  const { coords: coords2D, uniqueBefore } = spreadCollisions(
+    rawCoords,
+    texts.map((t, i) => `u${i}:${t.slice(0, 24)}`)
+  );
+  const degenerate = degenerateFlags(vectors);
+  const knnEdges = computeKnnEdges(vectors, 8);
+  const { degree, weighted } = edgeCentrality(knnEdges, texts.length);
   const clusterLabels = generateClusterLabels(texts, assignments, k);
 
   const intentionMap = new Map<number, IntentionAnalysis>();
@@ -193,6 +219,9 @@ async function buildFieldFromChunks(
       fz,
       fy: Math.round(fy * 100) / 100,
       sourcePath: chunks[i]?.source,
+      ...(degenerate[i] ? { degenerate: true } : {}),
+      degree: degree[i],
+      weightedCentrality: weighted[i],
       ...(intention && {
         intention: {
           speechAct: intention.speechAct,
@@ -237,15 +266,30 @@ async function buildFieldFromChunks(
   const boundaryUnits = units.filter((u) => u.fz > 0.65).length;
   onProgress?.("Field ready", 1);
 
+  const degenerateUnits = degenerate.filter(Boolean).length;
+  const stats: GeometricField["stats"] = {
+    totalUnits: units.length,
+    boundaryUnits,
+    avgFZ: units.reduce((s, u) => s + u.fz, 0) / units.length,
+    avgFY: units.reduce((s, u) => s + u.fy, 0) / units.length,
+    coordinateResolution: units.length ? Math.round((uniqueBefore / units.length) * 100) / 100 : 1,
+    degenerateUnits,
+  };
+  if (degenerateUnits > 0) {
+    stats.notes = [
+      `${degenerateUnits} unit${degenerateUnits === 1 ? "" : "s"} had no distinctive terms — their position is fallback placement, not semantics.`,
+    ];
+  }
+
   return {
     units,
     clusters,
-    stats: {
-      totalUnits: units.length,
-      boundaryUnits,
-      avgFZ: units.reduce((s, u) => s + u.fz, 0) / units.length,
-      avgFY: units.reduce((s, u) => s + u.fy, 0) / units.length,
-    },
+    edges: knnEdges.map((e) => ({
+      source: units[e.source].id,
+      target: units[e.target].id,
+      similarity: e.similarity,
+    })),
+    stats,
     useCase: `uploaded-${sourceType}`,
   };
 }
