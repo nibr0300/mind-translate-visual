@@ -5,6 +5,7 @@ import { distanceFromAnchor } from "@/lib/anchorMath";
 import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
 import AccountPanel from "./AccountPanel";
+import FieldGuide from "./FieldGuide";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
 import { toast } from "sonner";
