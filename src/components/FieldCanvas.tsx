@@ -505,7 +505,12 @@ export default function FieldCanvas({
 
           {/* Unit nodes */}
           {field.units.map((unit, i) => {
-            const size = 8 + unit.fz * 16;
+            const depth = depths[i] ?? 0;
+            // Depth cues: near nodes are bigger, sharper and brighter; far nodes recede.
+            const depthScale = 1 + depth * 0.35;
+            const size = (8 + unit.fz * 16) * depthScale;
+            const blur = depth < 0 ? Math.abs(depth) * 1.8 : 0;
+            const depthOpacity = 0.55 + (depth + 1) / 2 * 0.45;
             const isActive = activeCluster === null || unit.clusterId === activeCluster;
             const isSelected = selectedUnit?.id === unit.id;
             const isHovered = hoveredUnit?.id === unit.id;
@@ -513,7 +518,7 @@ export default function FieldCanvas({
             return (
               <motion.button
                 key={unit.id}
-                className="absolute rounded-full border-0 cursor-pointer focus:outline-none transition-[left,top] duration-700 ease-out"
+                className="absolute rounded-full border-0 cursor-pointer focus:outline-none transition-[left,top,width,height,filter] duration-700 ease-out"
                 style={{
                   left: pctX(i),
                   top: pctY(i),
@@ -521,6 +526,7 @@ export default function FieldCanvas({
                   height: size,
                   transform: "translate(-50%, -50%)",
                   background: CLUSTER_COLORS[unit.clusterId],
+                  filter: blur > 0.05 ? `blur(${blur}px)` : undefined,
                   boxShadow: isMatch
                     ? `0 0 ${18}px hsl(48, 100%, 60%), 0 0 0 2px hsl(48, 100%, 60%)`
                     : isSelected || isHovered
@@ -528,12 +534,16 @@ export default function FieldCanvas({
                     : unit.fz > 0.65
                     ? `0 0 ${unit.fz * 15}px hsl(25, 90%, 55%, 0.5)`
                     : `0 0 ${unit.fy * 8}px ${CLUSTER_COLORS[unit.clusterId]}44`,
-                  zIndex: isMatch ? 15 : isSelected || isHovered ? 20 : 2,
+                  zIndex: isMatch
+                    ? 15
+                    : isSelected || isHovered
+                    ? 20
+                    : 2 + Math.round((depth + 1) * 4),
                 }}
                 animate={{
                   opacity: normalizedQuery
                     ? isMatch ? 1 : 0.15
-                    : isActive ? 0.7 + unit.fy * 0.3 : 0.1,
+                    : isActive ? (0.7 + unit.fy * 0.3) * depthOpacity : 0.1,
                   scale: isSelected ? 1.6 : isHovered ? 1.3 : isMatch ? 1.4 : 1,
                 }}
                 transition={{ duration: 0.2 }}
@@ -547,6 +557,7 @@ export default function FieldCanvas({
               />
             );
           })}
+
         </div>
       </div>
 
