@@ -651,6 +651,13 @@ export default function FieldCanvas({
               <div className="text-muted-foreground">
                 type: <span className="text-foreground">{displayUnit.type}</span>
               </div>
+              <div className="text-muted-foreground">
+                djup:{" "}
+                <span className="text-foreground tabular-nums">
+                  {(depths[field.units.findIndex((u) => u.id === displayUnit.id)] ?? 0).toFixed(2)}
+                </span>
+              </div>
+
             </div>
             {displayUnit.intention && (
               <div className="mt-3 pt-3 border-t border-border">
