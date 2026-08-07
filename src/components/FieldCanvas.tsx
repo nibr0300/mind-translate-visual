@@ -561,6 +561,21 @@ export default function FieldCanvas({
         </div>
       </div>
 
+      {/* Rodret — vrid fältets axel genom intentionsrymden */}
+      <div className="absolute top-14 right-2 z-40 flex flex-col items-center gap-1 bg-card/80 backdrop-blur-sm border border-border rounded-lg px-2 py-2">
+        <span className="font-mono text-[9px] tracking-widest uppercase text-muted-foreground">Roder</span>
+        <HelmWheel theta={heading} onChange={setHeading} size={96} />
+        <button
+          onClick={() => setHeading(0)}
+          className="font-mono text-[9px] tracking-wider uppercase text-muted-foreground hover:text-foreground px-2 py-0.5 rounded hover:bg-secondary"
+          title="Centrera rodret"
+        >
+          Midskepps
+        </button>
+      </div>
+
+
+
       {/* Hover tooltip (not transformed) */}
       <AnimatePresence>
         {displayUnit && (
