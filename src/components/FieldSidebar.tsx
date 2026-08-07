@@ -187,8 +187,15 @@ export default function FieldSidebar({
         </p>
       </div>
 
+      {/* Permanent field guide + gentle exploration prompts */}
+      <FieldGuide
+        field={field}
+        onSelectCluster={onSelectCluster}
+      />
+
       {/* PDF Upload */}
       <PdfUploader onFieldGenerated={onUploadField} />
+
 
       {/* Use Case Selector */}
       <div className="p-4 border-b border-border">
