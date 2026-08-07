@@ -30,18 +30,15 @@ Analysen från ChatGPT pekar ut fyra tekniska brister som riskerar att förväxl
 - Lägg till per-nod `degree` och `weightedCentrality` så en läsande AI kan skilja verklig nodgrad från visuell linjetäthet.
 - Samma kanter exponeras via MCP-verktyget så en AI kan hämta topologin utan att gå via filexport.
 
-## Steg 4 — Introspektionsslingan (det egentligen nya)
+## Steg 4 — Introspektionsslingan (uppskjuten, byggs inte nu)
 
-Analysens skarpaste poäng: kartan blir intressant först när samma modell först *förutsäger* och sedan *ser*.
-
-- Nytt läge "Predict & Compare": innan fältet visas får modellen texten och ombeds peka ut de N meningar den tror får högst CTI.
-- Efter analys visas en jämförelsevy: förutsagda vs faktiska kritiska noder, med träffprocent och en lista över missarna.
-- Missarna sparas per dokument så avvikelserna kan följas över tid — det är det som gör det till ett självmodellskapande kretslopp snarare än post mortem.
+Specialfunktion kopplad till experimentet: låta modellen förutsäga sina egna högsta CTI-noder, jämföra med utfallet och spara avvikelsen över tid. Högintressant men expanderat användningsområde — tas efter att funktionsbristerna i steg 1–3 är åtgärdade.
 
 ## Teknisk not
 
-Steg 1–2 är rena klientändringar i `textAdapter.ts`, `pdfFieldGenerator.ts` och `textAnalyzer.ts`. Steg 3 rör fältexporten i `FieldSidebar.tsx` plus MCP-funktionen. Steg 4 kräver ett nytt anrop till analysfunktionen och en ny tabell för prediktioner.
+Steg 1–2 är rena klientändringar i `textAdapter.ts`, `pdfFieldGenerator.ts` och `textAnalyzer.ts`. Steg 3 rör fältexporten i `FieldSidebar.tsx` plus `corpus-map`/MCP-funktionerna. Inga schemaändringar krävs för steg 1–3.
 
-## Fråga innan start
+## Leverans
 
-Steg 1–3 gör om appen till ett trovärdigt mätinstrument. Steg 4 är den nya idén. Vill du att jag kör 1–3 i en följd först, eller ska jag börja med introspektionsslingan?
+Steg 1, 2 och 3 byggs i följd i denna omgång. Steg 4 ligger kvar som nästa etapp.
+
