@@ -135,7 +135,7 @@ export default function FieldGuide({
             <span>FY = resonans</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-[hsl(340,80%,55%)]" />
+            <div className="w-2 h-2 rounded-full bg-field-cti" />
             <span>CTI = kritisk</span>
           </div>
         </div>
