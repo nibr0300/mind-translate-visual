@@ -2,6 +2,9 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
 import { distanceFromAnchor } from "@/lib/anchorMath";
+import { computeDepths, applyHelm } from "@/lib/helmMath";
+import HelmWheel from "./HelmWheel";
+
 
 
 const CLUSTER_COLORS = [
@@ -64,8 +67,11 @@ export default function FieldCanvas({
     return out;
   }, [normalizedQuery, field.units]);
 
+  // Helm: heading angle (radians) through 5D intention space
+  const [heading, setHeading] = useState(0);
+
   // Compute positions as percentages (in untransformed content space).
-  const unitPositions = useMemo(() => {
+  const basePositions = useMemo(() => {
     if (!anchorUnit) {
       return field.units.map((u) => {
         const x = ((u.vector2d[0] + 4) / 8) * 100;
@@ -102,8 +108,17 @@ export default function FieldCanvas({
     });
   }, [field.units, anchorUnit]);
 
+  // Depth along the current heading — resolves stacked nodes into near/far layers.
+  const depths = useMemo(() => computeDepths(field.units, heading), [field.units, heading]);
+
+  const unitPositions = useMemo(
+    () => basePositions.map((p, i) => applyHelm(p, depths[i] ?? 0, heading)),
+    [basePositions, depths, heading]
+  );
+
   const pctX = (i: number) => `${unitPositions[i].x}%`;
   const pctY = (i: number) => `${unitPositions[i].y}%`;
+
 
   const clusterCenterPositions = useMemo(
     () =>
