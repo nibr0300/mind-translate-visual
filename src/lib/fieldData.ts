@@ -57,11 +57,21 @@ export interface FieldCluster {
 export interface GeometricField {
   units: FieldUnit[];
   clusters: FieldCluster[];
+  /** kNN graph in the original vector space — enables real network analysis on export. */
+  edges?: FieldEdge[];
   stats: {
     totalUnits: number;
     boundaryUnits: number;
     avgFZ: number;
     avgFY: number;
+    /** Units analyzed vs units found in the source (set when the source was capped). */
+    analyzedOf?: { analyzed: number; total: number };
+    /** unique coordinates / units — how much the 2D projection can be trusted. */
+    coordinateResolution?: number;
+    /** Units whose vector carried no signal (fallback placement). */
+    degenerateUnits?: number;
+    /** Human-readable warnings about the ingestion (markup stripped, truncation, …). */
+    notes?: string[];
   };
   useCase: string;
 }
