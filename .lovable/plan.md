@@ -1,61 +1,47 @@
-# Implementeringsplan
+# Nästa utvecklingssteg: från karta till mätinstrument
 
-Tre stora ändringar i en ordning som minimerar omarbete. Varje steg är committable för sig.
+Analysen från ChatGPT pekar ut fyra tekniska brister som riskerar att förväxlas med kognition. Alla fyra är bekräftade i koden. Planen åtgärdar dem i den ordning som ger störst tolkningsvinst per steg.
 
-## Steg 1 — Embedding-uppgradering (gemini-embedding-001, 3072 dim)
+## Vad som faktiskt är fel i koden idag
 
-**Varför först:** byte av vektor-dimension kräver migration av alla `vector(1536)` → `vector(3072)`. Allt som byggs efteråt (MCP, global field) lagras direkt i nya formatet och slipper en andra migration.
+| Observation i analysen | Bekräftad orsak |
+| --- | --- |
+| "Fältet slutar vid 80 enheter, arkivslutet saknas" | `pdfFieldGenerator.ts` kapar hårt vid 80 meningar. Textvägen (`fieldGenerator.ts`) har taket 600. PDF är alltså 7,5x snålare än text — utan att användaren informeras. |
+| "Den hade vikt", "Döda", "Ingen svarade" saknas | PDF-extraktionen filtrerar bort alla meningar kortare än 15 tecken. Korta litterära fragment kastas innan analys. |
+| "64 unika koordinatpar för 80 noder, 13 meningar på samma punkt" | `projectTo2D` är PCA på gles TF-IDF. Meningar utan gemensamma termer får nästan nollvektor och landar på samma punkt. Ingen kollisionsdetektering finns. |
+| "Exporten saknar unit-level-kanter, går ej att göra nätverksanalys" | Fältexporten innehåller enbart noder + kluster. Kanterna finns bara i `corpus-map` på klusternivå. |
+| "Corpus-topplistan förorenad av Quot · 11pt · Span" | `textAdapter.ts` läser råtext utan HTML-sanering. Sparad Google Docs-HTML blir till noder med hög CTI. |
 
-- Migration: ändra `chunks.embedding`, `clusters_summary.centroid_embedding` till `vector(3072)`. Sätt `embedding_dim` default = 3072. Behåll gamla rader men markera `embedding_model = 'openai/text-embedding-3-small'` så blandning är spårbar (eller töm dem — du väljer).
-- Uppdatera HNSW-index (drop + recreate på nya dim).
-- `embed-chunks/index.ts`: byt model-konstant till `google/gemini-embedding-001`.
-- `search-chunks/index.ts` + `search-clusters`: samma byte.
-- `fieldGenerator.ts`: skicka `embedding_model: "google/gemini-embedding-001"`, `embedding_dim: 3072` till `persist-field`.
-- En engångs-reembed-knapp (eller edge-funktion `reembed-all`) som kör om alla gamla dokument. Valfri; nya uppladdningar funkar direkt.
+## Steg 1 — Sanera indata (störst effekt, minst risk)
 
-## Steg 2 — Auth + RLS (förutsättning för MCP och global field)
+- HTML-sanering i textadaptern: strip `<style>`/`<script>`, taggar, CSS-deklarationer och `&nbsp;`-entiteter innan chunkning. Om >30 % av innehållet var markup, logga det och visa en not i sidopanelen.
+- Ta bort 15-teckenfiltret i PDF-extraktionen; sänk till 3 tecken (samma tröskel som textvägen) så korta fragment behålls.
+- Höj PDF-taket från 80 till samma 600 som textvägen, med samma rättvisa sampling. Om kapning ändå sker: visa "X av Y enheter analyserade" i UI:t istället för att tyst släppa svansen.
 
-**Varför nu:** MCP-anrop måste kunna sägas "denna användares data". Global field behöver "denna användare har gett samtycke". Båda kräver `user_id` på `documents`.
+## Steg 2 — Fixa projektionens kollapspunkter
 
-- Aktivera email + Google sign-in.
-- `documents`: lägg till `user_id uuid` (FK auth.users), `share_to_global boolean default false`.
-- RLS skrivs om: ersätt "readable by everyone (demo)" med `auth.uid() = user_id`. `chunks`/`clusters_summary` ärver via join på `documents.user_id` (security definer-funktion).
-- `persist-field`: läs `user_id` från JWT, skriv på documents.
-- En `api_keys`-tabell: `id, user_id, key_hash, name, scopes[], created_at, last_used_at, revoked_at`. Används av MCP för icke-browser-klienter.
-- Login/signup-sida + sidopanel visar inloggad användare.
+- Efter `projectTo2D`: detektera koordinatkollisioner (avstånd < epsilon) och sprid ut dem deterministiskt i en liten spiral kring gemensamt centrum, seedad på nod-id så kartan blir reproducerbar.
+- Lägg till `degenerate: true` på noder vars TF-IDF-vektor är nära noll, så tolkaren ser vilka positioner som är fallback och inte semantik.
+- Rapportera i fältstatistik: antal unika koordinater / antal noder. Det talet är i sig ett mått på hur mycket projektionen kan lita på.
 
-## Steg 3 — MCP-server (Edge Function via mcp-lite)
+## Steg 3 — Exportera kanterna, inte bara punkterna
 
-**Varför sist av kärnan:** kräver embedding-modell + auth färdiga.
+- Utöka fältexporten (JSON) med `edges`: kNN i den ursprungliga högdimensionella rymden (embeddings när de finns, annars TF-IDF-cosinus), k≈8, med `source`, `target`, `similarity`.
+- Lägg till per-nod `degree` och `weightedCentrality` så en läsande AI kan skilja verklig nodgrad från visuell linjetäthet.
+- Samma kanter exponeras via MCP-verktyget så en AI kan hämta topologin utan att gå via filexport.
 
-- Ny edge function `mcp/index.ts` med Hono + `mcp-lite@^0.10.0`, StreamableHttpTransport.
-- Auth: Bearer = api_key (slå upp i `api_keys`, sätt RLS-context via service role + manuellt user_id-filter).
-- Tools som exponeras:
-  - `search_chunks(query, min_cti?, min_similarity?, k?)` → omsluter `match_chunks`
-  - `search_clusters(query, k?)` → omsluter `match_clusters_hybrid`
-  - `get_corpus_map(include_chunks?)` → omsluter `corpus-map`
-  - `find_friction(min_cti)` → top-CTI chunks
-  - `compare_clusters(cluster_a_id, cluster_b_id)` → cosine + fz/fy-delta
-  - `ingest_text(text, filename?)` → kör samma pipeline som upload
-  - `list_documents()` → användarens dokument
-- En "Generate MCP key"-knapp i sidopanelen som returnerar nyckel + URL en gång.
+## Steg 4 — Introspektionsslingan (det egentligen nya)
 
-## Steg 4 — Global Field Friction Clusters (opt-in delat namnrum)
+Analysens skarpaste poäng: kartan blir intressant först när samma modell först *förutsäger* och sedan *ser*.
 
-- Ny tabell `global_clusters`: speglar `clusters_summary` men anonymiserad. `id, source_document_id, source_user_id (för audit, ej exponerat), label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding vector(3072), cohesion, separation, noise_ratio, contributed_at`.
-- RLS: SELECT öppen för authenticated. INSERT endast via security-definer-funktion som verifierar `documents.share_to_global = true`.
-- Trigger eller hook i `persist-field`: om `share_to_global` → kopiera kluster (inte chunks, inte text) till `global_clusters`.
-- Ny RPC `match_global_clusters(query_embedding, k)` för cross-user friction-sökning.
-- MCP-tool `search_global_friction(query, min_cti)`.
-- UI: checkbox "Bidra till Global Field Friction Clusters" per dokument + global toggle i user settings. Tydlig copy: "Endast kluster-centroider och metrik delas. Aldrig din text."
+- Nytt läge "Predict & Compare": innan fältet visas får modellen texten och ombeds peka ut de N meningar den tror får högst CTI.
+- Efter analys visas en jämförelsevy: förutsagda vs faktiska kritiska noder, med träffprocent och en lista över missarna.
+- Missarna sparas per dokument så avvikelserna kan följas över tid — det är det som gör det till ett självmodellskapande kretslopp snarare än post mortem.
 
-## Tekniska anteckningar
+## Teknisk not
 
-- Steg 1 kräver `DROP INDEX` + `CREATE INDEX` på nya dimensionen — ta backup eller acceptera att gamla embeddings nollas.
-- Steg 2 bryter den nuvarande "demo readable by everyone"-modellen. All existerande data utan `user_id` blir oåtkomlig om vi inte assignar dem till en seed-user eller raderar.
-- `mcp-lite` körs som vanlig edge function — ingen extra infrastruktur.
-- Global field kräver inte att användaren själv har auth om vi exponerar den read-only via MCP, men för INSERT krävs auth.
+Steg 1–2 är rena klientändringar i `textAdapter.ts`, `pdfFieldGenerator.ts` och `textAnalyzer.ts`. Steg 3 rör fältexporten i `FieldSidebar.tsx` plus MCP-funktionen. Steg 4 kräver ett nytt anrop till analysfunktionen och en ny tabell för prediktioner.
 
-## Förslag på första körning
+## Fråga innan start
 
-Säg "kör steg 1" så börjar jag med embedding-migrationen. Steg 2 är det mest disruptiva (förändrar dataåtkomst för befintlig data) — vill du att jag wipear nuvarande dokument vid det steget eller migrerar dem till en "legacy public"-user?
+Steg 1–3 gör om appen till ett trovärdigt mätinstrument. Steg 4 är den nya idén. Vill du att jag kör 1–3 i en följd först, eller ska jag börja med introspektionsslingan?
