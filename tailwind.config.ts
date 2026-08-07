@@ -54,6 +54,7 @@ export default {
         field: {
           fz: "hsl(var(--field-fz))",
           fy: "hsl(var(--field-fy))",
+          cti: "hsl(var(--field-cti))",
           void: "hsl(var(--field-void))",
           "cluster-0": "hsl(var(--field-cluster-0))",
           "cluster-1": "hsl(var(--field-cluster-1))",

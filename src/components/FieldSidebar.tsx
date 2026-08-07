@@ -5,6 +5,7 @@ import { distanceFromAnchor } from "@/lib/anchorMath";
 import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
 import AccountPanel from "./AccountPanel";
+import FieldGuide from "./FieldGuide";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -186,8 +187,15 @@ export default function FieldSidebar({
         </p>
       </div>
 
+      {/* Permanent field guide + gentle exploration prompts */}
+      <FieldGuide
+        field={field}
+        onSelectCluster={onSelectCluster}
+      />
+
       {/* PDF Upload */}
       <PdfUploader onFieldGenerated={onUploadField} />
+
 
       {/* Use Case Selector */}
       <div className="p-4 border-b border-border">
