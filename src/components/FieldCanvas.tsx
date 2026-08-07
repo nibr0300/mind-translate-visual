@@ -346,15 +346,16 @@ export default function FieldCanvas({
           {field.clusters.map((cluster, i) => {
             const pos = clusterCenterPositions[i];
             const isActive = activeCluster === null || activeCluster === i;
+            const isSelected = activeCluster === i;
             return (
               <motion.div
                 key={`cl-${i}`}
-                className="absolute pointer-events-none select-none"
+                className="absolute select-none"
                 style={{ left: pos.x, top: pos.y, transform: "translate(-50%, -50%)" }}
                 animate={{ opacity: isActive ? 0.5 : 0.1 }}
               >
                 <div
-                  className="rounded-full"
+                  className="rounded-full pointer-events-none"
                   style={{
                     width: `${cluster.unitCount * 25 + 60}px`,
                     height: `${cluster.unitCount * 25 + 60}px`,
@@ -362,12 +363,21 @@ export default function FieldCanvas({
                     border: `1px solid ${CLUSTER_COLORS[i]}22`,
                   }}
                 />
-                <span
-                  className="absolute left-1/2 -translate-x-1/2 -bottom-5 font-mono text-[10px] tracking-widest uppercase whitespace-nowrap"
-                  style={{ color: CLUSTER_COLORS[i] }}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectCluster(isSelected ? null : i);
+                  }}
+                  className={`absolute left-1/2 -translate-x-1/2 -bottom-5 font-mono text-[10px] tracking-widest uppercase whitespace-nowrap px-2 py-0.5 rounded transition-colors ${
+                    isSelected
+                      ? "bg-primary/20 text-primary border border-primary/30"
+                      : "hover:bg-secondary/60"
+                  }`}
+                  style={{ color: isSelected ? undefined : CLUSTER_COLORS[i] }}
+                  title={isSelected ? "Klicka för att visa alla kluster" : `Fokusera klustret ${cluster.label}`}
                 >
                   {cluster.label}
-                </span>
+                </button>
               </motion.div>
             );
           })}
