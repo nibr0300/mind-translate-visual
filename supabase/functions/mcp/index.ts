@@ -141,8 +141,10 @@ function buildServer(userId: string) {
   });
 
   server.tool("get_corpus_map", {
-    description: "Return the full corpus map (nodes, edges, quality, optional chunk embeddings) for the user.",
+    description:
+      "Return the full corpus map for the user: cluster nodes, cluster edges, quality metrics, and — when include_chunks is true — every unit plus unit-level kNN edges (chunk_edges) and per-unit degree/weighted centrality for real network analysis.",
     inputSchema: z.object({ include_chunks: z.boolean().optional() }),
+
     handler: async (args) => {
       const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/corpus-map`, {
         method: "POST",

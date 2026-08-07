@@ -244,8 +244,10 @@ Deno.serve(async (req) => {
 
     // 8) Chunks (valfritt). Streama i sidor om 1000 för att undvika 1000-radersgränsen.
     let chunks: any[] | undefined;
+    let chunkVectors: { id: string; vec: number[] }[] | undefined;
     if (includeChunks) {
       chunks = [];
+      chunkVectors = [];
       const pageSize = 1000;
       let from = 0;
       while (true) {
@@ -260,15 +262,63 @@ Deno.serve(async (req) => {
         if (!page || page.length === 0) break;
         for (const c of page) {
           const { embedding, ...rest } = c as any;
-          chunks.push(includeEmbeddings ? { ...rest, embedding: parseVector(embedding) } : rest);
+          const vec = parseVector(embedding);
+          if (vec.length) chunkVectors!.push({ id: rest.id, vec });
+          chunks.push(includeEmbeddings ? { ...rest, embedding: vec } : rest);
         }
         if (page.length < pageSize) break;
         from += pageSize;
       }
     }
 
+    // 8b) Unit-level kNN edges so an AI can run real network analysis
+    // (degree, centrality) instead of inferring structure from cluster lines.
+    let chunkEdges: any[] | undefined;
+    let chunkCentrality: Record<string, { degree: number; weighted_centrality: number }> | undefined;
+    const CHUNK_EDGE_LIMIT = 1200;
+    if (chunkVectors && chunkVectors.length >= 2 && chunkVectors.length <= CHUNK_EDGE_LIMIT) {
+      const k = 8;
+      const norms = chunkVectors.map(({ vec }) => Math.sqrt(vec.reduce((s, x) => s + x * x, 0)) || 1);
+      const seen = new Set<string>();
+      chunkEdges = [];
+      const degree: Record<string, number> = {};
+      const weighted: Record<string, number> = {};
+      for (let i = 0; i < chunkVectors.length; i++) {
+        const sims: { j: number; s: number }[] = [];
+        for (let j = 0; j < chunkVectors.length; j++) {
+          if (i === j) continue;
+          let dot = 0;
+          const a = chunkVectors[i].vec, b = chunkVectors[j].vec;
+          for (let d = 0; d < a.length; d++) dot += a[d] * b[d];
+          const sim = dot / (norms[i] * norms[j]);
+          if (sim > 0.2) sims.push({ j, s: sim });
+        }
+        sims.sort((a, b) => b.s - a.s);
+        for (const { j, s } of sims.slice(0, k)) {
+          const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const src = chunkVectors[i].id, tgt = chunkVectors[j].id;
+          chunkEdges.push({ source: src, target: tgt, similarity: Math.round(s * 10000) / 10000 });
+          degree[src] = (degree[src] ?? 0) + 1;
+          degree[tgt] = (degree[tgt] ?? 0) + 1;
+          weighted[src] = (weighted[src] ?? 0) + s;
+          weighted[tgt] = (weighted[tgt] ?? 0) + s;
+        }
+      }
+      const maxW = Math.max(1e-9, ...Object.values(weighted));
+      chunkCentrality = {};
+      for (const id of Object.keys(degree)) {
+        chunkCentrality[id] = {
+          degree: degree[id],
+          weighted_centrality: Math.round((weighted[id] / maxW) * 1000) / 1000,
+        };
+      }
+      chunkEdges.sort((a, b) => b.similarity - a.similarity);
+    }
+
     return new Response(JSON.stringify({
-      schema_version: "corpus-map/2.1",
+      schema_version: "corpus-map/2.2",
       exportedAt: new Date().toISOString(),
       params: {
         min_similarity: minSim,
@@ -283,6 +333,10 @@ Deno.serve(async (req) => {
       edges: edges ?? [],
       cross_doc_clusters: crossDoc,
       ...(chunks !== undefined ? { chunks } : {}),
+      ...(chunkEdges !== undefined ? { chunk_edges: chunkEdges, chunk_centrality: chunkCentrality } : {}),
+      ...(includeChunks && chunkEdges === undefined
+        ? { chunk_edges_note: `Unit-level kNN edges omitted: chunk count outside the computable range (2..${CHUNK_EDGE_LIMIT}).` }
+        : {}),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

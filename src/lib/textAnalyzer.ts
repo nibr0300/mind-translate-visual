@@ -224,3 +224,138 @@ export function generateClusterLabels(
 
   return labels;
 }
+
+/* ============================================================ *
+ *  Projection hygiene: collision spreading + degeneracy flags
+ * ============================================================ */
+
+/** Deterministic 0..1 hash from a string, so the same field always renders the same. */
+function seedHash(key: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 100000) / 100000;
+}
+
+/**
+ * PCA on sparse TF-IDF puts unrelated short sentences on the exact same point
+ * (near-zero vectors project to the same coordinate). That looks like semantic
+ * density in the map but is a projection artifact. We spread colliding points
+ * deterministically in a small spiral so the map stays honest and every node
+ * stays clickable.
+ *
+ * @param coords projected 2D coordinates
+ * @param keys   stable per-node keys (used as spiral seeds)
+ * @param eps    distance under which two points count as colliding
+ */
+export function spreadCollisions(
+  coords: [number, number][],
+  keys: string[],
+  eps = 0.02,
+): { coords: [number, number][]; uniqueBefore: number; movedCount: number } {
+  const quant = (v: number) => Math.round(v / eps);
+  const buckets = new Map<string, number[]>();
+  coords.forEach(([x, y], i) => {
+    const k = `${quant(x)}:${quant(y)}`;
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k)!.push(i);
+  });
+
+  const out = coords.map((c) => [c[0], c[1]] as [number, number]);
+  let movedCount = 0;
+
+  for (const idxs of buckets.values()) {
+    if (idxs.length < 2) continue;
+    // Golden-angle spiral around the shared centre; radius grows with count.
+    const cx = idxs.reduce((s, i) => s + coords[i][0], 0) / idxs.length;
+    const cy = idxs.reduce((s, i) => s + coords[i][1], 0) / idxs.length;
+    const golden = Math.PI * (3 - Math.sqrt(5));
+    idxs.forEach((idx, rank) => {
+      if (rank === 0) return; // keep one node on the true coordinate
+      const jitter = seedHash(keys[idx] ?? String(idx));
+      const angle = rank * golden + jitter * 0.6;
+      const radius = 0.06 * Math.sqrt(rank + 1) * (0.85 + jitter * 0.3);
+      out[idx] = [cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius];
+      movedCount++;
+    });
+  }
+
+  return { coords: out, uniqueBefore: buckets.size, movedCount };
+}
+
+/**
+ * A unit is "degenerate" when its TF-IDF vector carries almost no signal
+ * (no distinctive terms). Its 2D position is then fallback placement, not
+ * semantics — the reader should not interpret its neighbours as meaningful.
+ */
+export function degenerateFlags(vectors: number[][], threshold = 1e-6): boolean[] {
+  return vectors.map((v) => {
+    let norm = 0;
+    for (const x of v) norm += x * x;
+    return Math.sqrt(norm) < threshold;
+  });
+}
+
+/* ============================================================ *
+ *  kNN edges in the original high-dimensional space
+ * ============================================================ */
+
+export interface FieldEdgeRaw {
+  source: number;
+  target: number;
+  similarity: number;
+}
+
+
+
+
+/**
+ * Symmetric k-nearest-neighbour graph computed in the ORIGINAL vector space
+ * (not the 2D projection). This is what makes real network analysis possible:
+ * node degree and weighted centrality reflect semantic neighbourhood, not
+ * visual line density on the map.
+ */
+export function computeKnnEdges(vectors: number[][], k = 8, minSimilarity = 0.05): FieldEdgeRaw[] {
+  const n = vectors.length;
+  if (n < 2) return [];
+
+  const seen = new Set<string>();
+  const edges: FieldEdgeRaw[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const sims: { j: number; s: number }[] = [];
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      const s = cosine(vectors[i], vectors[j]);
+      if (s > minSimilarity) sims.push({ j, s });
+    }
+    sims.sort((a, b) => b.s - a.s);
+    for (const { j, s } of sims.slice(0, k)) {
+      const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edges.push({ source: Math.min(i, j), target: Math.max(i, j), similarity: Math.round(s * 10000) / 10000 });
+    }
+  }
+
+  return edges.sort((a, b) => b.similarity - a.similarity);
+}
+
+/** Degree + similarity-weighted centrality per node index. */
+export function edgeCentrality(
+  edges: FieldEdgeRaw[],
+  n: number,
+): { degree: number[]; weighted: number[] } {
+  const degree = new Array(n).fill(0);
+  const weighted = new Array(n).fill(0);
+  for (const e of edges) {
+    degree[e.source]++;
+    degree[e.target]++;
+    weighted[e.source] += e.similarity;
+    weighted[e.target] += e.similarity;
+  }
+  const max = Math.max(1e-9, ...weighted);
+  return { degree, weighted: weighted.map((w) => Math.round((w / max) * 1000) / 1000) };
+}

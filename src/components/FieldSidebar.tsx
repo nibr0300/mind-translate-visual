@@ -329,7 +329,40 @@ export default function FieldSidebar({
             <div className="text-[10px] text-muted-foreground font-mono">Avg FY</div>
           </div>
         </div>
+
+        {/* Ingestion quality: what the map can and cannot be trusted to show */}
+        {(field.stats.analyzedOf || field.stats.coordinateResolution !== undefined) && (
+          <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 gap-3">
+            {field.stats.analyzedOf && (
+              <div>
+                <div className="font-mono text-sm font-bold text-foreground">
+                  {field.stats.analyzedOf.analyzed}/{field.stats.analyzedOf.total}
+                </div>
+                <div className="text-[10px] text-muted-foreground font-mono">Units analyzed</div>
+              </div>
+            )}
+            {field.stats.coordinateResolution !== undefined && (
+              <div>
+                <div className="font-mono text-sm font-bold text-foreground">
+                  {(field.stats.coordinateResolution * 100).toFixed(0)}%
+                </div>
+                <div className="text-[10px] text-muted-foreground font-mono">Coord. resolution</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {field.stats.notes?.length ? (
+          <ul className="mt-3 space-y-1">
+            {field.stats.notes.map((n, i) => (
+              <li key={i} className="text-[10px] leading-snug font-mono text-field-fz/90">
+                ! {n}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
+
 
       {/* Per-file friction ranking (only when units carry sourcePath, e.g. zip) */}
       {(() => {

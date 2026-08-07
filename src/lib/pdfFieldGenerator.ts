@@ -11,6 +11,10 @@ import {
   computeTFIDF,
   kMeans,
   projectTo2D,
+  spreadCollisions,
+  degenerateFlags,
+  computeKnnEdges,
+  edgeCentrality,
   generateClusterLabels,
 } from "./textAnalyzer";
 import {
@@ -44,7 +48,9 @@ export async function extractTextFromPDF(file: File): Promise<string[]> {
       .replace(/\s+/g, " ")
       .split(/(?<=[.!?])\s+/)
       .map((s) => s.trim())
-      .filter((s) => s.length > 15);
+      // 3 chars, same threshold as the text path: short literary fragments
+      // ("Döda", "Ingen svarade") are exactly the high-tension units we must keep.
+      .filter((s) => s.length >= 3);
 
     sentences.push(...pageSentences);
   }
@@ -200,7 +206,15 @@ export async function generateFieldFromPDF(
     throw new Error("PDF contains too little text to generate a meaningful field, even after OCR. Need at least 3 text units.");
   }
 
-  const capped = sentences.length > 80 ? sentences.slice(0, 80) : sentences;
+  // Same budget as the text path (was 80, i.e. 7.5x stingier and silent about it).
+  const HARD_CAP = 600;
+  const totalFound = sentences.length;
+  let capped = sentences;
+  if (sentences.length > HARD_CAP) {
+    // Evenly sample so beginning, middle and end of the document all survive.
+    const step = sentences.length / HARD_CAP;
+    capped = Array.from({ length: HARD_CAP }, (_, i) => sentences[Math.floor(i * step)]);
+  }
 
   onProgress?.("Computing TF-IDF vectors…", 0.45);
   const { vectors } = computeTFIDF(capped);
@@ -223,7 +237,14 @@ export async function generateFieldFromPDF(
     isDiagram ? "Blending spatial layout with semantics…" : "Generating field topology…",
     0.85
   );
-  const coords2D = blendCoordinates(semanticCoords, spatialGroups, capped, diagramConfidence);
+  const blended = blendCoordinates(semanticCoords, spatialGroups, capped, diagramConfidence);
+  const { coords: coords2D, uniqueBefore } = spreadCollisions(
+    blended,
+    capped.map((t, i) => `u${i}:${t.slice(0, 24)}`)
+  );
+  const degenerate = degenerateFlags(vectors);
+  const knnEdges = computeKnnEdges(vectors, 8);
+  const { degree, weighted } = edgeCentrality(knnEdges, capped.length);
 
   const clusterLabels = generateClusterLabels(capped, assignments, k);
 
@@ -290,6 +311,9 @@ export async function generateFieldFromPDF(
       type,
       fz,
       fy: Math.round(fy * 100) / 100,
+      ...(degenerate[i] ? { degenerate: true } : {}),
+      degree: degree[i],
+      weightedCentrality: weighted[i],
       ...(intention && {
         intention: {
           speechAct: intention.speechAct,
@@ -333,14 +357,34 @@ export async function generateFieldFromPDF(
 
   onProgress?.("Field ready", 1);
 
+  const degenerateUnits = degenerate.filter(Boolean).length;
+  const notes: string[] = [];
+  if (totalFound > capped.length) {
+    notes.push(`Source capped: ${capped.length} of ${totalFound} text units analyzed (evenly sampled across the document).`);
+  }
+  if (degenerateUnits > 0) {
+    notes.push(
+      `${degenerateUnits} unit${degenerateUnits === 1 ? "" : "s"} had no distinctive terms — their position is fallback placement, not semantics.`
+    );
+  }
+
   return {
     units,
     clusters,
+    edges: knnEdges.map((e) => ({
+      source: units[e.source].id,
+      target: units[e.target].id,
+      similarity: e.similarity,
+    })),
     stats: {
       totalUnits: units.length,
       boundaryUnits,
       avgFZ: units.reduce((s, u) => s + u.fz, 0) / units.length,
       avgFY: units.reduce((s, u) => s + u.fy, 0) / units.length,
+      analyzedOf: { analyzed: capped.length, total: totalFound },
+      coordinateResolution: units.length ? Math.round((uniqueBefore / units.length) * 100) / 100 : 1,
+      degenerateUnits,
+      ...(notes.length ? { notes } : {}),
     },
     useCase: isDiagram ? "uploaded-diagram" : "uploaded",
   };

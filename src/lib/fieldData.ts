@@ -29,6 +29,19 @@ export interface FieldUnit {
   cti?: number;
   /** Origin path inside the source (e.g. a file inside a zip). Enables per-file friction ranking. */
   sourcePath?: string;
+  /** True when the TF-IDF vector carried no signal: the 2D position is fallback, not semantics. */
+  degenerate?: boolean;
+  /** Number of kNN neighbours in the original high-dimensional space. */
+  degree?: number;
+  /** Similarity-weighted centrality (0..1), normalized across the field. */
+  weightedCentrality?: number;
+}
+
+/** Edge in the kNN graph computed in the original vector space (not the 2D projection). */
+export interface FieldEdge {
+  source: string;
+  target: string;
+  similarity: number;
 }
 
 export interface FieldCluster {
@@ -44,11 +57,21 @@ export interface FieldCluster {
 export interface GeometricField {
   units: FieldUnit[];
   clusters: FieldCluster[];
+  /** kNN graph in the original vector space — enables real network analysis on export. */
+  edges?: FieldEdge[];
   stats: {
     totalUnits: number;
     boundaryUnits: number;
     avgFZ: number;
     avgFY: number;
+    /** Units analyzed vs units found in the source (set when the source was capped). */
+    analyzedOf?: { analyzed: number; total: number };
+    /** unique coordinates / units — how much the 2D projection can be trusted. */
+    coordinateResolution?: number;
+    /** Units whose vector carried no signal (fallback placement). */
+    degenerateUnits?: number;
+    /** Human-readable warnings about the ingestion (markup stripped, truncation, …). */
+    notes?: string[];
   };
   useCase: string;
 }
