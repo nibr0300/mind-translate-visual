@@ -29,6 +29,19 @@ export interface FieldUnit {
   cti?: number;
   /** Origin path inside the source (e.g. a file inside a zip). Enables per-file friction ranking. */
   sourcePath?: string;
+  /** True when the TF-IDF vector carried no signal: the 2D position is fallback, not semantics. */
+  degenerate?: boolean;
+  /** Number of kNN neighbours in the original high-dimensional space. */
+  degree?: number;
+  /** Similarity-weighted centrality (0..1), normalized across the field. */
+  weightedCentrality?: number;
+}
+
+/** Edge in the kNN graph computed in the original vector space (not the 2D projection). */
+export interface FieldEdge {
+  source: string;
+  target: string;
+  similarity: number;
 }
 
 export interface FieldCluster {
