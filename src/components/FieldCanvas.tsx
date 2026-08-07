@@ -2,6 +2,9 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
 import { distanceFromAnchor } from "@/lib/anchorMath";
+import { computeDepths, applyHelm } from "@/lib/helmMath";
+import HelmWheel from "./HelmWheel";
+
 
 
 const CLUSTER_COLORS = [
@@ -64,8 +67,11 @@ export default function FieldCanvas({
     return out;
   }, [normalizedQuery, field.units]);
 
+  // Helm: heading angle (radians) through 5D intention space
+  const [heading, setHeading] = useState(0);
+
   // Compute positions as percentages (in untransformed content space).
-  const unitPositions = useMemo(() => {
+  const basePositions = useMemo(() => {
     if (!anchorUnit) {
       return field.units.map((u) => {
         const x = ((u.vector2d[0] + 4) / 8) * 100;
@@ -102,8 +108,17 @@ export default function FieldCanvas({
     });
   }, [field.units, anchorUnit]);
 
+  // Depth along the current heading — resolves stacked nodes into near/far layers.
+  const depths = useMemo(() => computeDepths(field.units, heading), [field.units, heading]);
+
+  const unitPositions = useMemo(
+    () => basePositions.map((p, i) => applyHelm(p, depths[i] ?? 0, heading)),
+    [basePositions, depths, heading]
+  );
+
   const pctX = (i: number) => `${unitPositions[i].x}%`;
   const pctY = (i: number) => `${unitPositions[i].y}%`;
+
 
   const clusterCenterPositions = useMemo(
     () =>
@@ -490,7 +505,12 @@ export default function FieldCanvas({
 
           {/* Unit nodes */}
           {field.units.map((unit, i) => {
-            const size = 8 + unit.fz * 16;
+            const depth = depths[i] ?? 0;
+            // Depth cues: near nodes are bigger, sharper and brighter; far nodes recede.
+            const depthScale = 1 + depth * 0.35;
+            const size = (8 + unit.fz * 16) * depthScale;
+            const blur = depth < 0 ? Math.abs(depth) * 1.8 : 0;
+            const depthOpacity = 0.55 + (depth + 1) / 2 * 0.45;
             const isActive = activeCluster === null || unit.clusterId === activeCluster;
             const isSelected = selectedUnit?.id === unit.id;
             const isHovered = hoveredUnit?.id === unit.id;
@@ -498,7 +518,7 @@ export default function FieldCanvas({
             return (
               <motion.button
                 key={unit.id}
-                className="absolute rounded-full border-0 cursor-pointer focus:outline-none transition-[left,top] duration-700 ease-out"
+                className="absolute rounded-full border-0 cursor-pointer focus:outline-none transition-[left,top,width,height,filter] duration-700 ease-out"
                 style={{
                   left: pctX(i),
                   top: pctY(i),
@@ -506,6 +526,7 @@ export default function FieldCanvas({
                   height: size,
                   transform: "translate(-50%, -50%)",
                   background: CLUSTER_COLORS[unit.clusterId],
+                  filter: blur > 0.05 ? `blur(${blur}px)` : undefined,
                   boxShadow: isMatch
                     ? `0 0 ${18}px hsl(48, 100%, 60%), 0 0 0 2px hsl(48, 100%, 60%)`
                     : isSelected || isHovered
@@ -513,12 +534,16 @@ export default function FieldCanvas({
                     : unit.fz > 0.65
                     ? `0 0 ${unit.fz * 15}px hsl(25, 90%, 55%, 0.5)`
                     : `0 0 ${unit.fy * 8}px ${CLUSTER_COLORS[unit.clusterId]}44`,
-                  zIndex: isMatch ? 15 : isSelected || isHovered ? 20 : 2,
+                  zIndex: isMatch
+                    ? 15
+                    : isSelected || isHovered
+                    ? 20
+                    : 2 + Math.round((depth + 1) * 4),
                 }}
                 animate={{
                   opacity: normalizedQuery
                     ? isMatch ? 1 : 0.15
-                    : isActive ? 0.7 + unit.fy * 0.3 : 0.1,
+                    : isActive ? (0.7 + unit.fy * 0.3) * depthOpacity : 0.1,
                   scale: isSelected ? 1.6 : isHovered ? 1.3 : isMatch ? 1.4 : 1,
                 }}
                 transition={{ duration: 0.2 }}
@@ -532,8 +557,24 @@ export default function FieldCanvas({
               />
             );
           })}
+
         </div>
       </div>
+
+      {/* Rodret — vrid fältets axel genom intentionsrymden */}
+      <div className="absolute top-14 right-2 z-40 flex flex-col items-center gap-1 bg-card/80 backdrop-blur-sm border border-border rounded-lg px-2 py-2">
+        <span className="font-mono text-[9px] tracking-widest uppercase text-muted-foreground">Roder</span>
+        <HelmWheel theta={heading} onChange={setHeading} size={96} />
+        <button
+          onClick={() => setHeading(0)}
+          className="font-mono text-[9px] tracking-wider uppercase text-muted-foreground hover:text-foreground px-2 py-0.5 rounded hover:bg-secondary"
+          title="Centrera rodret"
+        >
+          Midskepps
+        </button>
+      </div>
+
+
 
       {/* Hover tooltip (not transformed) */}
       <AnimatePresence>
@@ -610,6 +651,13 @@ export default function FieldCanvas({
               <div className="text-muted-foreground">
                 type: <span className="text-foreground">{displayUnit.type}</span>
               </div>
+              <div className="text-muted-foreground">
+                djup:{" "}
+                <span className="text-foreground tabular-nums">
+                  {(depths[field.units.findIndex((u) => u.id === displayUnit.id)] ?? 0).toFixed(2)}
+                </span>
+              </div>
+
             </div>
             {displayUnit.intention && (
               <div className="mt-3 pt-3 border-t border-border">
