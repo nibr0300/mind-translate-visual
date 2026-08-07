@@ -134,6 +134,35 @@ export default function FieldCanvas({
     setTy(0);
   }, []);
 
+  // Keyboard shortcuts: / = search, R = reset, Esc = close selection/search
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "/" && !searchOpen) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        resetView();
+      }
+      if (e.key === "Escape") {
+        if (searchOpen) {
+          setSearchOpen(false);
+          setSearchQuery("");
+        }
+        if (selectedUnit || hoveredUnit) {
+          onSelectUnit(null);
+          setHoveredUnit(null);
+        }
+        if (activeCluster !== null) {
+          onSelectCluster(null);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [searchOpen, selectedUnit, hoveredUnit, activeCluster, resetView, onSelectUnit, onSelectCluster]);
+
   // Jump to the first search match whenever query changes
   useEffect(() => {
     if (!normalizedQuery) return;
