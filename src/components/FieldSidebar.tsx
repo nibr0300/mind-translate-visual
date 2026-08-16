@@ -54,6 +54,8 @@ export default function FieldSidebar({
   const corpusMapAbortRef = useRef<AbortController | null>(null);
   const [corpusMapDownload, setCorpusMapDownload] = useState<{ url: string; name: string } | null>(null);
   const [isExportingCorpusMap, setIsExportingCorpusMap] = useState(false);
+  const [showDegenerate, setShowDegenerate] = useState(false);
+
 
   const slugify = (s: string, max = 60) =>
     s
