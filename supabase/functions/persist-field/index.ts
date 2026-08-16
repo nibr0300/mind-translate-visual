@@ -73,9 +73,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1. Document-level dedup (scoped to this user)
+    // 1. Document identity (scoped to this user)
+    //    a) identical content  -> reuse as-is
+    //    b) same filename (+size) -> REPLACE the old version instead of duplicating
     let documentId: string | null = null;
     let reused = false;
+    let replaced = false;
 
     if (payload.content_hash) {
       const { data: existing } = await supabase
@@ -91,12 +94,50 @@ Deno.serve(async (req) => {
     }
 
     if (!documentId) {
+      let q = supabase
+        .from("documents")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("filename", payload.filename)
+        .order("uploaded_at", { ascending: false });
+      if (typeof payload.file_size === "number") {
+        q = q.or(`file_size.eq.${payload.file_size},file_size.is.null`);
+      }
+      const { data: sameName } = await q;
+      if (sameName?.length) {
+        documentId = sameName[0].id;
+        replaced = true;
+        // Drop every older copy with the same name outright
+        const stale = sameName.slice(1).map((d) => d.id);
+        if (stale.length) await supabase.from("documents").delete().in("id", stale);
+        // Wipe the previous version's content before rewriting
+        await supabase.from("chunks").delete().eq("document_id", documentId);
+        await supabase.from("clusters_summary").delete().eq("document_id", documentId);
+        const { error: updErr } = await supabase
+          .from("documents")
+          .update({
+            source_type: payload.source_type,
+            content_hash: payload.content_hash ?? null,
+            file_size: payload.file_size ?? null,
+            embedding_model: payload.embedding_model ?? "google/gemini-embedding-001",
+            embedding_dim: payload.embedding_dim ?? 3072,
+            stats: payload.stats ?? {},
+            uploaded_at: new Date().toISOString(),
+            share_to_global: payload.share_to_global ?? false,
+          })
+          .eq("id", documentId);
+        if (updErr) throw updErr;
+      }
+    }
+
+    if (!documentId) {
       const { data: doc, error: docErr } = await supabase
         .from("documents")
         .insert({
           filename: payload.filename,
           source_type: payload.source_type,
           content_hash: payload.content_hash ?? null,
+          file_size: payload.file_size ?? null,
           embedding_model: payload.embedding_model ?? "google/gemini-embedding-001",
           embedding_dim: payload.embedding_dim ?? 3072,
           stats: payload.stats ?? {},
