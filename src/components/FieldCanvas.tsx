@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
 import { distanceFromAnchor } from "@/lib/anchorMath";
 import { computeDepths, applyHelm } from "@/lib/helmMath";
@@ -116,15 +116,29 @@ export default function FieldCanvas({
     [basePositions, depths, heading]
   );
 
+  const indexByUnitId = useMemo(
+    () => new Map(field.units.map((unit, index) => [unit.id, index])),
+    [field.units]
+  );
+
+  const tensionUnits = useMemo(
+    () => field.units.flatMap((unit, index) => unit.fz > 0.65 ? [{ unit, index }] : []),
+    [field.units]
+  );
+
+  const criticalUnits = useMemo(
+    () => field.units.flatMap((unit, index) => (unit.cti ?? 0) > 0.35 ? [{ unit, index }] : []),
+    [field.units]
+  );
+
   // Render the bounded semantic kNN topology produced by the analyzer.
   // The old all-pairs pass created n(n-1)/2 React elements (179,700 for
   // 600 units), which exhausted mobile memory exactly when upload completed.
   const visibleEdges = useMemo(() => {
-    const indexById = new Map(field.units.map((unit, index) => [unit.id, index]));
     if (field.edges?.length) {
       return field.edges.flatMap((edge) => {
-        const source = indexById.get(edge.source);
-        const target = indexById.get(edge.target);
+        const source = indexByUnitId.get(edge.source);
+        const target = indexByUnitId.get(edge.target);
         return source === undefined || target === undefined
           ? []
           : [{ source, target, similarity: edge.similarity }];
@@ -144,7 +158,7 @@ export default function FieldCanvas({
       }
     }
     return fallback;
-  }, [field.edges, field.units]);
+  }, [field.edges, field.units, indexByUnitId]);
 
   const pctX = (i: number) => `${unitPositions[i].x}%`;
   const pctY = (i: number) => `${unitPositions[i].y}%`;
@@ -380,10 +394,8 @@ export default function FieldCanvas({
           style={{ transform: `translate(${tx}px, ${ty}px) scale(${scale})` }}
         >
           {/* Tension gradient background blobs */}
-          {field.units
-            .filter((u) => u.fz > 0.65)
-            .map((u, i) => {
-              const idx = field.units.indexOf(u);
+          {tensionUnits
+            .map(({ unit: u, index: idx }, i) => {
               return (
                 <div
                   key={`fz-${i}`}
@@ -402,10 +414,8 @@ export default function FieldCanvas({
             })}
 
           {/* CTI critical node markers */}
-          {field.units
-            .filter((u) => (u.cti ?? 0) > 0.35)
-            .map((u) => {
-              const idx = field.units.indexOf(u);
+          {criticalUnits
+            .map(({ unit: u, index: idx }) => {
               const cti = u.cti ?? 0;
               const ringSize = 28 + cti * 30;
               return (
@@ -491,8 +501,8 @@ export default function FieldCanvas({
 
           {/* Anchor rays */}
           {anchorUnit && (() => {
-            const anchorIdx = field.units.findIndex((u) => u.id === anchorUnit.id);
-            if (anchorIdx < 0) return null;
+            const anchorIdx = indexByUnitId.get(anchorUnit.id);
+            if (anchorIdx === undefined) return null;
             return (
               <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
                 {field.units.map((u, i) => {
@@ -518,8 +528,8 @@ export default function FieldCanvas({
 
           {/* Anchor ring */}
           {anchorUnit && (() => {
-            const idx = field.units.findIndex((u) => u.id === anchorUnit.id);
-            if (idx < 0) return null;
+            const idx = indexByUnitId.get(anchorUnit.id);
+            if (idx === undefined) return null;
             return (
               <div
                 key="anchor-ring"
@@ -613,7 +623,7 @@ export default function FieldCanvas({
 
 
       {/* Hover tooltip (not transformed) */}
-      <AnimatePresence>
+      <>
         {displayUnit && (
           <motion.div
             initial={{ opacity: 0, y: 5 }}
@@ -690,7 +700,7 @@ export default function FieldCanvas({
               <div className="text-muted-foreground">
                 djup:{" "}
                 <span className="text-foreground tabular-nums">
-                  {(depths[field.units.findIndex((u) => u.id === displayUnit.id)] ?? 0).toFixed(2)}
+                  {(depths[indexByUnitId.get(displayUnit.id) ?? -1] ?? 0).toFixed(2)}
                 </span>
               </div>
 
@@ -796,7 +806,7 @@ export default function FieldCanvas({
             )}
           </motion.div>
         )}
-      </AnimatePresence>
+      </>
     </div>
   );
 }

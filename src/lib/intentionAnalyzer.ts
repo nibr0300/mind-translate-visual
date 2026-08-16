@@ -35,8 +35,9 @@ export interface TriangulatedTension {
 }
 
 const BATCH_SIZE = 50;
-const BATCH_TIMEOUT_MS = 45_000;
-const CONCURRENCY = 3;
+const BATCH_TIMEOUT_MS = 12_000;
+const TOTAL_TIMEOUT_MS = 15_000;
+const CONCURRENCY = 4;
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([
@@ -88,7 +89,7 @@ export async function analyzeIntentions(
 
   const results: (IntentionAnalysis[] | null)[] = new Array(batches.length).fill(null);
   let next = 0;
-  await Promise.all(
+  const batchWork = Promise.all(
     Array.from({ length: Math.min(CONCURRENCY, batches.length) }, async () => {
       while (next < batches.length) {
         const i = next++;
@@ -96,6 +97,10 @@ export async function analyzeIntentions(
       }
     })
   );
+  const completed = await withTimeout(batchWork, TOTAL_TIMEOUT_MS);
+  if (!completed) {
+    console.warn("Intention analysis exceeded its total budget — rendering lexical field now.");
+  }
 
   // Edge function returns batch-local indices — remap them to global unit indices.
   const merged: IntentionAnalysis[] = [];

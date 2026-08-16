@@ -14,11 +14,16 @@
  * made fundamental units look "empty" and pushed them into fallback placement.
  */
 export function tokenize(text: string): string[] {
-  return text
+  const words = text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}λ∅→↔≠≡∈∀∃\s'_-]/gu, " ")
     .split(/\s+/)
     .filter((w) => w.length >= 2);
+  const notation = text
+    .toLowerCase()
+    .match(/[\p{N}λ∅→↔≠≡∈∀∃=\[\]]+/gu)
+    ?.filter((token) => /[λ∅→↔≠≡∈∀∃=\[\]]/u.test(token)) ?? [];
+  return [...words, ...notation];
 }
 
 
@@ -75,28 +80,21 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
 
   const isEligible = (w: string) => !STOPWORDS.has(w) && (df[w] || 0) < Math.max(2, N * 0.8);
 
-  // Vocabulary budget scales with the corpus instead of a flat 100 terms.
-  const budget = Math.min(2000, Math.max(300, N * 6));
+  // Keep the matrix bounded. The previous 2,000+ dimensional matrix turned
+  // kNN and projection into hundreds of millions of operations at 600 units.
+  // Reserved feature-hash buckets preserve rare axioms without unbounded RAM.
+  const lexicalBudget = Math.min(512, Math.max(192, Math.ceil(Math.sqrt(N || 1) * 18)));
+  const HASH_BUCKETS = 96;
 
   const globalRanked = Object.keys(df)
     .filter(isEligible)
     // Rank by informativeness (tf-idf mass), not raw frequency.
     .sort((a, b) => df[b] * Math.log(N / df[b]) - df[a] * Math.log(N / df[a]));
 
-  const vocabSet = new Set<string>(globalRanked.slice(0, budget));
-
-  // Coverage pass: guarantee every document has at least a few dimensions.
-  const MIN_DIMS_PER_DOC = 3;
-  docs.forEach((doc) => {
-    const own = Array.from(new Set(doc.filter(isEligible)));
-    if (own.filter((w) => vocabSet.has(w)).length >= MIN_DIMS_PER_DOC) return;
-    own
-      .sort((a, b) => df[a] - df[b]) // rarest (most distinctive) first
-      .slice(0, MIN_DIMS_PER_DOC)
-      .forEach((w) => vocabSet.add(w));
-  });
-
-  const vocab = Array.from(vocabSet);
+  const vocab = [
+    ...globalRanked.slice(0, lexicalBudget),
+    ...Array.from({ length: HASH_BUCKETS }, (_, i) => `__rare_${i}`),
+  ];
   const vocabIndex = new Map(vocab.map((w, i) => [w, i]));
 
   const vectors = docs.map((doc) => {
@@ -111,6 +109,14 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
         vec[idx] = (tf[w] / maxTf) * (1 + Math.log(N / (df[w] || 1)));
       }
     });
+
+    // Rare/symbolic terms outside the lexical budget still receive stable
+    // dimensions. Thus short system axioms never become zero vectors.
+    for (const w of new Set(doc.filter(isEligible))) {
+      if (vocabIndex.has(w)) continue;
+      const bucket = lexicalBudget + Math.floor(seedHash(w) * HASH_BUCKETS);
+      vec[bucket] += (tf[w] / maxTf) * (1 + Math.log(N / (df[w] || 1)));
+    }
     return vec;
   });
 
@@ -136,11 +142,15 @@ export function kMeans(vectors: number[][], k: number, maxIter = 20): number[] {
   if (n === 0 || dim === 0) return [];
 
   const indices = Array.from({ length: n }, (_, i) => i);
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
-  }
+  // Deterministic, evenly-spaced seeds make repeated analysis reproducible.
+  indices.sort((a, b) => seedHash(String(a)) - seedHash(String(b)));
   const centroids = indices.slice(0, k).map((i) => [...vectors[i]]);
+  const sparse = vectors.map((vector) =>
+    vector.flatMap((value, index) => (value === 0 ? [] : [[index, value] as const]))
+  );
+  const vectorNorms = sparse.map((entries) =>
+    Math.sqrt(entries.reduce((sum, [, value]) => sum + value * value, 0))
+  );
 
   const assignments = new Array(n).fill(0);
 
@@ -150,7 +160,10 @@ export function kMeans(vectors: number[][], k: number, maxIter = 20): number[] {
       let bestDist = -1;
       let bestK = 0;
       for (let c = 0; c < k; c++) {
-        const sim = cosine(vectors[i], centroids[c]);
+        let dot = 0;
+        for (const [d, value] of sparse[i]) dot += value * centroids[c][d];
+        const centroidNorm = Math.sqrt(centroids[c].reduce((sum, value) => sum + value * value, 0));
+        const sim = vectorNorms[i] && centroidNorm ? dot / (vectorNorms[i] * centroidNorm) : 0;
         if (sim > bestDist) {
           bestDist = sim;
           bestK = c;
@@ -164,53 +177,38 @@ export function kMeans(vectors: number[][], k: number, maxIter = 20): number[] {
     if (!changed) break;
 
     for (let c = 0; c < k; c++) {
-      const members = vectors.filter((_, i) => assignments[i] === c);
-      if (members.length === 0) continue;
-      for (let d = 0; d < dim; d++) {
-        centroids[c][d] = members.reduce((s, v) => s + v[d], 0) / members.length;
+      centroids[c].fill(0);
+      let memberCount = 0;
+      for (let i = 0; i < n; i++) {
+        if (assignments[i] !== c) continue;
+        memberCount++;
+        for (const [d, value] of sparse[i]) centroids[c][d] += value;
       }
+      if (memberCount) for (let d = 0; d < dim; d++) centroids[c][d] /= memberCount;
     }
   }
 
   return assignments;
 }
 
-/** Project high-dim vectors to 2D using PCA (power iteration) */
+/**
+ * Project high-dimensional vectors with a deterministic sparse random projection.
+ * This preserves neighbourhoods while remaining O(non-zero terms), unlike the
+ * previous dense PCA power iteration which blocked mobile browsers at 600 units.
+ */
 export function projectTo2D(vectors: number[][]): [number, number][] {
   const n = vectors.length;
-  const dim = vectors[0]?.length || 0;
   if (n === 0) return [];
-
-  const mean = new Array(dim).fill(0);
-  vectors.forEach((v) => v.forEach((val, i) => (mean[i] += val)));
-  mean.forEach((_, i) => (mean[i] /= n));
-  const centered = vectors.map((v) => v.map((val, i) => val - mean[i]));
-
-  const findPC = (data: number[][]): number[] => {
-    let pc = Array.from({ length: dim }, () => Math.random() - 0.5);
-    for (let iter = 0; iter < 50; iter++) {
-      const newPc = new Array(dim).fill(0);
-      data.forEach((v) => {
-        const dot = v.reduce((s, val, i) => s + val * pc[i], 0);
-        v.forEach((val, i) => (newPc[i] += dot * val));
-      });
-      const mag = Math.sqrt(newPc.reduce((s, v) => s + v * v, 0)) || 1;
-      pc = newPc.map((v) => v / mag);
-    }
-    return pc;
-  };
-
-  const pc1 = findPC(centered);
-  const deflated = centered.map((v) => {
-    const proj = v.reduce((s, val, i) => s + val * pc1[i], 0);
-    return v.map((val, i) => val - proj * pc1[i]);
+  const coords: [number, number][] = vectors.map((vector) => {
+    let x = 0;
+    let y = 0;
+    vector.forEach((value, index) => {
+      if (value === 0) return;
+      x += value * (seedHash(`x:${index}`) * 2 - 1);
+      y += value * (seedHash(`y:${index}`) * 2 - 1);
+    });
+    return [x, y];
   });
-  const pc2 = findPC(deflated);
-
-  const coords: [number, number][] = centered.map((v) => [
-    v.reduce((s, val, i) => s + val * pc1[i], 0),
-    v.reduce((s, val, i) => s + val * pc2[i], 0),
-  ]);
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   coords.forEach(([x, y]) => {
@@ -356,6 +354,23 @@ export function computeKnnEdges(vectors: number[][], k = 8, minSimilarity = 0.05
   const n = vectors.length;
   if (n < 2) return [];
 
+  const sparse = vectors.map((vector) =>
+    vector.flatMap((value, index) => (value === 0 ? [] : [[index, value] as const]))
+  );
+  const norms = sparse.map((entries) =>
+    Math.sqrt(entries.reduce((sum, [, value]) => sum + value * value, 0))
+  );
+  const sparseCosine = (a: number, b: number) => {
+    const left = sparse[a];
+    const right = sparse[b];
+    let i = 0, j = 0, dot = 0;
+    while (i < left.length && j < right.length) {
+      if (left[i][0] === right[j][0]) { dot += left[i][1] * right[j][1]; i++; j++; }
+      else if (left[i][0] < right[j][0]) i++;
+      else j++;
+    }
+    return norms[a] && norms[b] ? dot / (norms[a] * norms[b]) : 0;
+  };
   const seen = new Set<string>();
   const edges: FieldEdgeRaw[] = [];
 
@@ -363,7 +378,7 @@ export function computeKnnEdges(vectors: number[][], k = 8, minSimilarity = 0.05
     const sims: { j: number; s: number }[] = [];
     for (let j = 0; j < n; j++) {
       if (i === j) continue;
-      const s = cosine(vectors[i], vectors[j]);
+      const s = sparseCosine(i, j);
       if (s > minSimilarity) sims.push({ j, s });
     }
     sims.sort((a, b) => b.s - a.s);

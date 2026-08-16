@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { generateDemoField, type FieldUnit, type GeometricField } from "@/lib/fieldData";
 import FieldCanvas from "@/components/FieldCanvas";
 import FieldSidebar from "@/components/FieldSidebar";
@@ -6,61 +6,19 @@ import FieldInfoPanel from "@/components/FieldInfoPanel";
 
 type UseCase = "didactics" | "truth-seeking" | "negotiation" | "uploaded";
 
-/** Survive preview/tab reloads: a generated field is expensive, never lose it silently. */
-const FIELD_CACHE_KEY = "gvtd:last-field";
-/**
- * Bump whenever the analysis engine changes (tokenizer, vocabulary, projection).
- * Otherwise a cached field from an older engine keeps being shown and the user
- * sees stale results after a fix.
- */
-const ENGINE_VERSION = 4;
-
-function readCachedField(): { field: GeometricField; fileName: string } | null {
-  try {
-    const raw = sessionStorage.getItem(FIELD_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed?.engineVersion !== ENGINE_VERSION) {
-      sessionStorage.removeItem(FIELD_CACHE_KEY);
-      return null;
-    }
-    if (!parsed?.field?.units?.length) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-
 export default function Index() {
-  const cached = useMemo(readCachedField, []);
-  const [useCase, setUseCase] = useState<UseCase>(cached ? "uploaded" : "didactics");
+  const [useCase, setUseCase] = useState<UseCase>("didactics");
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<FieldUnit | null>(null);
   const [anchorUnitId, setAnchorUnitId] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
-  const [uploadedField, setUploadedField] = useState<GeometricField | null>(cached?.field ?? null);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(cached?.fileName ?? null);
+  const [uploadedField, setUploadedField] = useState<GeometricField | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   const demoField = useMemo(
     () => (useCase !== "uploaded" ? generateDemoField(useCase as "didactics" | "truth-seeking" | "negotiation") : null),
     [useCase]
   );
-
-  // Persist the uploaded field so an unexpected reload restores it instead of resetting to demo state.
-  useEffect(() => {
-    if (!uploadedField) return;
-    try {
-      sessionStorage.setItem(
-        FIELD_CACHE_KEY,
-        JSON.stringify({ engineVersion: ENGINE_VERSION, field: uploadedField, fileName: uploadedFileName })
-      );
-
-    } catch {
-      /* quota exceeded — field stays in memory only */
-    }
-  }, [uploadedField, uploadedFileName]);
-
 
   const field = useCase === "uploaded" && uploadedField ? uploadedField : demoField!;
   const anchorUnit = useMemo(

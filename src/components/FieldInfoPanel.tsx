@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 interface FieldInfoPanelProps {
   isOpen: boolean;
@@ -7,7 +7,7 @@ interface FieldInfoPanelProps {
 
 export default function FieldInfoPanel({ isOpen, onClose }: FieldInfoPanelProps) {
   return (
-    <AnimatePresence>
+    <>
       {isOpen && (
         <motion.div
           initial={{ opacity: 0, x: 40 }}
@@ -105,6 +105,6 @@ export default function FieldInfoPanel({ isOpen, onClose }: FieldInfoPanelProps)
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </>
   );
 }

@@ -1,8 +1,9 @@
 import * as pdfjsLib from "pdfjs-dist";
+import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { GeometricField, FieldUnit, FieldCluster } from "./fieldData";
 import { extractOcrUnitsFromPDF } from "./pdfOcr";
 import {
-  extractSpatialText,
+  extractSpatialTextFromDocument,
   detectSpatialGroups,
   detectDiagramLayout,
   type SpatialGroup,
@@ -27,13 +28,18 @@ import {
 } from "./intentionAnalyzer";
 import { analyzeHedgingBatch } from "./hedgingAnalyzer";
 
-// Configure pdf.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+// Bundle the matching worker with the app. A third-party CDN outage must never
+// make local PDF ingestion fail.
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 /** Extract all text from a PDF file (sentence-level) */
 export async function extractTextFromPDF(file: File): Promise<string[]> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  return extractTextFromDocument(pdf);
+}
+
+async function extractTextFromDocument(pdf: Awaited<ReturnType<typeof pdfjsLib.getDocument>["promise"]>): Promise<string[]> {
   const sentences: string[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
@@ -56,6 +62,18 @@ export async function extractTextFromPDF(file: File): Promise<string[]> {
   }
 
   return sentences;
+}
+
+/** Preserve every sentence while bounding the number of rendered analysis units. */
+function coalesceTextUnits(units: string[], targetCount: number): string[] {
+  if (units.length <= targetCount) return units;
+  const compacted: string[] = [];
+  for (let i = 0; i < targetCount; i++) {
+    const start = Math.floor((i * units.length) / targetCount);
+    const end = Math.floor(((i + 1) * units.length) / targetCount);
+    compacted.push(units.slice(start, Math.max(start + 1, end)).join(" "));
+  }
+  return compacted;
 }
 
 /** Extract text units from spatial groups (for diagram-heavy PDFs) */
@@ -168,10 +186,11 @@ export async function generateFieldFromPDF(
   onProgress?: (stage: string, progress: number) => void
 ): Promise<GeometricField> {
   onProgress?.("Extracting text & analyzing layout…", 0.08);
-  const [rawSentences, spatialItems] = await Promise.all([
-    extractTextFromPDF(file),
-    extractSpatialText(file),
-  ]);
+  // Open one PDF document and walk it for both text and layout. Previously two
+  // simultaneous PDF.js documents doubled peak memory on mobile.
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const rawSentences = await extractTextFromDocument(pdf);
+  const spatialItems = await extractSpatialTextFromDocument(pdf);
 
   let spatialGroups = detectSpatialGroups(spatialItems);
   let ocrTextUnits: string[] = [];
@@ -206,15 +225,11 @@ export async function generateFieldFromPDF(
     throw new Error("PDF contains too little text to generate a meaningful field, even after OCR. Need at least 3 text units.");
   }
 
-  // Same budget as the text path (was 80, i.e. 7.5x stingier and silent about it).
+  // Bound render cost without discarding content: adjacent sentences are
+  // coalesced, so beginning, middle and end are all analyzed in full.
   const HARD_CAP = 600;
   const totalFound = sentences.length;
-  let capped = sentences;
-  if (sentences.length > HARD_CAP) {
-    // Evenly sample so beginning, middle and end of the document all survive.
-    const step = sentences.length / HARD_CAP;
-    capped = Array.from({ length: HARD_CAP }, (_, i) => sentences[Math.floor(i * step)]);
-  }
+  const capped = coalesceTextUnits(sentences, HARD_CAP);
 
   onProgress?.("Computing TF-IDF vectors…", 0.45);
   const { vectors } = computeTFIDF(capped);
@@ -292,7 +307,8 @@ export async function generateFieldFromPDF(
       intention?.truthTension ?? null,
       hedging,
       intention?.speechAct ?? null,
-      clusterDeviation
+      clusterDeviation,
+      intention
     );
 
     const fz = intention
@@ -360,7 +376,7 @@ export async function generateFieldFromPDF(
   const degenerateUnits = degenerate.filter(Boolean).length;
   const notes: string[] = [];
   if (totalFound > capped.length) {
-    notes.push(`Source capped: ${capped.length} of ${totalFound} text units analyzed (evenly sampled across the document).`);
+    notes.push(`Full source analyzed: ${totalFound} text units were coalesced into ${capped.length} map nodes without dropping text.`);
   }
   if (degenerateUnits > 0) {
     notes.push(
