@@ -238,6 +238,7 @@ Deno.serve(async (req) => {
       document_id: documentId,
       persisted_chunks: chunkRows.length,
       reused: false,
+      replaced,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
