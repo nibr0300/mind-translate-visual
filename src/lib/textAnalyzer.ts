@@ -6,14 +6,21 @@
  * original pdfFieldGenerator for modularity.
  */
 
-/** Simple tokenizer */
+/**
+ * Tokenizer.
+ *
+ * Keeps 2-character tokens, digits and notation glyphs (λ, ∅, →, [0]=[7]) because
+ * axiomatic system instructions are often short and symbol-dense — dropping them
+ * made fundamental units look "empty" and pushed them into fallback placement.
+ */
 export function tokenize(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/[^a-zæøåäöü0-9\s'-]/g, " ")
+    .replace(/[^\p{L}\p{N}λ∅→↔≠≡∈∀∃\s'_-]/gu, " ")
     .split(/\s+/)
-    .filter((w) => w.length > 2);
+    .filter((w) => w.length >= 2);
 }
+
 
 /** Stopwords to ignore (multilingual: EN + SV; harmless cross-language overlap is OK) */
 export const STOPWORDS = new Set([
@@ -41,9 +48,19 @@ export const STOPWORDS = new Set([
 ]);
 
 
-/** Compute TF-IDF vectors for sentences */
+/**
+ * Compute TF-IDF vectors.
+ *
+ * Vocabulary selection is coverage-guaranteed: the global ranking is kept, but
+ * every document is also allowed to contribute its own most distinctive terms.
+ * Without this, short axiomatic units ("Ready for relation.", "[0]=[7] …") ended
+ * up with an all-zero vector and were reported as having "no distinctive terms".
+ * Hapax terms (df = 1) are now eligible — a term that appears once is the most
+ * informative term in the corpus, not noise.
+ */
 export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab: string[] } {
   const docs = sentences.map(tokenize);
+  const N = docs.length;
 
   const df: Record<string, number> = {};
   docs.forEach((doc) => {
@@ -56,14 +73,31 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
     });
   });
 
-  const vocab = Object.entries(df)
-    .filter(([, count]) => count >= 2 && count < docs.length * 0.8)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 100)
-    .map(([word]) => word);
+  const isEligible = (w: string) => !STOPWORDS.has(w) && (df[w] || 0) < Math.max(2, N * 0.8);
 
+  // Vocabulary budget scales with the corpus instead of a flat 100 terms.
+  const budget = Math.min(2000, Math.max(300, N * 6));
+
+  const globalRanked = Object.keys(df)
+    .filter(isEligible)
+    // Rank by informativeness (tf-idf mass), not raw frequency.
+    .sort((a, b) => df[b] * Math.log(N / df[b]) - df[a] * Math.log(N / df[a]));
+
+  const vocabSet = new Set<string>(globalRanked.slice(0, budget));
+
+  // Coverage pass: guarantee every document has at least a few dimensions.
+  const MIN_DIMS_PER_DOC = 3;
+  docs.forEach((doc) => {
+    const own = Array.from(new Set(doc.filter(isEligible)));
+    if (own.filter((w) => vocabSet.has(w)).length >= MIN_DIMS_PER_DOC) return;
+    own
+      .sort((a, b) => df[a] - df[b]) // rarest (most distinctive) first
+      .slice(0, MIN_DIMS_PER_DOC)
+      .forEach((w) => vocabSet.add(w));
+  });
+
+  const vocab = Array.from(vocabSet);
   const vocabIndex = new Map(vocab.map((w, i) => [w, i]));
-  const N = docs.length;
 
   const vectors = docs.map((doc) => {
     const tf: Record<string, number> = {};
@@ -74,7 +108,7 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
     doc.forEach((w) => {
       const idx = vocabIndex.get(w);
       if (idx !== undefined) {
-        vec[idx] = (tf[w] / maxTf) * Math.log(N / (df[w] || 1));
+        vec[idx] = (tf[w] / maxTf) * (1 + Math.log(N / (df[w] || 1)));
       }
     });
     return vec;
@@ -82,6 +116,7 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
 
   return { vectors, vocab };
 }
+
 
 /** Cosine similarity */
 export function cosine(a: number[], b: number[]): number {
