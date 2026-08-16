@@ -6,14 +6,21 @@
  * original pdfFieldGenerator for modularity.
  */
 
-/** Simple tokenizer */
+/**
+ * Tokenizer.
+ *
+ * Keeps 2-character tokens, digits and notation glyphs (λ, ∅, →, [0]=[7]) because
+ * axiomatic system instructions are often short and symbol-dense — dropping them
+ * made fundamental units look "empty" and pushed them into fallback placement.
+ */
 export function tokenize(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/[^a-zæøåäöü0-9\s'-]/g, " ")
+    .replace(/[^\p{L}\p{N}λ∅→↔≠≡∈∀∃\s'_-]/gu, " ")
     .split(/\s+/)
-    .filter((w) => w.length > 2);
+    .filter((w) => w.length >= 2);
 }
+
 
 /** Stopwords to ignore (multilingual: EN + SV; harmless cross-language overlap is OK) */
 export const STOPWORDS = new Set([
