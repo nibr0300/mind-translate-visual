@@ -36,6 +36,7 @@ interface PersistPayload {
   filename: string;
   source_type: string;
   content_hash?: string;          // NEW: document-level fingerprint
+  file_size?: number;             // NEW: used with filename to replace re-uploads
   embedding_model?: string;
   embedding_dim?: number;
   stats?: Record<string, unknown>;
