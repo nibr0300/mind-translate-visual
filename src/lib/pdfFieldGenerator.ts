@@ -1,4 +1,5 @@
 import * as pdfjsLib from "pdfjs-dist";
+import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { GeometricField, FieldUnit, FieldCluster } from "./fieldData";
 import { extractOcrUnitsFromPDF } from "./pdfOcr";
 import {
@@ -27,8 +28,9 @@ import {
 } from "./intentionAnalyzer";
 import { analyzeHedgingBatch } from "./hedgingAnalyzer";
 
-// Configure pdf.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+// Bundle the matching worker with the app. A third-party CDN outage must never
+// make local PDF ingestion fail.
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 /** Extract all text from a PDF file (sentence-level) */
 export async function extractTextFromPDF(file: File): Promise<string[]> {

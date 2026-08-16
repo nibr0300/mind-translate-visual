@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
 import { distanceFromAnchor } from "@/lib/anchorMath";
 import { computeDepths, applyHelm } from "@/lib/helmMath";
@@ -613,7 +613,7 @@ export default function FieldCanvas({
 
 
       {/* Hover tooltip (not transformed) */}
-      <AnimatePresence>
+      <>
         {displayUnit && (
           <motion.div
             initial={{ opacity: 0, y: 5 }}
@@ -796,7 +796,7 @@ export default function FieldCanvas({
             )}
           </motion.div>
         )}
-      </AnimatePresence>
+      </>
     </div>
   );
 }
