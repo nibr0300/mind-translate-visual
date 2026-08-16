@@ -385,6 +385,7 @@ async function persistFieldInBackground(
       filename: file.name,
       source_type: sourceType,
       content_hash: docHash,
+      file_size: file.size,
       embedding_model: "google/gemini-embedding-001",
       embedding_dim: dim,
       stats: field.stats,

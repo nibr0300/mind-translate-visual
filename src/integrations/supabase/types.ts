@@ -193,6 +193,7 @@ export type Database = {
           content_hash: string | null
           embedding_dim: number
           embedding_model: string
+          file_size: number | null
           filename: string
           id: string
           share_to_global: boolean
@@ -205,6 +206,7 @@ export type Database = {
           content_hash?: string | null
           embedding_dim?: number
           embedding_model?: string
+          file_size?: number | null
           filename: string
           id?: string
           share_to_global?: boolean
@@ -217,6 +219,7 @@ export type Database = {
           content_hash?: string | null
           embedding_dim?: number
           embedding_model?: string
+          file_size?: number | null
           filename?: string
           id?: string
           share_to_global?: boolean
