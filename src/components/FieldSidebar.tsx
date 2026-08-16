@@ -54,6 +54,8 @@ export default function FieldSidebar({
   const corpusMapAbortRef = useRef<AbortController | null>(null);
   const [corpusMapDownload, setCorpusMapDownload] = useState<{ url: string; name: string } | null>(null);
   const [isExportingCorpusMap, setIsExportingCorpusMap] = useState(false);
+  const [showDegenerate, setShowDegenerate] = useState(false);
+
 
   const slugify = (s: string, max = 60) =>
     s
@@ -369,6 +371,38 @@ export default function FieldSidebar({
             ))}
           </ul>
         ) : null}
+
+        {/* Inspect exactly which units lost their semantics */}
+        {(() => {
+          const flagged = field.units.filter((u) => u.degenerate);
+          if (!flagged.length) return null;
+          return (
+            <div className="mt-3">
+              <button
+                onClick={() => setShowDegenerate((v) => !v)}
+                className="font-mono text-[10px] tracking-wider uppercase text-field-fz hover:underline"
+              >
+                {showDegenerate ? "▾" : "▸"} Show {flagged.length} fallback-placed units
+              </button>
+              {showDegenerate && (
+                <ul className="mt-2 space-y-1 max-h-64 overflow-y-auto pr-1">
+                  {flagged.map((u) => (
+                    <li
+                      key={u.id}
+                      className="text-[10px] leading-snug font-mono text-muted-foreground border-l-2 border-field-fz/40 pl-2"
+                    >
+                      {u.sourcePath ? (
+                        <span className="text-foreground/70">{u.sourcePath.split("@")[0]} · </span>
+                      ) : null}
+                      {u.text.length > 160 ? `${u.text.slice(0, 160)}…` : u.text}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
+
       </div>
 
 
