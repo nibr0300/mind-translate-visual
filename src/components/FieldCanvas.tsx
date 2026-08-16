@@ -116,6 +116,36 @@ export default function FieldCanvas({
     [basePositions, depths, heading]
   );
 
+  // Render the bounded semantic kNN topology produced by the analyzer.
+  // The old all-pairs pass created n(n-1)/2 React elements (179,700 for
+  // 600 units), which exhausted mobile memory exactly when upload completed.
+  const visibleEdges = useMemo(() => {
+    const indexById = new Map(field.units.map((unit, index) => [unit.id, index]));
+    if (field.edges?.length) {
+      return field.edges.flatMap((edge) => {
+        const source = indexById.get(edge.source);
+        const target = indexById.get(edge.target);
+        return source === undefined || target === undefined
+          ? []
+          : [{ source, target, similarity: edge.similarity }];
+      });
+    }
+
+    // Demo/legacy fields may not carry edges. They are small, but keep a hard
+    // ceiling so malformed imported JSON can never recreate the crash.
+    const fallback: { source: number; target: number; similarity: number }[] = [];
+    const limit = Math.min(field.units.length, 120);
+    for (let source = 0; source < limit && fallback.length < 1200; source++) {
+      for (let target = source + 1; target < limit && fallback.length < 1200; target++) {
+        const a = field.units[source].vector2d;
+        const b = field.units[target].vector2d;
+        const distance = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (distance <= 2) fallback.push({ source, target, similarity: Math.max(0.05, 1 - distance / 2) });
+      }
+    }
+    return fallback;
+  }, [field.edges, field.units]);
+
   const pctX = (i: number) => `${unitPositions[i].x}%`;
   const pctY = (i: number) => `${unitPositions[i].y}%`;
 
@@ -439,29 +469,24 @@ export default function FieldCanvas({
 
           {/* Connection lines */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
-            {field.units.map((u, i) =>
-              field.units.slice(i + 1).map((v, j) => {
-                const dist = Math.sqrt(
-                  (u.vector2d[0] - v.vector2d[0]) ** 2 + (u.vector2d[1] - v.vector2d[1]) ** 2
-                );
-                if (dist > 2.0) return null;
-                const opacity = Math.max(0.02, 0.12 - dist * 0.05);
-                const isActive =
-                  activeCluster === null || u.clusterId === activeCluster || v.clusterId === activeCluster;
-                return (
-                  <line
-                    key={`l-${i}-${j}`}
-                    x1={pctX(i)}
-                    y1={pctY(i)}
-                    x2={pctX(i + 1 + j)}
-                    y2={pctY(i + 1 + j)}
-                    stroke={u.clusterId === v.clusterId ? CLUSTER_COLORS[u.clusterId] : "hsl(200,10%,30%)"}
-                    strokeWidth={0.5 / scale}
-                    opacity={isActive ? opacity : 0.01}
-                  />
-                );
-              })
-            )}
+            {visibleEdges.map((edge) => {
+              const source = field.units[edge.source];
+              const target = field.units[edge.target];
+              const isActive =
+                activeCluster === null || source.clusterId === activeCluster || target.clusterId === activeCluster;
+              return (
+                <line
+                  key={`l-${source.id}-${target.id}`}
+                  x1={pctX(edge.source)}
+                  y1={pctY(edge.source)}
+                  x2={pctX(edge.target)}
+                  y2={pctY(edge.target)}
+                  stroke={source.clusterId === target.clusterId ? CLUSTER_COLORS[source.clusterId] : "hsl(200,10%,30%)"}
+                  strokeWidth={0.5 / scale}
+                  opacity={isActive ? Math.max(0.025, Math.min(0.14, edge.similarity * 0.14)) : 0.01}
+                />
+              );
+            })}
           </svg>
 
           {/* Anchor rays */}
