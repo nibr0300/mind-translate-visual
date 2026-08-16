@@ -34,34 +34,86 @@ export interface TriangulatedTension {
   triangulated: number;
 }
 
-/**
- * Call the analyze-intentions edge function to get speech-act
- * and epistemic analysis for each text unit.
- *
- * Returns null (graceful degradation) if the call fails.
- */
-export async function analyzeIntentions(
-  textUnits: string[]
-): Promise<IntentionAnalysis[] | null> {
-  try {
-    const { data, error } = await supabase.functions.invoke("analyze-intentions", {
-      body: { textUnits },
-    });
+const BATCH_SIZE = 50;
+const BATCH_TIMEOUT_MS = 45_000;
+const CONCURRENCY = 3;
 
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    p,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
+async function analyzeBatch(textUnits: string[]): Promise<IntentionAnalysis[] | null> {
+  try {
+    const res = await withTimeout(
+      supabase.functions.invoke("analyze-intentions", { body: { textUnits } }),
+      BATCH_TIMEOUT_MS
+    );
+    if (!res) {
+      console.warn("Intention analysis timed out — falling back to lexical signals for this batch.");
+      return null;
+    }
+    const { data, error } = res;
     if (error) {
       if (isCreditError(error)) notifyCreditsExhausted();
       else console.warn("Intention analysis unavailable:", error.message);
       return null;
     }
-
-    return (data as { analyses: IntentionAnalysis[] }).analyses;
+    return (data as { analyses: IntentionAnalysis[] }).analyses ?? null;
   } catch (err) {
     if (isCreditError(err)) notifyCreditsExhausted();
     else console.warn("Intention analysis failed:", err);
     return null;
   }
-
 }
+
+/**
+ * Call the analyze-intentions edge function to get speech-act
+ * and epistemic analysis for each text unit.
+ *
+ * Batched with a hard per-batch timeout so a slow/unavailable model can never
+ * freeze ingestion indefinitely. Missing batches degrade to null entries.
+ */
+export async function analyzeIntentions(
+  textUnits: string[]
+): Promise<IntentionAnalysis[] | null> {
+  if (!textUnits.length) return null;
+
+  const batches: string[][] = [];
+  for (let i = 0; i < textUnits.length; i += BATCH_SIZE) {
+    batches.push(textUnits.slice(i, i + BATCH_SIZE));
+  }
+
+  const results: (IntentionAnalysis[] | null)[] = new Array(batches.length).fill(null);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, batches.length) }, async () => {
+      while (next < batches.length) {
+        const i = next++;
+        results[i] = await analyzeBatch(batches[i]);
+      }
+    })
+  );
+
+  // Edge function returns batch-local indices — remap them to global unit indices.
+  const merged: IntentionAnalysis[] = [];
+  let offset = 0;
+  results.forEach((r, i) => {
+    if (r) {
+      for (const a of r) {
+        const idx = offset + (a.index ?? 0);
+        if (idx < textUnits.length) merged.push({ ...a, index: idx });
+      }
+    }
+    offset += batches[i].length;
+  });
+
+  return merged.length ? merged : null;
+}
+
+
 
 /**
  * Content-tension: moral + narrative friction surfaced by the LLM.
