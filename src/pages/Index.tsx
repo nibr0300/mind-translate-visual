@@ -13,7 +13,7 @@ const FIELD_CACHE_KEY = "gvtd:last-field";
  * Otherwise a cached field from an older engine keeps being shown and the user
  * sees stale results after a fix.
  */
-const ENGINE_VERSION = 3;
+const ENGINE_VERSION = 4;
 
 function readCachedField(): { field: GeometricField; fileName: string } | null {
   try {
