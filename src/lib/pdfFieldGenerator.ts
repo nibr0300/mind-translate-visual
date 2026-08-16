@@ -307,7 +307,8 @@ export async function generateFieldFromPDF(
       intention?.truthTension ?? null,
       hedging,
       intention?.speechAct ?? null,
-      clusterDeviation
+      clusterDeviation,
+      intention
     );
 
     const fz = intention
