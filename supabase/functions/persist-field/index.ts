@@ -18,7 +18,7 @@ interface ChunkPayload {
   cti?: number;
   triangulation?: unknown;
   intention?: unknown;
-  embedding: number[];
+  embedding?: number[];
 }
 
 interface ClusterPayload {
@@ -29,7 +29,7 @@ interface ClusterPayload {
   avg_fz?: number;
   avg_fy?: number;
   avg_cti?: number;
-  centroid_embedding: number[];
+  centroid_embedding?: number[];
 }
 
 interface PersistPayload {
@@ -43,6 +43,53 @@ interface PersistPayload {
   chunks: ChunkPayload[];
   clusters: ClusterPayload[];
   share_to_global?: boolean;
+}
+
+const EMBEDDING_MODEL = "google/gemini-embedding-001";
+const EMBEDDING_DIM = 3072;
+const EMBEDDING_BATCH = 40;
+
+function augmentForEmbedding(chunk: ChunkPayload, filename: string): string {
+  const parts = [`[doc: ${filename}]`];
+  if (chunk.cluster_label) parts.push(`[cluster: ${chunk.cluster_label}]`);
+  const intention = chunk.intention as Record<string, unknown> | undefined;
+  if (typeof intention?.speechAct === "string") parts.push(`[act: ${intention.speechAct}]`);
+  if (typeof intention?.epistemicCertainty === "number") {
+    parts.push(`[certainty: ${intention.epistemicCertainty.toFixed(2)}]`);
+  }
+  parts.push(chunk.text);
+  return parts.join(" ");
+}
+
+async function createEmbeddings(chunks: ChunkPayload[], filename: string): Promise<number[][]> {
+  if (chunks.every((chunk) => Array.isArray(chunk.embedding))) {
+    return chunks.map((chunk) => chunk.embedding ?? []);
+  }
+
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) throw new Error("AI embedding service is not configured");
+  const embeddings: number[][] = new Array(chunks.length);
+
+  for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH) {
+    const input = chunks.slice(i, i + EMBEDDING_BATCH).map((chunk) => augmentForEmbedding(chunk, filename));
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
+    });
+    if (!response.ok) throw new Error(`Embedding failed (${response.status}): ${await response.text()}`);
+    const body = await response.json();
+    const vectors = (body.data ?? []) as { embedding: number[]; index: number }[];
+    for (const vector of vectors) embeddings[i + vector.index] = vector.embedding;
+  }
+
+  if (embeddings.some((embedding) => !Array.isArray(embedding))) {
+    throw new Error("Embedding response was incomplete");
+  }
+  return embeddings;
 }
 
 Deno.serve(async (req) => {
@@ -161,6 +208,10 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Generate embeddings server-side. Returning them through the browser used
+    // tens of megabytes of parsed JSON and caused mobile tabs to reload white.
+    const embeddings = await createEmbeddings(payload.chunks, payload.filename);
+
     // Postgres text/jsonb cannot store \u0000. Strip null bytes everywhere.
     const stripNulls = (s: unknown): unknown => {
       if (typeof s === "string") return s.replace(/\u0000/g, "");
@@ -175,7 +226,7 @@ Deno.serve(async (req) => {
     const clean = (s?: string) => (typeof s === "string" ? s.replace(/\u0000/g, "") : s);
 
     // 2. Upsert chunks (per-chunk dedup via UNIQUE (document_id, content_hash))
-    const chunkRows = payload.chunks.map((c) => ({
+    const chunkRows = payload.chunks.map((c, index) => ({
       document_id: documentId,
       chunk_index: c.chunk_index,
       text: clean(c.text),
@@ -188,8 +239,8 @@ Deno.serve(async (req) => {
       cti: c.cti,
       triangulation: stripNulls(c.triangulation),
       intention: stripNulls(c.intention),
-      embedding: c.embedding,
-      embedding_dim: payload.embedding_dim ?? 3072,
+      embedding: embeddings[index],
+      embedding_dim: payload.embedding_dim ?? EMBEDDING_DIM,
     }));
 
     const CHUNK_BATCH = 200;
@@ -205,18 +256,35 @@ Deno.serve(async (req) => {
     if (payload.clusters?.length) {
       // Skip empty clusters — no more "ghost" placeholders in corpus map
       const meaningful = payload.clusters.filter((c) => (c.unit_count ?? 0) > 0);
-      const clusterRows = meaningful.map((c) => ({
-        document_id: documentId,
-        cluster_id: c.cluster_id,
-        label: c.label,
-        description: c.description,
-        unit_count: c.unit_count,
-        avg_fz: c.avg_fz,
-        avg_fy: c.avg_fy,
-        avg_cti: c.avg_cti,
-        centroid_embedding: c.centroid_embedding,
-        embedding_dim: payload.embedding_dim ?? 3072,
-      }));
+      const clusterRows = meaningful.map((c) => {
+        const memberIndexes = payload.chunks.flatMap((chunk, index) =>
+          chunk.cluster_id === c.cluster_id ? [index] : []
+        );
+        const centroid = new Array(payload.embedding_dim ?? EMBEDDING_DIM).fill(0);
+        for (const index of memberIndexes) {
+          const embedding = embeddings[index];
+          for (let dimension = 0; dimension < centroid.length; dimension++) {
+            centroid[dimension] += embedding[dimension] ?? 0;
+          }
+        }
+        if (memberIndexes.length) {
+          for (let dimension = 0; dimension < centroid.length; dimension++) {
+            centroid[dimension] /= memberIndexes.length;
+          }
+        }
+        return {
+          document_id: documentId,
+          cluster_id: c.cluster_id,
+          label: c.label,
+          description: c.description,
+          unit_count: c.unit_count,
+          avg_fz: c.avg_fz,
+          avg_fy: c.avg_fy,
+          avg_cti: c.avg_cti,
+          centroid_embedding: c.centroid_embedding ?? centroid,
+          embedding_dim: payload.embedding_dim ?? EMBEDDING_DIM,
+        };
+      });
       if (clusterRows.length) {
         const { error: clErr } = await supabase
           .from("clusters_summary")
