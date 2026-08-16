@@ -308,25 +308,6 @@ async function persistFieldInBackground(
   file: File,
   sourceType: SourceType
 ): Promise<void> {
-  // Build embed items with augmentation metadata
-  const items = field.units.map((u, i) => ({
-    text: u.text,
-    docName: file.name,
-    clusterLabel: field.clusters[u.clusterId]?.label,
-    speechAct: u.intention?.speechAct,
-    certainty: u.intention?.epistemicCertainty,
-  }));
-
-  const { data: embedData, error: embedErr } = await supabase.functions.invoke("embed-chunks", {
-    body: { items },
-  });
-  if (embedErr) throw embedErr;
-
-  const { embeddings, dim } = embedData as { embeddings: number[][]; dim: number };
-  if (!embeddings || embeddings.length !== field.units.length) {
-    throw new Error("Embedding count mismatch");
-  }
-
   // Compute per-chunk content hashes
   const hashes = await Promise.all(field.units.map((u) => sha256Hex(u.text)));
 
@@ -342,21 +323,12 @@ async function persistFieldInBackground(
     cti: u.cti,
     triangulation: u.triangulation,
     intention: u.intention,
-    embedding: embeddings[i],
   }));
 
-  // Centroid embedding per cluster = mean of member embeddings
+  // Embeddings and cluster centroids are generated inside persist-field. Keeping
+  // 600 × 3072 JSON numbers out of the browser prevents mobile tab reloads.
   const clusterPayload = field.clusters.map((c) => {
-    const memberIdxs = field.units
-      .map((u, i) => (u.clusterId === c.id ? i : -1))
-      .filter((i) => i >= 0);
-    const centroid = new Array(dim).fill(0);
-    for (const idx of memberIdxs) {
-      const e = embeddings[idx];
-      for (let d = 0; d < dim; d++) centroid[d] += e[d];
-    }
-    if (memberIdxs.length) for (let d = 0; d < dim; d++) centroid[d] /= memberIdxs.length;
-
+    const memberIdxs = field.units.flatMap((u, i) => (u.clusterId === c.id ? [i] : []));
     const avgCti =
       memberIdxs.reduce((s, i) => s + (field.units[i].cti ?? 0), 0) / (memberIdxs.length || 1);
 
@@ -368,7 +340,6 @@ async function persistFieldInBackground(
       avg_fz: c.avgFZ,
       avg_fy: c.avgFY,
       avg_cti: avgCti,
-      centroid_embedding: centroid,
     };
   });
 
@@ -387,7 +358,7 @@ async function persistFieldInBackground(
       content_hash: docHash,
       file_size: file.size,
       embedding_model: "google/gemini-embedding-001",
-      embedding_dim: dim,
+      embedding_dim: 3072,
       stats: field.stats,
       chunks: chunkPayload,
       clusters: clusterPayload,

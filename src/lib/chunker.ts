@@ -36,11 +36,37 @@ const DEFAULTS: Required<ChunkOptions> = {
 };
 
 function splitSentences(text: string): string[] {
-  return text
+  const sentences = text
     .replace(/\s+/g, " ")
     .split(/(?<=[.!?])\s+(?=[A-ZÅÄÖ"'(\[])/u)
     .map((s) => s.trim())
     .filter(Boolean);
+
+  // Code cells, minified data and generated system prompts can contain tens of
+  // thousands of characters without sentence punctuation. Never let one such
+  // unit bypass maxChars: it multiplies memory use in tokenization and requests.
+  const bounded: string[] = [];
+  for (const sentence of sentences) {
+    if (sentence.length <= DEFAULTS.maxChars) {
+      bounded.push(sentence);
+      continue;
+    }
+
+    let offset = 0;
+    while (offset < sentence.length) {
+      const hardEnd = Math.min(sentence.length, offset + DEFAULTS.maxChars);
+      const window = sentence.slice(offset, hardEnd);
+      const softBreak = hardEnd < sentence.length
+        ? Math.max(window.lastIndexOf(" "), window.lastIndexOf("\n"))
+        : window.length;
+      const take = softBreak >= DEFAULTS.maxChars * 0.6 ? softBreak : window.length;
+      const part = sentence.slice(offset, offset + take).trim();
+      if (part) bounded.push(part);
+      offset += Math.max(take, 1);
+    }
+  }
+
+  return bounded;
 }
 
 /**
