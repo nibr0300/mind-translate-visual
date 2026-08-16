@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { isCreditError, notifyCreditsExhausted } from "./creditNotice";
+
 import {
   analyzeHedgingBatch,
   speechActDiscrepancy,
