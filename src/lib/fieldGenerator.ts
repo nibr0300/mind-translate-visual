@@ -33,6 +33,8 @@ import {
 } from "./intentionAnalyzer";
 import { analyzeHedgingBatch } from "./hedgingAnalyzer";
 import { supabase } from "@/integrations/supabase/client";
+import { isCreditError, notifyCreditsExhausted } from "./creditNotice";
+
 
 export type ProgressCb = (stage: string, value: number) => void;
 
