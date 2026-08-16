@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateFieldFromFile } from "@/lib/fieldGenerator";
 import type { GeometricField } from "@/lib/fieldData";
