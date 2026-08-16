@@ -35,6 +35,12 @@ export async function extractSpatialText(
 ): Promise<SpatialTextItem[]> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  return extractSpatialTextFromDocument(pdf);
+}
+
+export async function extractSpatialTextFromDocument(
+  pdf: Awaited<ReturnType<typeof pdfjsLib.getDocument>["promise"]>
+): Promise<SpatialTextItem[]> {
   const items: SpatialTextItem[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
