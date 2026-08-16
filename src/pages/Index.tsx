@@ -8,18 +8,29 @@ type UseCase = "didactics" | "truth-seeking" | "negotiation" | "uploaded";
 
 /** Survive preview/tab reloads: a generated field is expensive, never lose it silently. */
 const FIELD_CACHE_KEY = "gvtd:last-field";
+/**
+ * Bump whenever the analysis engine changes (tokenizer, vocabulary, projection).
+ * Otherwise a cached field from an older engine keeps being shown and the user
+ * sees stale results after a fix.
+ */
+const ENGINE_VERSION = 3;
 
 function readCachedField(): { field: GeometricField; fileName: string } | null {
   try {
     const raw = sessionStorage.getItem(FIELD_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    if (parsed?.engineVersion !== ENGINE_VERSION) {
+      sessionStorage.removeItem(FIELD_CACHE_KEY);
+      return null;
+    }
     if (!parsed?.field?.units?.length) return null;
     return parsed;
   } catch {
     return null;
   }
 }
+
 
 export default function Index() {
   const cached = useMemo(readCachedField, []);
@@ -42,8 +53,9 @@ export default function Index() {
     try {
       sessionStorage.setItem(
         FIELD_CACHE_KEY,
-        JSON.stringify({ field: uploadedField, fileName: uploadedFileName })
+        JSON.stringify({ engineVersion: ENGINE_VERSION, field: uploadedField, fileName: uploadedFileName })
       );
+
     } catch {
       /* quota exceeded — field stays in memory only */
     }
