@@ -18,6 +18,11 @@ const ACCEPT =
 
 const MAX_BYTES = 50 * 1024 * 1024; // 50MB cap across types
 
+/** Mobile browsers (esp. iOS Safari) kill the tab well below the desktop limit. */
+const IS_MOBILE = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const MOBILE_SOFT_LIMIT = 8 * 1024 * 1024;
+const BREADCRUMB_KEY = "gvtd:ingest-in-progress";
+
 export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState({ stage: "", value: 0 });
@@ -27,16 +32,46 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { isAdmin } = useIsAdmin();
 
+  // If a previous run never finished, the tab was reloaded/killed mid-ingest
+  // (white flash → back to start state). Tell the user instead of failing silently.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(BREADCRUMB_KEY);
+      if (raw) {
+        sessionStorage.removeItem(BREADCRUMB_KEY);
+        const { name, size } = JSON.parse(raw);
+        setError(
+          `Ingest of "${name}" (${(size / 1024 / 1024).toFixed(1)}MB) was interrupted — the browser tab ran out of memory and reloaded. Try a smaller file, or split the zip.`
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const processFile = useCallback(
     async (file: File) => {
       if (file.size > MAX_BYTES) {
         setError(`File too large (max ${MAX_BYTES / 1024 / 1024}MB)`);
         return;
       }
+      if (IS_MOBILE && file.size > MOBILE_SOFT_LIMIT) {
+        setError(
+          `${(file.size / 1024 / 1024).toFixed(1)}MB is too large for a mobile browser (limit ~${
+            MOBILE_SOFT_LIMIT / 1024 / 1024
+          }MB) — the tab will crash. Use a desktop browser or a smaller file.`
+        );
+        return;
+      }
 
       setError(null);
       setIsProcessing(true);
       setProgress({ stage: "Starting…", value: 0 });
+      try {
+        sessionStorage.setItem(BREADCRUMB_KEY, JSON.stringify({ name: file.name, size: file.size }));
+      } catch {
+        /* ignore */
+      }
 
       try {
         const field = await generateFieldFromFile(file, (stage, value) =>
@@ -62,11 +97,17 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
         console.error("[upload] failed", err);
         setError(err.message || "Failed to process file");
       } finally {
+        try {
+          sessionStorage.removeItem(BREADCRUMB_KEY);
+        } catch {
+          /* ignore */
+        }
         setIsProcessing(false);
       }
     },
     [onFieldGenerated]
   );
+
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
