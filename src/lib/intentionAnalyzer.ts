@@ -97,15 +97,22 @@ export async function analyzeIntentions(
     })
   );
 
-  const merged: (IntentionAnalysis | null)[] = [];
+  // Edge function returns batch-local indices — remap them to global unit indices.
+  const merged: IntentionAnalysis[] = [];
+  let offset = 0;
   results.forEach((r, i) => {
-    const size = batches[i].length;
-    for (let k = 0; k < size; k++) merged.push(r?.[k] ?? null);
+    if (r) {
+      for (const a of r) {
+        const idx = offset + (a.index ?? 0);
+        if (idx < textUnits.length) merged.push({ ...a, index: idx });
+      }
+    }
+    offset += batches[i].length;
   });
 
-  if (merged.every((m) => m === null)) return null;
-  return merged as IntentionAnalysis[];
+  return merged.length ? merged : null;
 }
+
 
 
 /**
