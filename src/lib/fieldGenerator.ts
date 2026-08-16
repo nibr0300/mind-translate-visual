@@ -33,6 +33,8 @@ import {
 } from "./intentionAnalyzer";
 import { analyzeHedgingBatch } from "./hedgingAnalyzer";
 import { supabase } from "@/integrations/supabase/client";
+import { isCreditError, notifyCreditsExhausted } from "./creditNotice";
+
 
 export type ProgressCb = (stage: string, value: number) => void;
 
@@ -116,8 +118,10 @@ export async function generateFieldFromFile(
 
   // Background: embed + persist. Don't block UI on it.
   void persistFieldInBackground(field, chunks, file, sourceType).catch((err) => {
-    console.warn("[persist] failed:", err);
+    if (isCreditError(err)) notifyCreditsExhausted();
+    else console.warn("[persist] failed:", err);
   });
+
 
   return field;
 }

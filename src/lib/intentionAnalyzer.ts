@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { isCreditError, notifyCreditsExhausted } from "./creditNotice";
+
 import {
   analyzeHedgingBatch,
   speechActDiscrepancy,
@@ -47,15 +49,18 @@ export async function analyzeIntentions(
     });
 
     if (error) {
-      console.warn("Intention analysis unavailable:", error.message);
+      if (isCreditError(error)) notifyCreditsExhausted();
+      else console.warn("Intention analysis unavailable:", error.message);
       return null;
     }
 
     return (data as { analyses: IntentionAnalysis[] }).analyses;
   } catch (err) {
-    console.warn("Intention analysis failed:", err);
+    if (isCreditError(err)) notifyCreditsExhausted();
+    else console.warn("Intention analysis failed:", err);
     return null;
   }
+
 }
 
 /**
