@@ -149,17 +149,28 @@ export default function FieldCanvas({
     setTy(0);
   }, []);
 
-  // Keyboard shortcuts: / = search, R = reset, Esc = close selection/search
+  // Keyboard shortcuts: / = search, R = reset, Esc = close selection/search.
+  // Never hijack typing: while focus is in a field, only Escape is handled.
   useEffect(() => {
+    const isEditable = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      if (!el || !el.tagName) return false;
+      const tag = el.tagName.toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select" || el.isContentEditable;
+    };
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "/" && !searchOpen) {
+      const typing = isEditable(e.target);
+
+      if (!typing && e.key === "/" && !searchOpen) {
         e.preventDefault();
         setSearchOpen(true);
       }
-      if (e.key === "r" || e.key === "R") {
+      if (!typing && (e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         resetView();
       }
+
       if (e.key === "Escape") {
         if (searchOpen) {
           setSearchOpen(false);
