@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { generateFieldFromFile } from "@/lib/fieldGenerator";
 import type { GeometricField } from "@/lib/fieldData";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -151,7 +151,7 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
             : "border-border hover:border-primary/30 hover:bg-secondary/30"
         }`}
       >
-        <AnimatePresence mode="wait">
+        <>
           {isProcessing ? (
             <motion.div
               key="processing"
@@ -179,7 +179,7 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
+        </>
       </div>
 
       {isAdmin && !isProcessing && (

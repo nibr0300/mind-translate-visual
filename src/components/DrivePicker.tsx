@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 
 interface DriveFile {
@@ -84,7 +84,7 @@ export default function DrivePicker({ open, onClose, onPicked }: Props) {
   if (!open) return null;
 
   return (
-    <AnimatePresence>
+    <>
       <motion.div
         className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
         initial={{ opacity: 0 }}
@@ -172,6 +172,6 @@ export default function DrivePicker({ open, onClose, onPicked }: Props) {
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </>
   );
 }

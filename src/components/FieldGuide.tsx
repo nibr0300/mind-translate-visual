@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
 import {
   HelpCircle,
@@ -142,7 +142,7 @@ export default function FieldGuide({
       )}
 
       {/* Expanded guide */}
-      <AnimatePresence initial={false}>
+      <>
         {expanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
@@ -184,7 +184,7 @@ export default function FieldGuide({
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </>
 
       {/* Exploration prompt — the gentle "gamification" layer */}
       <div className="mt-3 pt-3 border-t border-border/50">
