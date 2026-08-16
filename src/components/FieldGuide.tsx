@@ -194,7 +194,7 @@ export default function FieldGuide({
             Utforska vidare
           </span>
         </div>
-        <AnimatePresence mode="wait">
+        <>
           <motion.button
             key={promptIndex}
             initial={{ opacity: 0, y: 4 }}
@@ -220,7 +220,7 @@ export default function FieldGuide({
               <ChevronRight className="w-3 h-3" />
             </div>
           </motion.button>
-        </AnimatePresence>
+        </>
       </div>
     </div>
   );
