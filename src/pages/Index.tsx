@@ -53,8 +53,9 @@ export default function Index() {
     try {
       sessionStorage.setItem(
         FIELD_CACHE_KEY,
-        JSON.stringify({ field: uploadedField, fileName: uploadedFileName })
+        JSON.stringify({ engineVersion: ENGINE_VERSION, field: uploadedField, fileName: uploadedFileName })
       );
+
     } catch {
       /* quota exceeded — field stays in memory only */
     }
