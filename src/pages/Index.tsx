@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { generateDemoField, type FieldUnit, type GeometricField } from "@/lib/fieldData";
 import FieldCanvas from "@/components/FieldCanvas";
 import FieldSidebar from "@/components/FieldSidebar";
@@ -6,19 +6,49 @@ import FieldInfoPanel from "@/components/FieldInfoPanel";
 
 type UseCase = "didactics" | "truth-seeking" | "negotiation" | "uploaded";
 
+/** Survive preview/tab reloads: a generated field is expensive, never lose it silently. */
+const FIELD_CACHE_KEY = "gvtd:last-field";
+
+function readCachedField(): { field: GeometricField; fileName: string } | null {
+  try {
+    const raw = sessionStorage.getItem(FIELD_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.field?.units?.length) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export default function Index() {
-  const [useCase, setUseCase] = useState<UseCase>("didactics");
+  const cached = useMemo(readCachedField, []);
+  const [useCase, setUseCase] = useState<UseCase>(cached ? "uploaded" : "didactics");
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<FieldUnit | null>(null);
   const [anchorUnitId, setAnchorUnitId] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
-  const [uploadedField, setUploadedField] = useState<GeometricField | null>(null);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadedField, setUploadedField] = useState<GeometricField | null>(cached?.field ?? null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(cached?.fileName ?? null);
 
   const demoField = useMemo(
     () => (useCase !== "uploaded" ? generateDemoField(useCase as "didactics" | "truth-seeking" | "negotiation") : null),
     [useCase]
   );
+
+  // Persist the uploaded field so an unexpected reload restores it instead of resetting to demo state.
+  useEffect(() => {
+    if (!uploadedField) return;
+    try {
+      sessionStorage.setItem(
+        FIELD_CACHE_KEY,
+        JSON.stringify({ field: uploadedField, fileName: uploadedFileName })
+      );
+    } catch {
+      /* quota exceeded — field stays in memory only */
+    }
+  }, [uploadedField, uploadedFileName]);
+
 
   const field = useCase === "uploaded" && uploadedField ? uploadedField : demoField!;
   const anchorUnit = useMemo(
