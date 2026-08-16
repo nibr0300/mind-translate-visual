@@ -14,11 +14,16 @@
  * made fundamental units look "empty" and pushed them into fallback placement.
  */
 export function tokenize(text: string): string[] {
-  return text
+  const words = text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}λ∅→↔≠≡∈∀∃\s'_-]/gu, " ")
     .split(/\s+/)
     .filter((w) => w.length >= 2);
+  const notation = text
+    .toLowerCase()
+    .match(/[\p{N}λ∅→↔≠≡∈∀∃=\[\]]+/gu)
+    ?.filter((token) => /[λ∅→↔≠≡∈∀∃=\[\]]/u.test(token)) ?? [];
+  return [...words, ...notation];
 }
 
 
