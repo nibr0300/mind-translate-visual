@@ -12,6 +12,7 @@ import { extractFromFile, detectSourceType, type SourceType } from "./inputAdapt
 import { lastMarkupRatio } from "./inputAdapters/textAdapter";
 import { chunkUnits, type Chunk } from "./chunker";
 import { sha256Hex } from "./contentHash";
+import { getActiveDomainId } from "./domainProfiles";
 import { generateFieldFromPDF } from "./pdfFieldGenerator";
 import {
   computeTFIDF,
@@ -115,6 +116,8 @@ export async function generateFieldFromFile(
     field.stats.analyzedOf = { analyzed: chunks.length, total: totalFound };
     if (notes.length) field.stats.notes = [...(field.stats.notes ?? []), ...notes];
   }
+
+  field.domain = getActiveDomainId();
 
   // Make missing deep analysis visible instead of silently reporting llmTension = 0.
   const withIntention = field.units.filter((u) => u.intention).length;
@@ -235,6 +238,7 @@ async function buildFieldFromChunks(
       sourcePath: chunks[i]?.source,
       ...(degenerate[i] ? { degenerate: true } : {}),
       degree: degree[i],
+      ...(intention?.domainAxes ? { domainAxes: intention.domainAxes } : {}),
       weightedCentrality: weighted[i],
       ...(intention && {
         intention: {

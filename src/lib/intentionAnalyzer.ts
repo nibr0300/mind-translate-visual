@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isCreditError, notifyCreditsExhausted } from "./creditNotice";
+import { getDomainProfile, getActiveDomainId } from "./domainProfiles";
 
 import {
   analyzeHedgingBatch,
@@ -19,6 +20,8 @@ export interface IntentionAnalysis {
   narrativeTension?: number;
   /** 0-1: actively refusing or rewriting plain reality */
   denialMarker?: number;
+  /** 0-1 scores on the active domain profile's two axes, keyed by axis key */
+  domainAxes?: Record<string, number>;
 }
 
 export interface TriangulatedTension {
@@ -46,10 +49,15 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
   ]);
 }
 
+function domainPayload() {
+  const p = getDomainProfile(getActiveDomainId());
+  return { id: p.id, guidance: p.guidance, axes: p.axes };
+}
+
 async function analyzeBatch(textUnits: string[]): Promise<IntentionAnalysis[] | null> {
   try {
     const res = await withTimeout(
-      supabase.functions.invoke("analyze-intentions", { body: { textUnits } }),
+      supabase.functions.invoke("analyze-intentions", { body: { textUnits, domain: domainPayload() } }),
       BATCH_TIMEOUT_MS
     );
     if (!res) {
