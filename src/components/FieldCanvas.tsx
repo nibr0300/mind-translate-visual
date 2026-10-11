@@ -738,6 +738,32 @@ export default function FieldCanvas({
                 </div>
               </div>
             )}
+            {displayUnit.domainAxes && (() => {
+              const profile = getDomainProfile(field.domain);
+              return (
+                <div className="mt-2 pt-2 border-t border-border/50">
+                  <div className="text-[10px] tracking-wider uppercase text-muted-foreground mb-2">
+                    Domain · {profile.label}
+                  </div>
+                  {profile.axes.map((a) => {
+                    const v = displayUnit.domainAxes?.[a.key];
+                    if (typeof v !== "number") return null;
+                    return (
+                      <div key={a.key} className="mb-1.5 text-[10px]">
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>{a.low}</span>
+                          <span className="text-foreground">{a.label} {v.toFixed(2)}</span>
+                          <span>{a.high}</span>
+                        </div>
+                        <div className="relative h-1 bg-secondary rounded-full">
+                          <div className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-primary" style={{ left: `calc(${v * 100}% - 4px)` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             {displayUnit.triangulation && (
               <div className="mt-2 pt-2 border-t border-border/50">
                 <div className="text-[10px] tracking-wider uppercase text-muted-foreground mb-2">
