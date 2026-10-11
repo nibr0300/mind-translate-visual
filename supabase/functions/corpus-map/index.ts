@@ -19,6 +19,8 @@ interface Body {
   noise_threshold?: number;
   /** Service-role callers (e.g. MCP server) may pass the target user_id explicitly. */
   user_id?: string;
+  /** Only include documents of this domain (e.g. "poker"). */
+  domain?: string;
 }
 
 /** pgvector returnerar centroid_embedding som sträng "[0.1,0.2,...]". Parse till number[]. */
@@ -89,9 +91,14 @@ Deno.serve(async (req) => {
     // 1) Documents (owned by user)
     const { data: docs, error: dErr } = await supabase
       .from("documents")
-      .select("id, filename, source_type, uploaded_at, embedding_model, embedding_dim, stats")
-      .eq("user_id", userId);
+      .select("id, filename, source_type, uploaded_at, embedding_model, embedding_dim, stats, domain")
+      .eq("user_id", userId)
+      .match(body.domain ? { domain: body.domain } : {});
     if (dErr) throw dErr;
+    for (const d of (docs ?? []) as any[]) {
+      const res = Number(d.stats?.coordinateResolution);
+      d.low_structure = Number.isFinite(res) && res < 0.3;
+    }
     const userDocIds = new Set((docs ?? []).map((d: any) => d.id));
 
     if (userDocIds.size === 0) {
@@ -126,7 +133,7 @@ Deno.serve(async (req) => {
     // computed in-process to avoid corpus-wide DB vector joins that can timeout.
     const { data: rawNodes, error: nErr } = await supabase
       .from("clusters_summary")
-      .select("id, document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding, embedding_dim")
+      .select("id, document_id, cluster_id, label, custom_label, description, unit_count, avg_fz, avg_fy, avg_cti, centroid_embedding, embedding_dim, cohesion, noise_ratio")
       .in("document_id", Array.from(userDocIds));
     if (nErr) throw nErr;
 
@@ -169,6 +176,8 @@ Deno.serve(async (req) => {
       const nearest = nearestDistance.get(n.id);
       return [n.id, {
         separation: typeof nearest === "number" && Number.isFinite(nearest) ? nearest : 1,
+        cohesion: n.cohesion ?? null,
+        noise_ratio: n.noise_ratio ?? null,
         member_count: n.unit_count ?? 0,
       }];
     }));
@@ -321,6 +330,7 @@ Deno.serve(async (req) => {
       schema_version: "corpus-map/2.2",
       exportedAt: new Date().toISOString(),
       params: {
+        domain: body.domain ?? null,
         min_similarity: minSim,
         max_edges: maxEdges,
         include_chunks: includeChunks,

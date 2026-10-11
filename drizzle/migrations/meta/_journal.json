@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791738316004,
+      "tag": "0000_domain_and_cluster_quality",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791738340371,
+      "tag": "0001_noise_ratio_misassigned",
+      "breakpoints": true
+    }
+  ]
+}

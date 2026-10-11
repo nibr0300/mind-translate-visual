@@ -5,6 +5,7 @@ import { distanceFromAnchor } from "@/lib/anchorMath";
 import { computeDepths, applyHelm } from "@/lib/helmMath";
 import HelmWheel from "./HelmWheel";
 import { getDomainProfile } from "@/lib/domainProfiles";
+import { axisLayout } from "@/lib/axisLayout";
 
 
 
@@ -71,8 +72,15 @@ export default function FieldCanvas({
   // Helm: heading angle (radians) through 5D intention space
   const [heading, setHeading] = useState(0);
 
+  // Domain-axis view: place nodes by two chosen domain axes instead of semantics.
+  const domainAxisList = useMemo(() => getDomainProfile(field.domain).axes, [field.domain]);
+  const hasAxisScores = useMemo(() => field.units.some((u) => u.domainAxes), [field.units]);
+  const [axisView, setAxisView] = useState<{ x: string; y: string } | null>(null);
+  useEffect(() => { setAxisView(null); }, [field]);
+
   // Compute positions as percentages (in untransformed content space).
   const basePositions = useMemo(() => {
+    if (axisView) return axisLayout(field.units, axisView.x, axisView.y).map(({ x, y }) => ({ x, y }));
     if (!anchorUnit) {
       return field.units.map((u) => {
         const x = ((u.vector2d[0] + 4) / 8) * 100;
@@ -107,7 +115,7 @@ export default function FieldCanvas({
       const y = ((ny + 4) / 8) * 100;
       return { x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) };
     });
-  }, [field.units, anchorUnit]);
+  }, [field.units, anchorUnit, axisView]);
 
   // Depth along the current heading — resolves stacked nodes into near/far layers.
   const depths = useMemo(() => computeDepths(field.units, heading), [field.units, heading]);
@@ -187,11 +195,19 @@ export default function FieldCanvas({
   const clusterCenterPositions = useMemo(
     () =>
       field.clusters.map((c) => {
+        if (axisView) {
+          const idx = field.units.flatMap((u, i) => (u.clusterId === c.id ? [i] : []));
+          const n = idx.length || 1;
+          return {
+            x: `${idx.reduce((s, i) => s + basePositions[i].x, 0) / n}%`,
+            y: `${idx.reduce((s, i) => s + basePositions[i].y, 0) / n}%`,
+          };
+        }
         const x = ((c.center[0] + 4) / 8) * 100;
         const y = ((c.center[1] + 4) / 8) * 100;
         return { x: `${x}%`, y: `${y}%` };
       }),
-    [field.clusters]
+    [field.clusters, field.units, axisView, basePositions]
   );
 
   // Center the view on a percentage point in content space, at a target scale.
@@ -396,7 +412,40 @@ export default function FieldCanvas({
             >🔍 Sök</button>
           )}
         </div>
+        {hasAxisScores && domainAxisList.length >= 2 && (
+          <div className="pointer-events-auto flex items-center gap-1 bg-card/80 backdrop-blur-sm border border-border rounded-md px-1 h-7 text-[10px] font-mono">
+            <button
+              onClick={() => setAxisView((v) => (v ? null : { x: domainAxisList[0].key, y: domainAxisList[1].key }))}
+              className={`px-1 uppercase tracking-wider ${axisView ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              title="Placera noder efter domänaxlar"
+            >{axisView ? "Axlar" : "Semantik"}</button>
+            {axisView && (["x", "y"] as const).map((dim) => (
+              <select
+                key={dim}
+                aria-label={`Axel ${dim}`}
+                value={axisView[dim]}
+                onChange={(e) => setAxisView({ ...axisView, [dim]: e.target.value })}
+                className="bg-transparent text-foreground outline-none max-w-[84px]"
+              >
+                {domainAxisList.map((a) => <option key={a.key} value={a.key}>{dim.toUpperCase()}: {a.label}</option>)}
+              </select>
+            ))}
+          </div>
+        )}
       </div>
+      {axisView && (() => {
+        const ax = domainAxisList.find((a) => a.key === axisView.x);
+        const ay = domainAxisList.find((a) => a.key === axisView.y);
+        return (
+          <div className="absolute inset-0 z-30 pointer-events-none font-mono text-[9px] text-muted-foreground">
+            <span className="absolute left-2 top-1/2">← {ax?.low}</span>
+            <span className="absolute right-2 top-1/2">{ax?.high} →</span>
+            <span className="absolute left-1/2 -translate-x-1/2 top-11">↑ {ay?.high}</span>
+            <span className="absolute left-1/2 -translate-x-1/2 bottom-7">↓ {ay?.low}</span>
+            <span className="absolute left-2 bottom-1 opacity-70">ej poängsatt ·····</span>
+          </div>
+        );
+      })()}
 
       {/* Pan/zoom viewport */}
       <div

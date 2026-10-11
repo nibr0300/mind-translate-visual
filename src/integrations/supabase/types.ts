@@ -129,6 +129,7 @@ export type Database = {
           avg_fz: number | null
           centroid_embedding: string | null
           cluster_id: number
+          cohesion: number | null
           created_at: string
           custom_label: string | null
           custom_label_updated_at: string | null
@@ -137,6 +138,7 @@ export type Database = {
           embedding_dim: number
           id: string
           label: string
+          noise_ratio: number | null
           unit_count: number
         }
         Insert: {
@@ -145,6 +147,7 @@ export type Database = {
           avg_fz?: number | null
           centroid_embedding?: string | null
           cluster_id: number
+          cohesion?: number | null
           created_at?: string
           custom_label?: string | null
           custom_label_updated_at?: string | null
@@ -153,6 +156,7 @@ export type Database = {
           embedding_dim?: number
           id?: string
           label: string
+          noise_ratio?: number | null
           unit_count?: number
         }
         Update: {
@@ -161,6 +165,7 @@ export type Database = {
           avg_fz?: number | null
           centroid_embedding?: string | null
           cluster_id?: number
+          cohesion?: number | null
           created_at?: string
           custom_label?: string | null
           custom_label_updated_at?: string | null
@@ -169,6 +174,7 @@ export type Database = {
           embedding_dim?: number
           id?: string
           label?: string
+          noise_ratio?: number | null
           unit_count?: number
         }
         Relationships: [
@@ -191,6 +197,7 @@ export type Database = {
       documents: {
         Row: {
           content_hash: string | null
+          domain: string
           embedding_dim: number
           embedding_model: string
           file_size: number | null
@@ -204,6 +211,7 @@ export type Database = {
         }
         Insert: {
           content_hash?: string | null
+          domain?: string
           embedding_dim?: number
           embedding_model?: string
           file_size?: number | null
@@ -217,6 +225,7 @@ export type Database = {
         }
         Update: {
           content_hash?: string | null
+          domain?: string
           embedding_dim?: number
           embedding_model?: string
           file_size?: number | null
