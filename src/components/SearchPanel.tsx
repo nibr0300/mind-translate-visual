@@ -10,6 +10,9 @@ import {
 } from "@/lib/searchClient";
 import type { GeometricField } from "@/lib/fieldData";
 import { ChevronDown, RefreshCw, Search } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { DOMAIN_PROFILES } from "@/lib/domainProfiles";
+import CalibrationPanel from "./CalibrationPanel";
 
 interface Props {
   field: GeometricField;
@@ -29,6 +32,22 @@ export default function SearchPanel({ field, fileName, activeClusterId, onSelect
     finally { setLoadingCorpus(false); }
   };
   useEffect(() => { void loadCorpus(); }, []);
+
+  // Domain per document (clean per-domain fields) + list filter.
+  const [domains, setDomains] = useState<Record<string, string>>({});
+  const [domainFilter, setDomainFilter] = useState("all");
+  useEffect(() => {
+    if (!corpus?.length) return;
+    supabase.from("documents").select("id, domain").in("id", corpus.map((d) => d.id)).then(({ data }) => {
+      setDomains(Object.fromEntries((data ?? []).map((d) => [d.id, d.domain])));
+    });
+  }, [corpus]);
+  const setDocDomain = async (id: string, domain: string) => {
+    setDomains((m) => ({ ...m, [id]: domain }));
+    const { error } = await supabase.from("documents").update({ domain }).eq("id", id);
+    if (error) console.warn("[domain] update failed:", error.message);
+  };
+  const shownCorpus = (corpus ?? []).filter((d) => domainFilter === "all" || (domains[d.id] ?? "general") === domainFilter);
 
   // Resolve current document_id by filename (latest upload wins)
   const currentDocId = useMemo(() => {
@@ -124,13 +143,22 @@ export default function SearchPanel({ field, fileName, activeClusterId, onSelect
             <RefreshCw className={`w-3 h-3 ${loadingCorpus ? "animate-spin" : ""}`} />
           </button>
         </div>
-        {!corpus || corpus.length === 0 ? (
+        <select
+          aria-label="Filter corpus by domain"
+          value={domainFilter}
+          onChange={(e) => setDomainFilter(e.target.value)}
+          className="mb-2 w-full bg-background border border-border rounded px-1 py-0.5 text-[10px] font-mono text-foreground"
+        >
+          <option value="all">All domains</option>
+          {DOMAIN_PROFILES.map((p) => <option key={p.id} value={p.id}>Only {p.label}</option>)}
+        </select>
+        {shownCorpus.length === 0 ? (
           <p className="text-[11px] text-muted-foreground font-mono">
             {loadingCorpus ? "Loading…" : "No persisted documents yet."}
           </p>
         ) : (
           <ul className="flex flex-col gap-1">
-            {corpus.slice(0, 8).map((d, i) => (
+            {shownCorpus.slice(0, domainFilter === "all" ? 8 : 30).map((d, i) => (
               <li key={d.id} className="flex items-center gap-2 text-[11px] font-mono">
                 <span className="text-muted-foreground/60 w-4 text-right">{i + 1}</span>
                 <span className="flex-1 truncate text-foreground" title={d.filename}>{d.filename}</span>
@@ -139,11 +167,21 @@ export default function SearchPanel({ field, fileName, activeClusterId, onSelect
                 </div>
                 <span className="w-9 text-right text-muted-foreground">{d.avg_cti.toFixed(2)}</span>
                 <span className="w-10 text-right text-muted-foreground/60">k={d.cluster_count}</span>
+                <select
+                  aria-label={`Domain for ${d.filename}`}
+                  value={domains[d.id] ?? "general"}
+                  onChange={(e) => setDocDomain(d.id, e.target.value)}
+                  className="w-16 bg-transparent text-[10px] text-muted-foreground outline-none"
+                >
+                  {DOMAIN_PROFILES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      <CalibrationPanel />
 
       {/* ─── B. Friction cluster similarity ─── */}
       <div className="border-b border-border">
