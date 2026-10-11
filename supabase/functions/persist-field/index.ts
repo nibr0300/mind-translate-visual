@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
             embedding_model: payload.embedding_model ?? "google/gemini-embedding-001",
             embedding_dim: payload.embedding_dim ?? 3072,
             stats: payload.stats ?? {},
+            domain: String((payload.stats as any)?.domain ?? "general"),
             uploaded_at: new Date().toISOString(),
             share_to_global: payload.share_to_global ?? false,
           })
@@ -195,6 +196,7 @@ Deno.serve(async (req) => {
           embedding_model: payload.embedding_model ?? "google/gemini-embedding-001",
           embedding_dim: payload.embedding_dim ?? 3072,
           stats: payload.stats ?? {},
+          domain: String((payload.stats as any)?.domain ?? "general"),
           user_id: userId,
           share_to_global: payload.share_to_global ?? false,
         })
@@ -292,6 +294,24 @@ Deno.serve(async (req) => {
           embedding_dim: payload.embedding_dim ?? EMBEDDING_DIM,
         };
       });
+      // Quality: cohesion = mean cosine of members to own centroid;
+      // noise_ratio = share of members closer to another cluster's centroid.
+      const cos = (a: number[], b: number[]) => {
+        let d = 0, na = 0, nb = 0;
+        for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+        return d / (Math.sqrt(na * nb) || 1);
+      };
+      for (const row of clusterRows as any[]) {
+        const members = payload.chunks.flatMap((ch, i) => (ch.cluster_id === row.cluster_id ? [i] : []));
+        let sum = 0, noisy = 0;
+        for (const i of members) {
+          const own = cos(embeddings[i], row.centroid_embedding);
+          sum += own;
+          if ((clusterRows as any[]).some((o) => o !== row && cos(embeddings[i], o.centroid_embedding) > own)) noisy++;
+        }
+        row.cohesion = members.length ? sum / members.length : null;
+        row.noise_ratio = members.length ? noisy / members.length : null;
+      }
       if (clusterRows.length) {
         const { error: clErr } = await supabase
           .from("clusters_summary")
