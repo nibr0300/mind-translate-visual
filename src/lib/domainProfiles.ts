@@ -1,7 +1,7 @@
 /**
  * Domain profiles: adapt the AI analysis and the map's interpretation to a
  * field of knowledge. Each profile adds domain guidance to the analysis prompt
- * and defines two domain axes that every unit is scored on (0..1).
+ * and defines domain axes (2–4) that every unit is scored on (0..1).
  */
 export interface DomainAxis {
   key: string;
@@ -15,7 +15,7 @@ export interface DomainProfile {
   label: string;
   description: string;
   guidance: string;
-  axes: [DomainAxis, DomainAxis];
+  axes: DomainAxis[];
 }
 
 export const DOMAIN_PROFILES: DomainProfile[] = [
@@ -38,6 +38,8 @@ export const DOMAIN_PROFILES: DomainProfile[] = [
     axes: [
       { key: "exploit", label: "GTO ↔ Exploit", low: "balanced / GTO", high: "exploitative" },
       { key: "aggression", label: "Aggression", low: "passive", high: "aggressive" },
+      { key: "icm", label: "ICM ↔ chip-EV", low: "chip-EV", high: "ICM pressure" },
+      { key: "bluff", label: "Value ↔ Bluff", low: "value", high: "bluff" },
     ],
   },
   {

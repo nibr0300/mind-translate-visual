@@ -336,7 +336,7 @@ async function persistFieldInBackground(
     fy: u.fy,
     cti: u.cti,
     triangulation: u.triangulation,
-    intention: u.intention,
+    intention: u.intention ? { ...u.intention, ...(u.domainAxes ? { domainAxes: u.domainAxes } : {}) } : undefined,
   }));
 
   // Embeddings and cluster centroids are generated inside persist-field. Keeping
@@ -373,7 +373,7 @@ async function persistFieldInBackground(
       file_size: file.size,
       embedding_model: "google/gemini-embedding-001",
       embedding_dim: 3072,
-      stats: field.stats,
+      stats: { ...field.stats, domain: field.domain },
       chunks: chunkPayload,
       clusters: clusterPayload,
       share_to_global: shareToGlobal,
