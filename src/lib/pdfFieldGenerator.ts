@@ -330,12 +330,16 @@ export async function generateFieldFromPDF(
       ...(degenerate[i] ? { degenerate: true } : {}),
       degree: degree[i],
       weightedCentrality: weighted[i],
+      ...(intention?.domainAxes ? { domainAxes: intention.domainAxes } : {}),
       ...(intention && {
         intention: {
           speechAct: intention.speechAct,
           epistemicCertainty: intention.epistemicCertainty,
           intentionalForce: intention.intentionalForce,
           truthTension: intention.truthTension,
+          moralTension: intention.moralTension,
+          narrativeTension: intention.narrativeTension,
+          denialMarker: intention.denialMarker,
         },
       }),
       triangulation: {

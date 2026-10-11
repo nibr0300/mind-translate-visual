@@ -35,6 +35,8 @@ export interface FieldUnit {
   degree?: number;
   /** Similarity-weighted centrality (0..1), normalized across the field. */
   weightedCentrality?: number;
+  /** 0-1 scores on the domain profile axes used when the field was built. */
+  domainAxes?: Record<string, number>;
 }
 
 /** Edge in the kNN graph computed in the original vector space (not the 2D projection). */
@@ -74,6 +76,8 @@ export interface GeometricField {
     notes?: string[];
   };
   useCase: string;
+  /** Domain profile id used for the analysis (see domainProfiles.ts). */
+  domain?: string;
 }
 
 const CLUSTER_DEFS: Record<string, { label: string; description: string; center: [number, number] }[]> = {

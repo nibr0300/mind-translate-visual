@@ -16,7 +16,30 @@ serve(async (req) => {
   if ("error" in auth) return auth.error;
 
   try {
-    const { textUnits } = await req.json();
+    const { textUnits, domain } = await req.json();
+
+    // Optional domain profile: extra guidance + two 0-1 axes per unit.
+    const axes: { key: string; label: string; low: string; high: string }[] =
+      Array.isArray(domain?.axes)
+        ? domain.axes
+            .filter((a: any) => a && /^[a-z_]{1,32}$/.test(String(a.key)))
+            .slice(0, 2)
+            .map((a: any) => ({ key: String(a.key), label: String(a.label ?? a.key).slice(0, 60), low: String(a.low ?? "").slice(0, 60), high: String(a.high ?? "").slice(0, 60) }))
+        : [];
+    const guidance = typeof domain?.guidance === "string" ? domain.guidance.slice(0, 1000) : "";
+    const domainPrompt = guidance || axes.length
+      ? `\n\nDOMAIN PROFILE: ${guidance}\nAlso return **domainAxes**, scoring each unit 0.0-1.0 on: ${axes.map((a) => `${a.key} (${a.label}: 0 = ${a.low}, 1 = ${a.high})`).join("; ")}.`
+      : "";
+    const domainAxesSchema = axes.length
+      ? {
+          domainAxes: {
+            type: "object",
+            properties: Object.fromEntries(axes.map((a) => [a.key, { type: "number", description: `0.0 ${a.low} - 1.0 ${a.high}` }])),
+            required: axes.map((a) => a.key),
+            additionalProperties: false,
+          },
+        }
+      : {};
 
     if (!Array.isArray(textUnits) || textUnits.length === 0) {
       return new Response(
@@ -61,7 +84,7 @@ For each numbered unit, return:
 6. **narrativeTension** (0.0 no inter-subject friction ↔ 1.0 strong conflict between characters/voices/positions: betrayal, abandonment, accusation, unresolved harm, silenced witness)
 7. **denialMarker** (0.0 owns reality ↔ 1.0 actively refuses or rewrites what is plainly the case)
 
-Lyrics, prose, and dialogue can score high on moral/narrative tension even when the speech act is "expressive" and the hedging is zero — that is exactly the friction we are hunting. A line that piously absolves a perpetrator, blames the victim, or invokes fate/God to avoid responsibility is HIGH moralTension even if it sounds calm. A line where one character is wrongly accused, or where a voice silences another, is HIGH narrativeTension. Do not score moralTension on the mere presence of religious or dark vocabulary — score it on the *function* of the line in the field. Respond ONLY with the tool call.`,
+Lyrics, prose, and dialogue can score high on moral/narrative tension even when the speech act is "expressive" and the hedging is zero — that is exactly the friction we are hunting. A line that piously absolves a perpetrator, blames the victim, or invokes fate/God to avoid responsibility is HIGH moralTension even if it sounds calm. A line where one character is wrongly accused, or where a voice silences another, is HIGH narrativeTension. Do not score moralTension on the mere presence of religious or dark vocabulary — score it on the *function* of the line in the field. Respond ONLY with the tool call.${domainPrompt}`,
             },
             {
               role: "user",
@@ -93,8 +116,9 @@ Lyrics, prose, and dialogue can score high on moral/narrative tension even when 
                           moralTension: { type: "number", description: "0.0-1.0" },
                           narrativeTension: { type: "number", description: "0.0-1.0" },
                           denialMarker: { type: "number", description: "0.0-1.0" },
+                          ...domainAxesSchema,
                         },
-                        required: ["index", "speechAct", "epistemicCertainty", "intentionalForce", "truthTension", "moralTension", "narrativeTension", "denialMarker"],
+                        required: ["index", "speechAct", "epistemicCertainty", "intentionalForce", "truthTension", "moralTension", "narrativeTension", "denialMarker", ...(axes.length ? ["domainAxes"] : [])],
                         additionalProperties: false,
                       },
                     },
