@@ -34,10 +34,10 @@ export interface TriangulatedTension {
   triangulated: number;
 }
 
-const BATCH_SIZE = 50;
-const BATCH_TIMEOUT_MS = 12_000;
-const TOTAL_TIMEOUT_MS = 15_000;
-const CONCURRENCY = 4;
+const BATCH_SIZE = 15;
+const BATCH_TIMEOUT_MS = 40_000;
+const TOTAL_TIMEOUT_MS = 120_000;
+const CONCURRENCY = 6;
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([

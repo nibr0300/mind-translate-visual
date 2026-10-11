@@ -116,6 +116,16 @@ export async function generateFieldFromFile(
     if (notes.length) field.stats.notes = [...(field.stats.notes ?? []), ...notes];
   }
 
+  // Make missing deep analysis visible instead of silently reporting llmTension = 0.
+  const withIntention = field.units.filter((u) => u.intention).length;
+  if (withIntention < field.units.length) {
+    const pct = Math.round((withIntention / Math.max(1, field.units.length)) * 100);
+    field.stats.notes = [
+      ...(field.stats.notes ?? []),
+      `Deep (AI) tension analysis covered only ${withIntention} of ${field.units.length} units (${pct}%). The rest use word-level signals only, so their llmTension and CTI read as 0. Sign in and check AI credits, then re-upload.`,
+    ];
+  }
+
   // Background: embed + persist. Don't block UI on it.
   void persistFieldInBackground(field, chunks, file, sourceType).catch((err) => {
     if (isCreditError(err)) notifyCreditsExhausted();
