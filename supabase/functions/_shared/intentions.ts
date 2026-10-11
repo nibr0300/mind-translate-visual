@@ -20,13 +20,13 @@ export async function analyzeUnits(textUnits: string[], domain?: DomainInput | n
       : [];
   const guidance = typeof domain?.guidance === "string" ? domain.guidance.slice(0, 1000) : "";
   const domainPrompt = guidance || axes.length
-    ? `\n\nDOMAIN PROFILE: ${guidance}\nAlso return **domainAxes**, scoring each unit 0.0-1.0 on: ${axes.map((a) => `${a.key} (${a.label}: 0 = ${a.low}, 1 = ${a.high})`).join("; ")}.`
+    ? `\n\nDOMAIN PROFILE: ${guidance}\nAlso return **domainAxes**, scoring each unit 0.0-1.0 on: ${axes.map((a) => `${a.key} (${a.label}: 0 = ${a.low}, 1 = ${a.high})`).join("; ")}.\nScore in fine steps (e.g. 0.15, 0.4, 0.72), based only on what the unit itself says. If an axis does not apply to the unit at all (e.g. a methods paragraph says nothing about bluffing), return -1 for that axis instead of guessing a middle value.`
     : "";
   const domainAxesSchema = axes.length
     ? {
         domainAxes: {
           type: "object",
-          properties: Object.fromEntries(axes.map((a) => [a.key, { type: "number", description: `0.0 ${a.low} - 1.0 ${a.high}` }])),
+          properties: Object.fromEntries(axes.map((a) => [a.key, { type: "number", description: `0.0 ${a.low} - 1.0 ${a.high}; -1 if not applicable` }])),
           required: axes.map((a) => a.key),
           additionalProperties: false,
         },
@@ -138,5 +138,14 @@ Lyrics, prose, and dialogue can score high on moral/narrative tension even when 
     }
   }
 
+  // Drop "not applicable" (-1) axis scores so they never count as real values.
+  for (const r of allResults) {
+    if (r?.domainAxes && typeof r.domainAxes === "object") {
+      const kept = Object.fromEntries(
+        Object.entries(r.domainAxes).filter(([, v]) => typeof v === "number" && v >= 0 && v <= 1),
+      );
+      if (Object.keys(kept).length) r.domainAxes = kept; else delete r.domainAxes;
+    }
+  }
   return allResults;
 }
