@@ -173,7 +173,7 @@ async function ingest(userId: string, body: unknown) {
 
   const sb = admin();
   const { data: doc, error: dErr } = await sb.from("documents").insert({
-    filename, source_type: "api-text", user_id: userId, file_size: text.length,
+    filename, source_type: "text", user_id: userId, file_size: text.length,
     embedding_model: EMBEDDING_MODEL, embedding_dim: 3072,
     stats: { totalUnits: units.length, domain: domain?.id ?? "general", via: "field-api" },
   }).select("id").single();
@@ -282,6 +282,6 @@ Deno.serve(async (req) => {
   } catch (e) {
     if (e instanceof IntentionError) return json({ error: e.message }, e.status);
     console.error("field-api error:", e);
-    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return json({ error: (e as { message?: string })?.message ?? "Unknown error" }, 500);
   }
 });
