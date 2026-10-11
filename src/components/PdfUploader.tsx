@@ -4,6 +4,7 @@ import { generateFieldFromFile } from "@/lib/fieldGenerator";
 import type { GeometricField } from "@/lib/fieldData";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import DrivePicker from "./DrivePicker";
+import { DOMAIN_PROFILES, getActiveDomainId, setActiveDomainId, getDomainProfile } from "@/lib/domainProfiles";
 
 interface FileUploaderProps {
   onFieldGenerated: (field: GeometricField, fileName: string) => void;
@@ -31,6 +32,7 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { isAdmin } = useIsAdmin();
+  const [domainId, setDomainId] = useState(getActiveDomainId);
 
   // If a previous run never finished, the tab was reloaded/killed mid-ingest
   // (white flash → back to start state). Tell the user instead of failing silently.
@@ -124,6 +126,24 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
       <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-2">
         Upload Source
       </label>
+
+      <label className="font-mono text-[10px] text-muted-foreground block mb-1" htmlFor="domain-profile">
+        Domain profile
+      </label>
+      <select
+        id="domain-profile"
+        value={domainId}
+        disabled={isProcessing}
+        onChange={(e) => { setDomainId(e.target.value); setActiveDomainId(e.target.value); }}
+        className="w-full mb-1 font-mono text-[11px] bg-secondary border border-border rounded-md px-2 py-1.5 text-foreground"
+      >
+        {DOMAIN_PROFILES.map((p) => (
+          <option key={p.id} value={p.id}>{p.label}</option>
+        ))}
+      </select>
+      <p className="font-mono text-[10px] text-muted-foreground/70 mb-3">
+        {getDomainProfile(domainId).description} Axes: {getDomainProfile(domainId).axes.map((a) => a.label).join(" · ")}
+      </p>
 
       <input
         ref={inputRef}

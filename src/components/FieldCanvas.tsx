@@ -4,6 +4,7 @@ import type { GeometricField, FieldUnit } from "@/lib/fieldData";
 import { distanceFromAnchor } from "@/lib/anchorMath";
 import { computeDepths, applyHelm } from "@/lib/helmMath";
 import HelmWheel from "./HelmWheel";
+import { getDomainProfile } from "@/lib/domainProfiles";
 
 
 
