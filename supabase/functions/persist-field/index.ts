@@ -72,15 +72,22 @@ async function createEmbeddings(chunks: ChunkPayload[], filename: string): Promi
 
   for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH) {
     const input = chunks.slice(i, i + EMBEDDING_BATCH).map((chunk) => augmentForEmbedding(chunk, filename));
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
-    });
-    if (!response.ok) throw new Error(`Embedding failed (${response.status}): ${await response.text()}`);
+    // Retry transient upstream failures (429/5xx) with backoff instead of failing the whole save.
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
+      });
+      if (response.ok || !(response.status === 429 || response.status >= 500)) break;
+      await response.text();
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+    }
+    if (!response!.ok) throw new Error(`Embedding failed (${response!.status}): ${await response!.text()}`);
     const body = await response.json();
     const vectors = (body.data ?? []) as { embedding: number[]; index: number }[];
     for (const vector of vectors) embeddings[i + vector.index] = vector.embedding;
