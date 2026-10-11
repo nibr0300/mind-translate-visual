@@ -28,7 +28,12 @@ async function userFromKey(req: Request): Promise<string | null> {
   const hash = await sha256Hex(token);
   const sb = admin();
   const { data } = await sb.from("api_keys").select("user_id, revoked_at").eq("key_hash", hash).maybeSingle();
-  if (!data || data.revoked_at) return null;
+  if (!data) {
+    // Fallback: signed-in app user (JWT) — used by the in-app calibration panel.
+    const { data: u } = await sb.auth.getUser(token);
+    return u.user?.id ?? null;
+  }
+  if (data.revoked_at) return null;
   await sb.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("key_hash", hash);
   return data.user_id;
 }
@@ -176,6 +181,7 @@ async function ingest(userId: string, body: unknown) {
     filename, source_type: "text", user_id: userId, file_size: text.length,
     embedding_model: EMBEDDING_MODEL, embedding_dim: 3072,
     stats: { totalUnits: units.length, domain: domain?.id ?? "general", via: "field-api" },
+    domain: domain?.id ?? "general",
   }).select("id").single();
   if (dErr) throw dErr;
 
@@ -213,12 +219,13 @@ const ProjectSchema = z.object({
   situation: z.string().min(3).max(4000),
   field_id: z.string().uuid().optional(),
   n: z.number().int().min(1).max(20).optional(),
+  domain: z.string().max(40).optional(),
 });
 
 async function project(userId: string, body: unknown) {
   const p = ProjectSchema.safeParse(body);
   if (!p.success) return json({ error: p.error.flatten().fieldErrors }, 400);
-  const { situation, field_id, n = 5 } = p.data;
+  const { situation, field_id, n = 5, domain } = p.data;
   const [q] = await embed([`[situation] ${situation}`]);
   const sb = admin();
   let docIds: string[];
@@ -227,9 +234,17 @@ async function project(userId: string, body: unknown) {
     docIds = (data ?? []).map((d) => d.id);
     if (!docIds.length) return json({ error: "Field not found" }, 404);
   } else {
-    const { data } = await sb.from("documents").select("id").eq("user_id", userId).order("uploaded_at", { ascending: false }).limit(50);
+    let q = sb.from("documents").select("id").eq("user_id", userId);
+    if (domain) q = q.eq("domain", domain);
+    const { data } = await q.order("uploaded_at", { ascending: false }).limit(50);
     docIds = (data ?? []).map((d) => d.id);
+    if (!docIds.length) return json({ error: domain ? `No fields in domain "${domain}"` : "No fields" }, 404);
   }
+  const { data: docMeta } = await sb.from("documents").select("id, stats").in("id", docIds);
+  const lowStructure = new Set((docMeta ?? []).filter((d) => {
+    const r = Number((d.stats as Record<string, unknown>)?.coordinateResolution);
+    return Number.isFinite(r) && r < 0.3;
+  }).map((d) => d.id));
   const { data: clusters } = await sb.from("clusters_summary")
     .select("document_id, cluster_id, label, custom_label, avg_fz, avg_fy, avg_cti, unit_count, centroid_embedding")
     .in("document_id", docIds);
@@ -238,7 +253,8 @@ async function project(userId: string, body: unknown) {
       const v = parseVec(c.centroid_embedding);
       return { field_id: c.document_id, cluster_id: c.cluster_id, label: c.custom_label ?? c.label,
         centroid: { fz: c.avg_fz, fy: c.avg_fy }, cti: c.avg_cti, unit_count: c.unit_count,
-        similarity: v ? Math.round(cosine(q, v) * 1000) / 1000 : 0 };
+        low_structure: lowStructure.has(c.document_id),
+        similarity: v ? Math.round(cosine(q, v) * (lowStructure.has(c.document_id) ? 0.8 : 1) * 1000) / 1000 : 0 };
     })
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, n);
@@ -249,7 +265,7 @@ async function project(userId: string, body: unknown) {
     const near = new Set(ranked.filter((r) => r.field_id === ranked[0].field_id).map((r) => r.cluster_id));
     frictions = f ? f.tensions(20).filter((t) => near.has(t.clusters[0]) || near.has(t.clusters[1])).slice(0, 5) : [];
   }
-  return json({ version: CONTRACT_VERSION, situation, coordinates: ranked[0]?.centroid ?? null, nearest_clusters: ranked, frictions });
+  return json({ version: CONTRACT_VERSION, situation, domain: domain ?? null, coordinates: ranked[0]?.centroid ?? null, nearest_clusters: ranked, frictions });
 }
 
 Deno.serve(async (req) => {
@@ -264,6 +280,7 @@ Deno.serve(async (req) => {
     const uuid = z.string().uuid();
 
     if (req.method === "POST" && route === "ingest") return await ingest(userId, await req.json());
+    if (req.method === "POST" && route === "calibrate") return await calibrate(userId);
     if (req.method === "POST" && route === "project") return await project(userId, await req.json());
     if (req.method === "GET" && route === "field" && uuid.safeParse(id).success) {
       const c = await fieldContract(userId, id);
@@ -276,7 +293,7 @@ Deno.serve(async (req) => {
       return json({ version: CONTRACT_VERSION, field_id: id, axes: f.weights, tensions: f.tensions(n) });
     }
     if (req.method === "GET" && !route) {
-      return json({ version: CONTRACT_VERSION, routes: ["POST /ingest", "GET /field/{id}", "GET /tensions/{id}", "POST /project"] });
+      return json({ version: CONTRACT_VERSION, routes: ["POST /calibrate", "POST /ingest", "GET /field/{id}", "GET /tensions/{id}", "POST /project"] });
     }
     return json({ error: "Not found" }, 404);
   } catch (e) {
@@ -285,3 +302,92 @@ Deno.serve(async (req) => {
     return json({ error: (e as { message?: string })?.message ?? "Unknown error" }, 500);
   }
 });
+
+// ---- Calibration (poker field) -------------------------------------------
+const POKER_DOMAIN = {
+  id: "poker",
+  guidance:
+    "The text concerns poker (hand histories, strategy, reads). Interpret units as decision signals: position, ranges, sizing, stacks, board texture, opponent reads, tournament (ICM) pressure. High tension marks where the decision is most uncertain.",
+  axes: [
+    { key: "exploit", label: "GTO ↔ Exploit", low: "balanced / GTO", high: "exploitative" },
+    { key: "aggression", label: "Aggression", low: "passive", high: "aggressive" },
+    { key: "icm", label: "ICM ↔ chip-EV", low: "chip-EV", high: "ICM pressure" },
+    { key: "bluff", label: "Value ↔ Bluff", low: "value", high: "bluff" },
+  ],
+};
+const CONTRAST = [
+  "Du ska alltid 3-betta med AA preflop.",
+  "Med AA preflop bör du ofta limpa för att dölja styrkan.",
+];
+const HAND_PHASES = [
+  "Preflop: UTG öppnar 2.5bb, jag 3-bettar med AQs från knappen, UTG callar.",
+  "Flop K♠7♦2♣: UTG checkar, jag c-bettar 33 % av potten, UTG callar.",
+  "Turn 5♥: UTG checkar igen, jag checkar bakom för att kontrollera potten.",
+  "River Q♣: UTG leder 75 % av potten och vi är på finalbordet med korta stackar bakom.",
+];
+
+async function calibrate(userId: string) {
+  const sb = admin();
+  const { data: docs } = await sb.from("documents").select("id, filename, domain").eq("user_id", userId);
+  const all = docs ?? [];
+  const { data: cl } = await sb.from("clusters_summary")
+    .select("document_id, cluster_id, label, custom_label, centroid_embedding")
+    .in("document_id", all.map((d) => d.id));
+  const byDoc = new Map<string, number[][]>();
+  const pokerClusters: { doc: string; cid: number; label: string; v: number[] }[] = [];
+  const pokerIds = new Set(all.filter((d) => d.domain === "poker").map((d) => d.id));
+  for (const c of cl ?? []) {
+    const v = parseVec(c.centroid_embedding);
+    if (!v) continue;
+    if (!byDoc.has(c.document_id)) byDoc.set(c.document_id, []);
+    byDoc.get(c.document_id)!.push(v);
+    if (pokerIds.has(c.document_id)) pokerClusters.push({ doc: c.document_id, cid: c.cluster_id, label: c.custom_label ?? c.label, v });
+  }
+  const docVec = new Map<string, number[]>();
+  for (const [id, vs] of byDoc) docVec.set(id, vs[0].map((_, d) => vs.reduce((s, v) => s + v[d], 0) / vs.length));
+  const poker = [...docVec.keys()].filter((id) => pokerIds.has(id));
+  const other = [...docVec.keys()].filter((id) => !pokerIds.has(id));
+  const r3 = (x: number) => Math.round(x * 1000) / 1000;
+
+  // Test 1: domain separation
+  let t1: Record<string, unknown>;
+  if (poker.length < 2 || other.length < 1) {
+    t1 = { status: "skipped", reason: `Needs ≥2 poker fields and ≥1 other (has ${poker.length} poker, ${other.length} other). Mark documents as Poker in the corpus list.` };
+  } else {
+    const pairs = (a: string[], b: string[], same: boolean) => {
+      const s: number[] = [];
+      a.forEach((x, i) => b.forEach((y, j) => { if (!same || j > i) s.push(cosine(docVec.get(x)!, docVec.get(y)!)); }));
+      return s.reduce((p, c) => p + c, 0) / (s.length || 1);
+    };
+    const within = pairs(poker, poker, true), between = pairs(poker, other, false);
+    t1 = { status: within > between + 0.01 ? "pass" : "fail", within: r3(within), between: r3(between), margin: r3(within - between) };
+  }
+
+  // Test 2: contrast detection
+  const [vecs, analyses] = await Promise.all([embed(CONTRAST), analyzeUnits(CONTRAST, POKER_DOMAIN)]);
+  const sim = cosine(vecs[0], vecs[1]);
+  const a = analyses.find((x) => x.index === 0), b = analyses.find((x) => x.index === 1);
+  const aggGap = Math.abs((a?.domainAxes?.aggression ?? 0) - (b?.domainAxes?.aggression ?? 0));
+  const tension = Math.max(a?.truthTension ?? 0, b?.truthTension ?? 0);
+  const t2 = {
+    status: sim >= 0.75 && (aggGap >= 0.3 || tension >= 0.4) ? "pass" : "fail",
+    similarity: r3(sim), aggression_gap: r3(aggGap), max_truth_tension: r3(tension),
+    axes: [a?.domainAxes ?? null, b?.domainAxes ?? null],
+  };
+
+  // Test 3: situation projection — do the hand's phases activate different clusters?
+  let t3: Record<string, unknown>;
+  if (!pokerClusters.length) {
+    t3 = { status: "skipped", reason: "No poker fields yet." };
+  } else {
+    const pv = await embed(HAND_PHASES.map((h) => `[situation] ${h}`));
+    const hits = pv.map((q, i) => {
+      let best = pokerClusters[0], bs = -1;
+      for (const c of pokerClusters) { const s = cosine(q, c.v); if (s > bs) { bs = s; best = c; } }
+      return { phase: HAND_PHASES[i].split(":")[0], cluster: best.label, field_id: best.doc, cluster_id: best.cid, similarity: r3(bs) };
+    });
+    const distinct = new Set(hits.map((h) => `${h.field_id}:${h.cluster_id}`)).size;
+    t3 = { status: distinct >= 2 ? "pass" : "fail", distinct_clusters: distinct, hits };
+  }
+  return json({ version: CONTRACT_VERSION, poker_fields: poker.length, tests: { domain_separation: t1, contrast: t2, projection: t3 } });
+}
