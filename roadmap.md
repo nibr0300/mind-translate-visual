@@ -6,4 +6,7 @@
 
 ## Expansion (efter grunden)
 - [x] Domänprofiler (General, Poker, Research, Law & policy, Dialogue & therapy) med två egna axlar var
+- [x] A1 domänaxlar med corpus-vikt + A4 fält-API (ingest, field, tensions, project)
+- [ ] A3 deformation + A5 versionshistorik
+- [ ] App B navigatör (separat projekt)
 - [ ] Agentloop: situation → projicera → mäta → resonera → handla → observera → deformera fältet
