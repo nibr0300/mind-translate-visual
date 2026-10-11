@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
 import { distanceFromAnchor } from "@/lib/anchorMath";
+import { getDomainProfile } from "@/lib/domainProfiles";
+import { axisWeights, axisFrictions } from "../../supabase/functions/_shared/axisMath";
 import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
 import AccountPanel from "./AccountPanel";
@@ -446,6 +448,46 @@ export default function FieldSidebar({
                 </li>
               ))}
             </ul>
+          </div>
+        );
+      })()}
+
+      {/* Domain axes: corpus-derived weight + strongest frictions */}
+      {(() => {
+        const profile = getDomainProfile(field.domain);
+        const keys = profile.axes.map((a) => a.key);
+        const axisUnits = field.units
+          .filter((u) => u.domainAxes)
+          .map((u) => ({ clusterId: u.clusterId, axes: u.domainAxes!, tension: u.triangulation?.triangulated ?? u.fz }));
+        if (axisUnits.length < 3) return null;
+        const weights = axisWeights(axisUnits, keys);
+        const frictions = axisFrictions(axisUnits, keys, 3);
+        const label = (k: string) => profile.axes.find((a) => a.key === k)?.label ?? k;
+        return (
+          <div className="p-4 border-b border-border">
+            <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-2">
+              Domain axes · {profile.label}
+            </label>
+            <ul className="flex flex-col gap-1 mb-2">
+              {weights.map((w) => (
+                <li key={w.key} className="flex items-center gap-2 text-[11px] font-mono">
+                  <div className="flex-1 truncate text-foreground">{label(w.key)}</div>
+                  <div className="w-16 h-1.5 rounded bg-secondary overflow-hidden">
+                    <div className="h-full bg-primary" style={{ width: `${w.weight * 100}%` }} />
+                  </div>
+                  <span className="w-10 text-right text-muted-foreground">{w.weight.toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+            {frictions.length > 0 && (
+              <ul className="flex flex-col gap-0.5 text-[10px] font-mono text-muted-foreground">
+                {frictions.map((f, i) => (
+                  <li key={i} className="truncate">
+                    ⟷ {label(f.axis)}: {field.clusters[f.clusters[0]]?.label} / {field.clusters[f.clusters[1]]?.label} ({f.magnitude.toFixed(2)})
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         );
       })()}
