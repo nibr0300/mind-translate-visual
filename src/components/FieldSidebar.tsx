@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import type { GeometricField, FieldUnit } from "@/lib/fieldData";
 import { distanceFromAnchor } from "@/lib/anchorMath";
-import { getDomainProfile } from "@/lib/domainProfiles";
+import { getDomainProfile, getActiveDomainId } from "@/lib/domainProfiles";
 import { axisWeights, axisFrictions } from "../../supabase/functions/_shared/axisMath";
 import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
@@ -130,7 +130,7 @@ export default function FieldSidebar({
           Authorization: `Bearer ${accessToken}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ min_similarity: 0.55, max_edges: 500, include_chunks: false, include_embeddings: false }),
+        body: JSON.stringify({ min_similarity: 0.55, max_edges: 500, include_chunks: false, include_embeddings: false, ...(getActiveDomainId() !== "general" ? { domain: getActiveDomainId() } : {}) }),
         signal: controller.signal,
       });
 
