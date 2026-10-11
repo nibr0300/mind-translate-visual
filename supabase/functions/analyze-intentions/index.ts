@@ -18,8 +18,6 @@ serve(async (req) => {
 
   try {
     const { textUnits, domain } = await req.json();
-
-    const { textUnits, domain } = await req.json();
     if (!Array.isArray(textUnits) || textUnits.length === 0) {
       return new Response(
         JSON.stringify({ error: "textUnits must be a non-empty array of strings" }),
