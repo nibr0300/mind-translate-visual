@@ -5,5 +5,5 @@
 - [ ] Uppladdning hoppar tillbaka till startläge — blockerad: behöver den exakta filen som fallerar för att återskapa felet.
 
 ## Expansion (efter grunden)
-- [ ] Valfria domänprofiler (egna axlar per ämne; poker som en profil)
+- [x] Domänprofiler (General, Poker, Research, Law & policy, Dialogue & therapy) med två egna axlar var
 - [ ] Agentloop: situation → projicera → mäta → resonera → handla → observera → deformera fältet
