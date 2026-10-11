@@ -122,14 +122,33 @@ export default function FieldCanvas({
     [field.units]
   );
 
+  // Lite rendering: phones (high pixel density) and large fields. Hundreds of
+  // blurred, glowing, endlessly animated layers exhaust GPU memory and make
+  // mobile browsers kill the tab (white flash back to the start page).
+  const lite = useMemo(
+    () =>
+      field.units.length > 150 ||
+      (typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)),
+    [field.units.length]
+  );
+  const MARKER_CAP = lite ? 30 : 120;
+
   const tensionUnits = useMemo(
-    () => field.units.flatMap((unit, index) => unit.fz > 0.65 ? [{ unit, index }] : []),
-    [field.units]
+    () =>
+      field.units
+        .flatMap((unit, index) => (unit.fz > 0.65 ? [{ unit, index }] : []))
+        .sort((a, b) => b.unit.fz - a.unit.fz)
+        .slice(0, MARKER_CAP),
+    [field.units, MARKER_CAP]
   );
 
   const criticalUnits = useMemo(
-    () => field.units.flatMap((unit, index) => (unit.cti ?? 0) > 0.35 ? [{ unit, index }] : []),
-    [field.units]
+    () =>
+      field.units
+        .flatMap((unit, index) => ((unit.cti ?? 0) > 0.35 ? [{ unit, index }] : []))
+        .sort((a, b) => (b.unit.cti ?? 0) - (a.unit.cti ?? 0))
+        .slice(0, MARKER_CAP),
+    [field.units, MARKER_CAP]
   );
 
   // Render the bounded semantic kNN topology produced by the analyzer.
@@ -408,7 +427,7 @@ export default function FieldCanvas({
                     height: `${u.fz * 120}px`,
                     transform: "translate(-50%, -50%)",
                     background: `radial-gradient(circle, hsl(25, 90%, 55%, ${u.fz * 0.2}) 0%, transparent 70%)`,
-                    animation: `tension-ripple ${3 + i * 0.5}s ease-in-out infinite`,
+                    animation: lite ? undefined : `tension-ripple ${3 + i * 0.5}s ease-in-out infinite`,
                   }}
                 />
               );
@@ -431,7 +450,7 @@ export default function FieldCanvas({
                     transform: "translate(-50%, -50%)",
                     border: `1.5px solid hsl(340, 80%, 60%, ${0.3 + cti * 0.5})`,
                     boxShadow: `0 0 ${cti * 20}px hsl(340, 80%, 60%, ${cti * 0.3}), inset 0 0 ${cti * 12}px hsl(340, 80%, 60%, ${cti * 0.15})`,
-                    animation: `tension-ripple ${2 + cti * 2}s ease-in-out infinite`,
+                    animation: lite ? undefined : `tension-ripple ${2 + cti * 2}s ease-in-out infinite`,
                     zIndex: 1,
                   }}
                 />
@@ -556,7 +575,7 @@ export default function FieldCanvas({
             // Depth cues: near nodes are bigger, sharper and brighter; far nodes recede.
             const depthScale = 1 + depth * 0.35;
             const size = (8 + unit.fz * 16) * depthScale;
-            const blur = depth < 0 ? Math.abs(depth) * 1.8 : 0;
+            const blur = lite ? 0 : depth < 0 ? Math.abs(depth) * 1.8 : 0;
             const depthOpacity = 0.55 + (depth + 1) / 2 * 0.45;
             const isActive = activeCluster === null || unit.clusterId === activeCluster;
             const isSelected = selectedUnit?.id === unit.id;
@@ -578,6 +597,8 @@ export default function FieldCanvas({
                     ? `0 0 ${18}px hsl(48, 100%, 60%), 0 0 0 2px hsl(48, 100%, 60%)`
                     : isSelected || isHovered
                     ? `0 0 ${unit.fz * 25 + 10}px ${CLUSTER_COLORS[unit.clusterId]}`
+                    : lite
+                    ? undefined
                     : unit.fz > 0.65
                     ? `0 0 ${unit.fz * 15}px hsl(25, 90%, 55%, 0.5)`
                     : `0 0 ${unit.fy * 8}px ${CLUSTER_COLORS[unit.clusterId]}44`,
