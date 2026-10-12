@@ -24,8 +24,21 @@ export interface SourceClass {
   description: string;
 }
 
+/** A dictionary term: plain string (weight 0.7) or [term, weight]. */
+export type AxisTerm = string | [string, number];
+
 /** Per axis: words/phrases that pull a unit towards the low or the high pole. */
-export type AxisDictionary = Record<string, { low: string[]; high: string[] }>;
+export type AxisDictionary = Record<string, { low: AxisTerm[]; high: AxisTerm[]; lowRegex?: RegExp[]; highRegex?: RegExp[] }>;
+
+/** Contrast-based tension weights (see recalibrateFz in domainLayer). */
+export interface FzCalibration {
+  llmTension: number;
+  triangulated: number;
+  cti: number;
+  axisBonus: number;
+  oppositionBonus: number;
+  directivePenalty: number;
+}
 
 export interface DomainProfile {
   id: string;
@@ -35,6 +48,8 @@ export interface DomainProfile {
   axes: DomainAxis[];
   sourceClasses?: SourceClass[];
   axisDictionaries?: AxisDictionary;
+  /** Replace the generic FZ blend with a contrast-based formula. */
+  fzCalibration?: FzCalibration;
   /**
    * Send axes to the LLM for scoring. Profiles with a calibrated lexical layer
    * keep this off so the field rests on a deterministic ground.
@@ -104,62 +119,64 @@ export const DOMAIN_PROFILES: DomainProfile[] = [
     ],
     axisDictionaries: {
       breadth_depth: {
-        low: ["subdomain", "asset list", "wildcard", "inventory", "enumerate", "all hosts", "surface map"],
-        high: ["deep dive", "root cause", "internals", "code path", "step through", "specific endpoint"],
+        low: [["breadth", 0.9], ["broad", 0.8], ["wildcard", 0.8], ["all subdomains", 0.9], ["attack surface", 0.8], ["enumerate", 0.8], ["discovery", 0.7], ["sweep", 0.6], ["coverage", 0.6], ["reconnaissance", 0.7], ["recon", 0.6], ["subdomain", 0.6], ["map the", 0.5]],
+        high: [["depth", 0.9], ["deep dive", 0.9], ["dig deep", 0.8], ["single endpoint", 0.8], ["one endpoint", 0.8], ["in-depth", 0.8], ["focused", 0.6], ["vertical", 0.5], ["drill", 0.5]],
       },
       passive_active: {
-        low: ["passive", "osint", "observe", "archive", "certificate transparency", "public record", "read-only"],
-        high: ["fuzz", "probe", "scan", "request", "payload", "inject", "brute", "active test"],
+        low: [["passive", 0.9], ["passively", 0.8], ["recon", 0.7], ["crawl", 0.6], ["observe", 0.5], ["fingerprint", 0.6]],
+        high: [["active", 0.9], ["aktiv", 0.9], ["fuzz", 0.9], ["fuzzing", 0.9], ["scan", 0.8], ["scanner", 0.8], ["brute", 0.7], ["hammer", 0.7], ["rate limit", 0.6], ["throttle", 0.6]],
       },
       manual_automated: {
-        low: ["manual", "by hand", "inspect", "review", "read the code"],
-        high: ["automated", "scanner", "nuclei", "burp suite", "script", "crawler", "pipeline", "wordlist"],
+        low: [["manual", 0.9], ["manually", 0.9], ["by hand", 0.8], ["intuition", 0.7], ["hand-crafted", 0.7], ["bespoke", 0.6], ["intercept", 0.5], ["burp", 0.6]],
+        high: [["automated", 0.9], ["automation", 0.9], ["nuclei", 0.9], ["ffuf", 0.9], ["scripted", 0.7], ["bulk", 0.6], ["crawl", 0.5]],
       },
       deterministic_intermittent: {
-        low: ["deterministic", "always", "reproducible", "every request", "consistent"],
-        high: ["intermittent", "sometimes", "flaky", "timing", "under load", "race", "non-deterministic"],
+        low: [["always", 0.7], ["every time", 0.8], ["reproducible", 0.9], ["reliably", 0.7], ["consistent", 0.6], ["100%", 0.6], ["deterministic", 0.9], ["stable", 0.5]],
+        high: [["intermittent", 0.9], ["flaky", 0.9], ["sporadic", 0.8], ["sometimes", 0.6], ["occasionally", 0.6], ["not always", 0.8], ["could not always reproduce", 0.9], ["timing-dependent", 0.8], ["transient", 0.7], ["heisenbug", 0.9], ["known intermittent", 0.9]],
       },
       pre_post_auth: {
-        low: ["unauthenticated", "pre-auth", "anonymous", "public endpoint", "no token", "guest"],
-        high: ["authenticated", "post-auth", "logged in", "session", "bearer", "api key required", "member only"],
+        low: [["pre-auth", 0.9], ["preauth", 0.9], ["unauthenticated", 0.9], ["before login", 0.8], ["before authentication", 0.9], ["no login required", 0.8], ["/public/", 0.9], ["anonymous", 0.7], ["public endpoint", 0.8]],
+        high: [["post-auth", 0.9], ["authenticated", 0.7], ["after login", 0.7], ["logged in", 0.7], ["requires login", 0.8], ["bearer token", 0.7], ["/internal/", 0.9], ["internal endpoint", 0.8]],
       },
       authn_authz: {
-        low: ["login", "authentication", "password", "mfa", "otp", "sso", "sign in", "credential"],
-        high: ["authorization", "permission", "role", "idor", "access control", "tenant", "privilege", "acl", "ownership"],
+        low: [["authentication", 0.8], ["authenticate", 0.8], ["sso", 0.9], ["saml", 0.9], ["mfa", 0.9], ["2fa", 0.9], ["password", 0.6], ["credentials", 0.7], ["otp", 0.7], ["identity", 0.6], ["jwt", 0.5]],
+        high: [["authorization", 0.9], ["authorize", 0.8], ["access control", 0.9], ["idor", 0.9], ["object-level", 0.9], ["privilege", 0.8], ["role", 0.7], ["permission", 0.7], ["membership", 0.8], ["re-check membership", 0.9], ["admin only", 0.7], ["who can", 0.6]],
       },
       stateless_race: {
-        low: ["stateless", "idempotent", "single request", "pure function"],
-        high: ["race", "concurrent", "parallel requests", "toctou", "double spend", "lock", "transaction"],
+        low: [["stateless", 0.9], ["idempotent", 0.9], ["idempotency", 0.9], ["atomic", 0.8], ["single request", 0.6], ["sequential", 0.7], ["one at a time", 0.7]],
+        high: [["race", 0.9], ["race condition", 0.9], ["concurrent", 0.9], ["concurrency", 0.9], ["simultaneous", 0.8], ["parallel", 0.7], ["toctou", 0.9], ["time-of-check", 0.9], ["between read and commit", 0.9], ["double spend", 0.9], ["double-spend", 0.9]],
       },
       inband_oob: {
-        low: ["response body", "in-band", "reflected", "returned in the response"],
-        high: ["out-of-band", "oob", "webhook", "callback", "dns", "collaborator", "interactsh", "ssrf", "email delivery"],
+        low: [["in-band", 0.9], ["inband", 0.9], ["in the response", 0.7], ["response body", 0.6], ["visible in response", 0.8], ["synchronous", 0.6], ["status code", 0.5], ["always 200", 0.9]],
+        high: [["out-of-band", 0.9], ["out of band", 0.9], ["oob", 0.9], ["callback", 0.8], ["webhook", 0.8], ["blind", 0.7], ["exfil", 0.8], ["exfiltration", 0.8], ["dns callback", 0.9], ["collaborator", 0.9], ["interactsh", 0.9], ["beacon", 0.7]],
       },
       signature_semantics: {
-        low: ["signature", "regex", "pattern", "waf", "blocklist", "known payload", "cve"],
-        high: ["business logic", "semantics", "workflow", "intended behaviour", "state machine", "logic flaw"],
+        low: [["signed with", 0.9], ["signature", 0.7], ["jwt", 0.8], ["rs256", 0.9], ["hmac", 0.9], ["shared secret", 0.9], ["same secret", 0.9], ["across environments", 0.9], ["reused", 0.8], ["signing key", 0.7]],
+        high: [["business logic", 0.8], ["business layer", 0.8], ["signature is not authorization", 0.9], ["token is valid", 0.8], ["logic flaw", 0.7], ["semantic", 0.6], ["client-controlled", 0.6]],
       },
       trust_boundary: {
-        low: ["client-side", "hidden field", "frontend check", "javascript validation", "disabled button", "local storage"],
-        high: ["server-side validation", "backend check", "enforced on the server", "signed", "verified server side"],
+        low: [["gateway trusts", 0.9], ["trusts the", 0.9], ["trusted header", 0.9], ["x-vela-user", 0.9], ["passed upstream", 0.8], ["reads it directly", 0.8], ["prefer it over", 0.8], ["carries the user id", 0.7], ["client-side", 0.8], ["client side", 0.8], ["client-controlled", 0.8], ["controlled by the client", 0.8], ["client-supplied", 0.8], ["caches entitlements", 0.8], ["offline mode", 0.7], ["local cache", 0.6], ["feature flag", 0.6], ["feature gate", 0.6], ["mobile sdk", 0.5], ["assumes", 0.5], ["presumes", 0.5]],
+        high: [["server-side", 0.8], ["server side", 0.8], ["validates inputs", 0.9], ["server validation", 0.9], ["re-validates", 0.8], ["re-check", 0.8], ["authoritative", 0.7], ["source of truth", 0.7], ["enforced in the backend", 0.7], ["cannot be spoofed", 0.7]],
       },
       impact_demonstrable: {
-        low: ["theoretical", "potential", "could be", "might allow", "informational", "best practice"],
-        high: ["proof of concept", "demonstrated", "exfiltrated", "account takeover", "data exposure", "rce", "confirmed impact"],
+        low: [["theoretical", 0.9], ["in theory", 0.8], ["could potentially", 0.7], ["may allow", 0.6], ["cvss", 0.7], ["potentially", 0.5]],
+        high: [["demonstrable", 0.9], ["proof of concept", 0.8], ["poc", 0.8], ["reproduced", 0.7], ["confirmed", 0.6], ["actual impact", 0.8], ["financial impact", 0.9], ["released funds", 0.9], ["funds", 0.6], ["data leaked", 0.8]],
       },
       duplicate_uniqueness: {
-        low: ["duplicate", "already reported", "known issue", "previously disclosed"],
-        high: ["novel", "not previously reported", "new finding", "first report", "undocumented"],
+        low: [["duplicate", 0.9], ["dupe", 0.9], ["already reported", 0.8], ["first valid report", 0.9], ["crowded", 0.8], ["common", 0.5], ["well-known", 0.6], ["frequently reported", 0.8]],
+        high: [["unique", 0.8], ["novel", 0.8], ["fresh", 0.7], ["new surface", 0.8], ["unreported", 0.8], ["overlooked", 0.7], ["unexplored", 0.7], ["edge case", 0.6]],
       },
       scope_adjacent: {
-        low: ["in scope", "eligible", "wildcard", "covered by the program", "bounty eligible"],
-        high: ["out of scope", "third party", "affiliate", "not eligible", "excluded", "vendor-owned", "adjacent"],
+        low: [["in scope", 0.9], ["in-scope", 0.9], ["eligible", 0.8], ["covered", 0.7], ["listed asset", 0.8], ["within scope", 0.9], ["wildcard", 0.5]],
+        high: [["out of scope", 0.9], ["out-of-scope", 0.9], ["adjacent", 0.9], ["third-party", 0.8], ["third party", 0.8], ["acquired", 0.8], ["not listed", 0.8], ["unlisted", 0.8], ["partially migrated", 0.9], ["served from", 0.7], ["different root", 0.8], ["shares a read replica", 0.9], ["across environments", 0.7], ["subsidiary", 0.7], ["affiliate", 0.7], ["scope question", 0.8]],
       },
       single_chain: {
-        low: ["single issue", "standalone", "isolated"],
-        high: ["chain", "chained", "pivot", "combined with", "escalate to", "multi-step", "leads to"],
+        low: [["one report per root cause", 0.9], ["on its own", 0.6], ["isolated", 0.5], ["standalone", 0.5]],
+        high: [["combined into", 0.9], ["may be combined", 0.9], ["chained", 0.9], ["chain", 0.6], ["escalate", 0.7], ["escalation", 0.7], ["aggregate", 0.6], ["stack", 0.6], ["thereby", 0.5], ["which allows", 0.5]],
+        highRegex: [/two\s+p\d\w*\s+(may|can)\s+be\s+combined/i, /(combined|chained)\s+(into|with)\s+p\d/i],
       },
     },
+    fzCalibration: { llmTension: 0.5, triangulated: 0.3, cti: 0.2, axisBonus: 0.12, oppositionBonus: 0.1, directivePenalty: 0.1 },
     llmAxesByDefault: false,
   },
   {
@@ -266,27 +283,57 @@ export function setLlmAxesEnabled(domainId: string, enabled: boolean) {
   }
 }
 
+const termRegexCache = new Map<string, RegExp>();
+function termRegex(term: string): RegExp {
+  let re = termRegexCache.get(term);
+  if (!re) {
+    const esc = term.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    re = new RegExp(`(?<![a-z0-9])${esc}(?![a-z0-9])`, "i");
+    termRegexCache.set(term, re);
+  }
+  return re;
+}
+
+function poleWeight(hay: string, terms: AxisTerm[], regexes: RegExp[] = []): number {
+  let w = 0;
+  for (const t of terms) {
+    const [term, weight] = typeof t === "string" ? [t, 0.7] : t;
+    if (termRegex(term).test(hay)) w += weight;
+  }
+  for (const re of regexes) if (re.test(hay)) w += 0.9;
+  return w;
+}
+
+export interface AxisHitDetail {
+  score: number;
+  low: number;
+  high: number;
+}
+
+/** Per-axis pole weights; axes without any hit are omitted. Word-bounded, case-insensitive. */
+export function lexicalAxisDetail(text: string, profile: DomainProfile): Record<string, AxisHitDetail> {
+  const dict = profile.axisDictionaries;
+  if (!dict) return {};
+  const hay = text.toLowerCase().replace(/\s+/g, " ");
+  const out: Record<string, AxisHitDetail> = {};
+  for (const axis of profile.axes) {
+    const entry = dict[axis.key];
+    if (!entry) continue;
+    const lo = poleWeight(hay, entry.low, entry.lowRegex);
+    const hi = poleWeight(hay, entry.high, entry.highRegex);
+    if (lo === 0 && hi === 0) continue;
+    const total = lo + hi;
+    const confidence = Math.min(1, total / 0.9);
+    const score = Math.round((0.5 + (hi / total - 0.5) * confidence) * 100) / 100;
+    out[axis.key] = { score, low: lo, high: hi };
+  }
+  return out;
+}
+
 /**
  * Deterministic axis annotation. Returns a 0..1 score per axis that has at
  * least one dictionary hit; axes without hits are omitted (never guessed).
  */
 export function lexicalAxisHits(text: string, profile: DomainProfile): Record<string, number> {
-  const dict = profile.axisDictionaries;
-  if (!dict) return {};
-  const hay = ` ${text.toLowerCase().replace(/\s+/g, " ")} `;
-  const out: Record<string, number> = {};
-  for (const axis of profile.axes) {
-    const entry = dict[axis.key];
-    if (!entry) continue;
-    const count = (terms: string[]) => terms.reduce((n, t) => (hay.includes(` ${t}`) || hay.includes(`${t} `) ? n + 1 : n), 0);
-    const lo = count(entry.low);
-    const hi = count(entry.high);
-    if (lo === 0 && hi === 0) continue;
-    // Pull towards the pole with more hits; strength grows with dominance.
-    const total = lo + hi;
-    const raw = hi / total;
-    const confidence = Math.min(1, total / 2);
-    out[axis.key] = Math.round((0.5 + (raw - 0.5) * confidence) * 100) / 100;
-  }
-  return out;
+  return Object.fromEntries(Object.entries(lexicalAxisDetail(text, profile)).map(([k, d]) => [k, d.score]));
 }

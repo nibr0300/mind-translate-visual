@@ -39,6 +39,28 @@ export async function extractTextFromPDF(file: File): Promise<string[]> {
   return extractTextFromDocument(pdf);
 }
 
+/** Line-preserving text (newline on EOL or y-change) — keeps table rows apart. */
+export async function extractLinesFromPDF(file: File): Promise<string> {
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pages: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const content = await (await pdf.getPage(i)).getTextContent();
+    let out = "";
+    let lastY: number | null = null;
+    for (const item of content.items as any[]) {
+      if (!("str" in item)) continue;
+      const y = item.transform?.[5];
+      if (lastY !== null && typeof y === "number" && Math.abs(y - lastY) > 2) out += "\n";
+      else if (out && !out.endsWith("\n") && item.str && !out.endsWith(" ")) out += " ";
+      out += item.str;
+      if (item.hasEOL) out += "\n";
+      if (typeof y === "number") lastY = y;
+    }
+    pages.push(out);
+  }
+  return pages.join("\n\n");
+}
+
 async function extractTextFromDocument(pdf: Awaited<ReturnType<typeof pdfjsLib.getDocument>["promise"]>): Promise<string[]> {
   const sentences: string[] = [];
 

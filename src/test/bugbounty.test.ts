@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { extractSecurityUnits, corpusHash, dedupeNearDuplicates } from "@/lib/inputAdapters/securityExtractor";
 import { getDomainProfile, lexicalAxisHits } from "@/lib/domainProfiles";
-import { applySourceWeight } from "@/lib/domainLayer";
+import { applySourceWeight, calibratedFz, isDirective } from "@/lib/domainLayer";
 
 const ENDPOINTS = Array.from({ length: 30 }, (_, i) => `POST /api/v2/resource${i}/{id}/transfer`);
 const HOSTS = Array.from({ length: 20 }, (_, i) => `svc${i}.target-example.com`);
@@ -53,13 +53,52 @@ describe("bug bounty ingestion", () => {
     expect(hits.scope_adjacent).toBe(1);
   });
 
-  it("source weight halves tension for a blog (0.5) and keeps scope (1.0)", () => {
+  it("source weight scales by 0.5+0.5w: blog (0.5) keeps 75%, scope (1.0) keeps all", () => {
     const units = [{ fz: 0.8, cti: 0.4 }, { fz: 0.8, cti: 0.4 }] as any[];
     applySourceWeight([units[0]], 0.5);
     applySourceWeight([units[1]], 1.0);
-    expect(units[0].fz).toBe(0.4);
-    expect(units[0].cti).toBe(0.2);
+    expect(units[0].fz).toBe(0.6);
+    expect(units[0].cti).toBe(0.3);
     expect(units[1].fz).toBe(0.8);
+  });
+
+  const p = getDomainProfile("bugbounty");
+  it("trust_boundary catches 'gateway trusts the header' on the client_trust pole", () => {
+    expect(lexicalAxisHits("The gateway trusts the X-Vela-User header passed upstream.", p).trust_boundary).toBe(0);
+  });
+  it("signature_semantics catches same secret across environments", () => {
+    const h = lexicalAxisHits("Webhooks are HMAC signed with the same secret across environments.", p);
+    expect(h.signature_semantics).toBe(0);
+    expect(h.scope_adjacent).toBeGreaterThan(0.5);
+  });
+  it("single_chain fires on 'two P3s may be combined into a P2'", () => {
+    expect(lexicalAxisHits("Two P3s may be combined into a P2.", p).single_chain).toBe(1);
+  });
+  it("passive_active no longer fires on observed/prefer/carries", () => {
+    expect(lexicalAxisHits("We observed it seemed to prefer the one that carries truly.", p).passive_active).toBeUndefined();
+  });
+  it("word boundaries: 'trace' is not 'race', 'controller' is not 'role'", () => {
+    const h = lexicalAxisHits("The trace from the controller.", p);
+    expect(h.stateless_race).toBeUndefined();
+    expect(h.authn_authz).toBeUndefined();
+  });
+  it("a scope table becomes one unit per row, keeping api-eu its own node", () => {
+    const { units } = extractSecurityUnits("| Asset | Type |\n|---|---|\n| api.vela.io | API |\n| api-eu.vela.io | served from different root |");
+    expect(units.filter((u) => u.unitType === "prose" && u.text.includes("api-eu.vela.io"))).toHaveLength(1);
+    expect(units.some((u) => u.unitType === "hostname" && u.text === "api-eu.vela.io")).toBe(true);
+  });
+  it("never drops headings or short lines with an amount or status", () => {
+    const { units } = extractSecurityUnits("## Outcome\n\nP2, $1800.\n\nDebate in comments.");
+    const texts = units.map((u) => u.text);
+    expect(texts).toEqual(expect.arrayContaining(["Outcome", "P2, $1800.", "Debate in comments."]));
+  });
+  it("FZ: a plain rule lands at or below 0.42, a planted tension at or above 0.50", () => {
+    expect(isDirective("No destructive testing.")).toBe(true);
+    const w = p.fzCalibration!;
+    const rule = calibratedFz({ llmTension: 0.5, triangulated: 0.3, cti: 0.2, distinctAxes: 1, opposition: false, directive: true }, w);
+    const tension = calibratedFz({ llmTension: 0.55, triangulated: 0.4, cti: 0.3, distinctAxes: 2, opposition: false, directive: false }, w);
+    expect(rule).toBeLessThanOrEqual(0.42);
+    expect(tension).toBeGreaterThanOrEqual(0.5);
   });
 
   it("bug bounty profile has 14 axes in three families", () => {

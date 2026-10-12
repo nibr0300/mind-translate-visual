@@ -14,7 +14,7 @@ import { chunkUnits, type Chunk } from "./chunker";
 import { sha256Hex } from "./contentHash";
 import { getActiveDomainId, getDomainProfile, getActiveSourceClass } from "./domainProfiles";
 import { extractSecurityUnits, dedupeNearDuplicates, corpusHash, type NoiseDrop } from "./inputAdapters/securityExtractor";
-import { applyLexicalAxes, applySourceWeight } from "./domainLayer";
+import { applyLexicalAxes, applySourceWeight, recalibrateFz, axisClusterLabels } from "./domainLayer";
 
 interface SecurityMeta {
   dropped: NoiseDrop[];
@@ -26,11 +26,17 @@ interface SecurityMeta {
 /** Deterministic domain layer: lexical axes, source-class weight, provenance stats. */
 function applyDomainLayer(field: GeometricField, meta: SecurityMeta | null) {
   const profile = getDomainProfile(field.domain);
-  applyLexicalAxes(field.units, profile);
+  const details = applyLexicalAxes(field.units, profile);
+  if (profile.fzCalibration) recalibrateFz(field.units, details, profile.fzCalibration);
+  if (profile.axisDictionaries) axisClusterLabels(field.units, field.clusters, profile);
   const sourceClass = getActiveSourceClass(profile.id);
   if (sourceClass) {
     applySourceWeight(field.units, sourceClass.weight);
     field.stats.sourceClass = { id: sourceClass.id, weight: sourceClass.weight };
+  }
+  for (const c of field.clusters) {
+    const cu = field.units.filter((u) => u.clusterId === c.id);
+    if (cu.length) c.avgFZ = cu.reduce((s, u) => s + u.fz, 0) / cu.length;
   }
   if (meta) {
     field.stats.security = {
@@ -42,7 +48,7 @@ function applyDomainLayer(field: GeometricField, meta: SecurityMeta | null) {
     };
   }
 }
-import { generateFieldFromPDF } from "./pdfFieldGenerator";
+import { generateFieldFromPDF, extractLinesFromPDF } from "./pdfFieldGenerator";
 import {
   computeTFIDF,
   kMeans,
@@ -80,7 +86,8 @@ export async function generateFieldFromFile(
   let totalFound = 0;
   let securityMeta: SecurityMeta | null = null;
 
-  if (sourceType === "pdf") {
+  const isBugBounty = getDomainProfile(getActiveDomainId()).id === "bugbounty";
+  if (sourceType === "pdf" && !isBugBounty) {
     field = await generateFieldFromPDF(file, onProgress);
     // Re-derive chunks from the field's units for persistence
     chunks = field.units.map((u, i) => ({
@@ -91,14 +98,18 @@ export async function generateFieldFromFile(
     }));
   } else {
     onProgress?.(`Extracting ${sourceType}…`, 0.08);
-    const { units: rawUnits } = await extractFromFile(file, onProgress);
+    // Bug bounty PDFs keep their line structure so table rows stay separate.
+    const rawUnits =
+      sourceType === "pdf"
+        ? [{ text: await extractLinesFromPDF(file), source: file.name, position: 0 }]
+        : (await extractFromFile(file, onProgress)).units;
 
     if (rawUnits.length === 0) {
       throw new Error(`No text could be extracted from this ${sourceType} file.`);
     }
 
     onProgress?.("Chunking content…", 0.2);
-    if (getDomainProfile(getActiveDomainId()).id === "bugbounty") {
+    if (isBugBounty) {
       // Structural units (endpoints, hosts, params…) become their own nodes;
       // they are never chunked into prose.
       const extraction = extractSecurityUnits(rawUnits.map((u) => u.text).join("\n\n"));
