@@ -111,7 +111,7 @@ export function pokerNumericAxes(text: string): Record<string, NumericHit> {
 
   // defensive_honesty: fold to 3-bet, with 3-bet frequency for "paper tiger" friction.
   const f3 = pct(pick(t, new RegExp(`fold to (?:a )?3-?bet\\D{0,8}${num}`)));
-  const threeBet = pct(pick(t, new RegExp(`(?<!fold to (?:a )?)(?<![a-z] )3-?bet(?: of| at| freq\\w*)?\\s*${num}\\s*%`)));
+  const threeBet = pct(pick(t, new RegExp(`(?<!fold to (?:a )?)3-?bet(?: of| at| freq\\w*)?\\s*${num}\\s*%`)));
   const xr = pct(pick(t, new RegExp(`check-?raise\\D{0,8}${num}`)));
   if (f3 !== null) set("defensive_honesty", lerp(f3, 0.5, 0.65, 0.1, 0.9), f3 > 0.65 && threeBet !== null && threeBet >= 0.1);
   else if (xr !== null && xr > 0.2) set("defensive_honesty", 0.3);
