@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isCreditError, notifyCreditsExhausted } from "./creditNotice";
-import { getDomainProfile, getActiveDomainId } from "./domainProfiles";
+import { getDomainProfile, getActiveDomainId, getLlmAxesEnabled } from "./domainProfiles";
 
 import {
   analyzeHedgingBatch,
