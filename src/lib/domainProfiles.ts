@@ -398,7 +398,7 @@ export interface AxisHitDetail {
 /** Per-axis pole weights; axes without any hit are omitted. Word-bounded, case-insensitive. */
 export function lexicalAxisDetail(text: string, profile: DomainProfile): Record<string, AxisHitDetail> {
   const dict = profile.axisDictionaries;
-  if (!dict) return {};
+  if (!dict) return profile.numericAxes ? profile.numericAxes(text) : {};
   const hay = text.toLowerCase().replace(/\s+/g, " ");
   const out: Record<string, AxisHitDetail> = {};
   for (const axis of profile.axes) {
@@ -412,6 +412,7 @@ export function lexicalAxisDetail(text: string, profile: DomainProfile): Record<
     const score = Math.round((0.5 + (hi / total - 0.5) * confidence) * 100) / 100;
     out[axis.key] = { score, low: lo, high: hi };
   }
+  if (profile.numericAxes) Object.assign(out, profile.numericAxes(text));
   return out;
 }
 
