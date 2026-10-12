@@ -12,7 +12,36 @@ import { extractFromFile, detectSourceType, type SourceType } from "./inputAdapt
 import { lastMarkupRatio } from "./inputAdapters/textAdapter";
 import { chunkUnits, type Chunk } from "./chunker";
 import { sha256Hex } from "./contentHash";
-import { getActiveDomainId } from "./domainProfiles";
+import { getActiveDomainId, getDomainProfile, getActiveSourceClass } from "./domainProfiles";
+import { extractSecurityUnits, dedupeNearDuplicates, corpusHash, type NoiseDrop } from "./inputAdapters/securityExtractor";
+import { applyLexicalAxes, applySourceWeight } from "./domainLayer";
+
+interface SecurityMeta {
+  dropped: NoiseDrop[];
+  byType: Record<string, number>;
+  nearDuplicates: number;
+  corpusHash: string;
+}
+
+/** Deterministic domain layer: lexical axes, source-class weight, provenance stats. */
+function applyDomainLayer(field: GeometricField, meta: SecurityMeta | null) {
+  const profile = getDomainProfile(field.domain);
+  applyLexicalAxes(field.units, profile);
+  const sourceClass = getActiveSourceClass(profile.id);
+  if (sourceClass) {
+    applySourceWeight(field.units, sourceClass.weight);
+    field.stats.sourceClass = { id: sourceClass.id, weight: sourceClass.weight };
+  }
+  if (meta) {
+    field.stats.security = {
+      byType: meta.byType,
+      noiseDropped: meta.dropped.length,
+      droppedSample: meta.dropped.slice(0, 40),
+      nearDuplicates: meta.nearDuplicates,
+      corpusHash: meta.corpusHash,
+    };
+  }
+}
 import { generateFieldFromPDF } from "./pdfFieldGenerator";
 import {
   computeTFIDF,
@@ -49,6 +78,7 @@ export async function generateFieldFromFile(
   let chunks: Chunk[];
   const notes: string[] = [];
   let totalFound = 0;
+  let securityMeta: SecurityMeta | null = null;
 
   if (sourceType === "pdf") {
     field = await generateFieldFromPDF(file, onProgress);
@@ -68,7 +98,26 @@ export async function generateFieldFromFile(
     }
 
     onProgress?.("Chunking content…", 0.2);
-    chunks = chunkUnits(rawUnits);
+    if (getDomainProfile(getActiveDomainId()).id === "bugbounty") {
+      // Structural units (endpoints, hosts, params…) become their own nodes;
+      // they are never chunked into prose.
+      const extraction = extractSecurityUnits(rawUnits.map((u) => u.text).join("\n\n"));
+      const deduped = dedupeNearDuplicates(extraction.units);
+      chunks = deduped.map((u, i) => ({
+        index: i,
+        text: u.text,
+        source: `${file.name}#${u.unitType}@${u.start}`,
+        startPosition: u.start,
+      }));
+      securityMeta = {
+        dropped: extraction.dropped,
+        byType: deduped.reduce<Record<string, number>>((acc, u) => ((acc[u.unitType] = (acc[u.unitType] ?? 0) + 1), acc), {}),
+        nearDuplicates: extraction.units.length - deduped.length,
+        corpusHash: corpusHash(deduped),
+      };
+    } else {
+      chunks = chunkUnits(rawUnits);
+    }
     totalFound = chunks.length;
 
     if (lastMarkupRatio > 0.3) {
@@ -118,6 +167,7 @@ export async function generateFieldFromFile(
   }
 
   field.domain = getActiveDomainId();
+  applyDomainLayer(field, securityMeta);
 
   // Make missing deep analysis visible instead of silently reporting llmTension = 0.
   const withIntention = field.units.filter((u) => u.intention).length;
