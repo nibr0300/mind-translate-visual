@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isCreditError, notifyCreditsExhausted } from "./creditNotice";
-import { getDomainProfile, getActiveDomainId } from "./domainProfiles";
+import { getDomainProfile, getActiveDomainId, getLlmAxesEnabled } from "./domainProfiles";
 
 import {
   analyzeHedgingBatch,
@@ -51,7 +51,8 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
 
 function domainPayload() {
   const p = getDomainProfile(getActiveDomainId());
-  return { id: p.id, guidance: p.guidance, axes: p.axes };
+  // Lexical-first profiles keep LLM axis scoring off until calibrated.
+  return { id: p.id, guidance: p.guidance, axes: getLlmAxesEnabled(p.id) ? p.axes : [] };
 }
 
 async function analyzeBatch(textUnits: string[]): Promise<IntentionAnalysis[] | null> {

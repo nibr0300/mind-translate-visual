@@ -15,7 +15,7 @@ export async function analyzeUnits(textUnits: string[], domain?: DomainInput | n
     Array.isArray(domain?.axes)
       ? domain.axes
           .filter((a: any) => a && /^[a-z_]{1,32}$/.test(String(a.key)))
-          .slice(0, 4)
+          .slice(0, 16)
           .map((a: any) => ({ key: String(a.key), label: String(a.label ?? a.key).slice(0, 60), low: String(a.low ?? "").slice(0, 60), high: String(a.high ?? "").slice(0, 60) }))
       : [];
   const guidance = typeof domain?.guidance === "string" ? domain.guidance.slice(0, 1000) : "";

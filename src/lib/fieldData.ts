@@ -74,6 +74,16 @@ export interface GeometricField {
     degenerateUnits?: number;
     /** Human-readable warnings about the ingestion (markup stripped, truncation, …). */
     notes?: string[];
+    /** Source class chosen at upload and its weight (profiles with a source taxonomy). */
+    sourceClass?: { id: string; weight: number };
+    /** Structural extraction stats (bug bounty profile). */
+    security?: {
+      byType: Record<string, number>;
+      noiseDropped: number;
+      droppedSample: { text: string; reason: string }[];
+      nearDuplicates: number;
+      corpusHash: string;
+    };
   };
   useCase: string;
   /** Domain profile id used for the analysis (see domainProfiles.ts). */

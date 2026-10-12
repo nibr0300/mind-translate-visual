@@ -9,6 +9,8 @@
 - [x] A1 domänaxlar med corpus-vikt + A4 fält-API (ingest, field, tensions, project)
 - [x] Kalibrering: domän per dokument, riktiga kvalitetsmått, axelvy, kalibreringstester
 - [ ] Kalibreringstest 1 och 3 — väntar på ≥2 pokerdokument markerade som Poker
+- [x] Bug bounty-profil steg 1: 14 axlar i tre familjer, källklasser med vikt, strukturella enheter, brusfilter med logg, ordlista först, 8 tester
+- [ ] Bug bounty: kalibrera ordlistorna mot din väns riktiga scope/rapporter (väntar på material)
 - [ ] A3 deformation + A5 versionshistorik
 - [ ] App B navigatör (separat projekt)
 - [ ] Agentloop: situation → projicera → mäta → resonera → handla → observera → deformera fältet

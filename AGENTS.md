@@ -7,3 +7,5 @@
 - Each document carries a `domain` column; corpus-map and field-api /project filter on it. Why: a navigator must only see fields of its own domain.
 - Cluster cohesion/noise_ratio are computed at persist time and stored on clusters_summary (noise = members closer to another centroid). Why: corpus-wide vector joins time out.
 - Calibration tests live in field-api POST /calibrate (accepts API key or user JWT). Why: one place for navigator readiness checks.
+- Domain profiles may carry source classes and lexical axis dictionaries; the lexical layer (src/lib/domainLayer.ts) overrides LLM axis scores. Why: deterministic ground first, LLM only fills gaps.
+- Bug bounty structural extraction lives in src/lib/inputAdapters/securityExtractor.ts and bypasses the prose chunker. Why: endpoints/hosts must stay intact as their own units.

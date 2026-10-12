@@ -4,7 +4,10 @@ import { generateFieldFromFile } from "@/lib/fieldGenerator";
 import type { GeometricField } from "@/lib/fieldData";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import DrivePicker from "./DrivePicker";
-import { DOMAIN_PROFILES, getActiveDomainId, setActiveDomainId, getDomainProfile } from "@/lib/domainProfiles";
+import {
+  DOMAIN_PROFILES, getActiveDomainId, setActiveDomainId, getDomainProfile,
+  getActiveSourceClass, setActiveSourceClass, getLlmAxesEnabled, setLlmAxesEnabled,
+} from "@/lib/domainProfiles";
 
 interface FileUploaderProps {
   onFieldGenerated: (field: GeometricField, fileName: string) => void;
@@ -33,6 +36,12 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { isAdmin } = useIsAdmin();
   const [domainId, setDomainId] = useState(getActiveDomainId);
+  const [sourceClassId, setSourceClassId] = useState(() => getActiveSourceClass(getActiveDomainId())?.id ?? "");
+  const [llmAxes, setLlmAxes] = useState(() => getLlmAxesEnabled(getActiveDomainId()));
+  useEffect(() => {
+    setSourceClassId(getActiveSourceClass(domainId)?.id ?? "");
+    setLlmAxes(getLlmAxesEnabled(domainId));
+  }, [domainId]);
 
   // If a previous run never finished, the tab was reloaded/killed mid-ingest
   // (white flash → back to start state). Tell the user instead of failing silently.
@@ -144,6 +153,33 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
       <p className="font-mono text-[10px] text-muted-foreground/70 mb-3">
         {getDomainProfile(domainId).description} Axes: {getDomainProfile(domainId).axes.map((a) => a.label).join(" · ")}
       </p>
+      {getDomainProfile(domainId).sourceClasses && (
+        <>
+          <label className="font-mono text-[10px] text-muted-foreground block mb-1" htmlFor="source-class">
+            Source class (weight)
+          </label>
+          <select
+            id="source-class"
+            value={sourceClassId}
+            disabled={isProcessing}
+            onChange={(e) => { setSourceClassId(e.target.value); setActiveSourceClass(domainId, e.target.value); }}
+            className="w-full mb-2 font-mono text-[11px] bg-secondary border border-border rounded-md px-2 py-1.5 text-foreground"
+          >
+            {getDomainProfile(domainId).sourceClasses!.map((c) => (
+              <option key={c.id} value={c.id}>{c.label} · {c.weight.toFixed(1)} — {c.description}</option>
+            ))}
+          </select>
+          <label className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground mb-3">
+            <input
+              type="checkbox"
+              checked={llmAxes}
+              disabled={isProcessing}
+              onChange={(e) => { setLlmAxes(e.target.checked); setLlmAxesEnabled(domainId, e.target.checked); }}
+            />
+            AI also scores axes (off = word lists only, same result every time)
+          </label>
+        </>
+      )}
 
       <input
         ref={inputRef}
