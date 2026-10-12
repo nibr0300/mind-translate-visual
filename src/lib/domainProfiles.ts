@@ -8,6 +8,7 @@
  *  - `axisDictionaries`: deterministic lexical annotation per axis pole
  *  - `families`: grouping of axes for display
  */
+import { pokerNumericAxes } from "./pokerMath";
 export interface DomainAxis {
   key: string;
   label: string;
@@ -48,6 +49,8 @@ export interface DomainProfile {
   axes: DomainAxis[];
   sourceClasses?: SourceClass[];
   axisDictionaries?: AxisDictionary;
+  /** Numeric parser: numbers in the text set axis scores and override dictionary hits. */
+  numericAxes?: (text: string) => Record<string, { score: number; low: number; high: number }>;
   /** Replace the generic FZ blend with a contrast-based formula. */
   fzCalibration?: FzCalibration;
   /**
@@ -72,15 +75,97 @@ export const DOMAIN_PROFILES: DomainProfile[] = [
   {
     id: "poker",
     label: "Poker",
-    description: "Hand histories and strategy: GTO vs exploit, ICM pressure.",
+    description: "Poker math first: sizing, stats, stack depth and ICM.",
     guidance:
-      "The text concerns poker (hand histories, strategy, reads). Interpret units as decision signals: position, ranges, sizing, stacks, board texture, opponent reads, tournament (ICM) pressure. High tension marks where the decision is most uncertain.",
+      "The text concerns poker (hand histories, strategy, HUD stats, tournament structure). Read units as decision signals anchored in math: bet sizing vs required bluff success, VPIP/PFR, c-bet by street, fold to 3-bet, combinatorics and blockers, stack depth (CSI/M), bubble factor, multiway. High tension marks where two measures contradict each other.",
     axes: [
-      { key: "exploit", label: "GTO ↔ Exploit", low: "balanced / GTO", high: "exploitative" },
-      { key: "aggression", label: "Aggression", low: "passive", high: "aggressive" },
-      { key: "icm", label: "ICM ↔ chip-EV", low: "chip-EV", high: "ICM pressure" },
-      { key: "bluff", label: "Value ↔ Bluff", low: "value", high: "bluff" },
+      { key: "bluff_math", label: "Bluff math", low: "profitable air", high: "negative-EV bluff", family: "Math" },
+      { key: "combinatorial_density", label: "Combinatorial density", low: "combo-heavy range", high: "combo-starved range", family: "Math" },
+      { key: "multiway_viability", label: "Heads-up ↔ Multiway", low: "heads-up dominant", high: "multiway viable", family: "Math" },
+      { key: "range_polarity", label: "VPIP/PFR", low: "tight-aggressive", high: "loose-passive", family: "Stats" },
+      { key: "aggression_decay", label: "Aggression decay", low: "one and done", high: "relentless barrel", family: "Stats" },
+      { key: "defensive_honesty", label: "Defence vs aggression", low: "sticky caller", high: "overly folding", family: "Stats" },
+      { key: "exploit", label: "GTO ↔ Exploit", low: "balanced / GTO", high: "exploitative", family: "Stats" },
+      { key: "stack_urgency", label: "Stack urgency (CSI)", low: "deep, manoeuvrable", high: "push/fold", family: "Tournament" },
+      { key: "icm_pressure", label: "ICM pressure", low: "chip-EV", high: "survival", family: "Tournament" },
+      { key: "speculative_threshold", label: "Rule of 5 and 10", low: "implied odds viable", high: "stack bleeding", family: "Tournament" },
     ],
+    axisDictionaries: {
+      bluff_math: {
+        low: [["fold equity", 0.8], ["folds too much", 0.8], ["overfold", 0.9], ["overfolds", 0.9], ["profitable bluff", 0.9], ["auto-profit", 0.9], ["air", 0.5]],
+        high: [["overbluff", 0.8], ["calling station", 0.8], ["never folds", 0.9], ["spew", 0.7], ["burning money", 0.8], ["negative ev", 0.9], ["-ev", 0.8]],
+      },
+      combinatorial_density: {
+        low: [["combos", 0.5], ["combinations", 0.5], ["value-heavy", 0.8], ["full range", 0.6]],
+        high: [["blocker", 0.9], ["blockers", 0.9], ["block", 0.6], ["card removal", 0.9], ["removal", 0.6], ["capped", 0.7]],
+      },
+      multiway_viability: {
+        low: [["heads-up", 0.8], ["heads up", 0.8], ["hu", 0.5], ["isolate", 0.7], ["isolation", 0.7], ["reverse implied odds", 0.9], ["dominated", 0.7]],
+        high: [["multiway", 0.9], ["multi-way", 0.9], ["set mining", 0.9], ["set mine", 0.9], ["suited connector", 0.8], ["suited connectors", 0.8], ["implied odds", 0.6], ["small pair", 0.6]],
+      },
+      range_polarity: {
+        low: [["tag", 0.8], ["tight aggressive", 0.9], ["tight-aggressive", 0.9], ["nit", 0.6], ["reg", 0.5]],
+        high: [["loose passive", 0.9], ["loose-passive", 0.9], ["fish", 0.7], ["limps", 0.7], ["limper", 0.7], ["calling station", 0.8], ["passive", 0.5]],
+      },
+      aggression_decay: {
+        low: [["gives up", 0.9], ["give up", 0.8], ["one and done", 0.9], ["checks turn", 0.7], ["honest turn", 0.8], ["stab", 0.5]],
+        high: [["double barrel", 0.9], ["triple barrel", 0.9], ["barrel", 0.7], ["barrels", 0.7], ["relentless", 0.8], ["fires again", 0.8]],
+      },
+      defensive_honesty: {
+        low: [["sticky", 0.9], ["calls down", 0.8], ["hero call", 0.6], ["never folds", 0.8], ["station", 0.6]],
+        high: [["folds to 3-bet", 0.9], ["too honest", 0.9], ["paper tiger", 0.9], ["folds to aggression", 0.9], ["weak-tight", 0.8], ["overfolds", 0.7]],
+      },
+      exploit: {
+        low: [["gto", 0.9], ["balanced", 0.8], ["solver", 0.7], ["equilibrium", 0.8], ["nash", 0.7], ["unexploitable", 0.9], ["mixed strategy", 0.8]],
+        high: [["exploit", 0.9], ["exploitative", 0.9], ["exploitable", 0.8], ["read", 0.5], ["tendency", 0.6], ["leak", 0.8], ["deviate", 0.7]],
+      },
+      stack_urgency: {
+        low: [["deep stack", 0.9], ["deep-stacked", 0.9], ["deep", 0.5], ["100bb", 0.8], ["post-flop play", 0.7], ["postflop", 0.5]],
+        high: [["push/fold", 0.9], ["push or fold", 0.9], ["shove", 0.7], ["jam", 0.7], ["short stack", 0.8], ["short-stacked", 0.8], ["move-in", 0.9], ["re-steal", 0.7], ["resteal", 0.7]],
+      },
+      icm_pressure: {
+        low: [["chip ev", 0.9], ["chip-ev", 0.9], ["cev", 0.8], ["cash game", 0.7], ["accumulate", 0.6]],
+        high: [["icm", 0.9], ["bubble", 0.8], ["bubble factor", 0.9], ["pay jump", 0.9], ["final table", 0.6], ["survival", 0.7], ["ladder", 0.6], ["$ev", 0.8]],
+      },
+      speculative_threshold: {
+        low: [["implied odds", 0.7], ["cheap call", 0.7], ["set value", 0.7]],
+        high: [["rule of 5 and 10", 0.6], ["too expensive", 0.8], ["bleed", 0.7], ["bleeding", 0.7], ["priced out", 0.8]],
+      },
+    },
+    numericAxes: pokerNumericAxes,
+    fzCalibration: { llmTension: 0.5, triangulated: 0.3, cti: 0.2, axisBonus: 0.12, oppositionBonus: 0.1, directivePenalty: 0.1 },
+    llmAxesByDefault: false,
+  },
+  {
+    id: "poker_tells",
+    label: "Poker – live tells",
+    description: "Body language at the live table (Navarro): congruence, posture, baseline.",
+    guidance:
+      "The text describes live poker behaviour: physical tells, pacifying gestures, posture, timing. A tell is only valid against the player's own baseline. High tension marks where words, actions and body send contradicting signals. Never treat a single gesture as proof.",
+    axes: [
+      { key: "verbal_physical_congruence", label: "Words ↔ Body", low: "authentic confidence", high: "perception management", family: "Tells" },
+      { key: "action_posture_alignment", label: "Action ↔ Posture", low: "engaged", high: "disengaged (flight)", family: "Tells" },
+      { key: "baseline_deviation", label: "Baseline deviation", low: "homeostatic calm", high: "limbic arousal", family: "Tells" },
+      { key: "micro_macro_sync", label: "Micro ↔ Macro", low: "honest micro", high: "manufactured macro", family: "Tells" },
+    ],
+    axisDictionaries: {
+      verbal_physical_congruence: {
+        low: [["relaxed", 0.6], ["genuine", 0.7], ["congruent", 0.9]],
+        high: [["going hollywood", 0.9], ["neck touch", 0.9], ["touches neck", 0.9], ["pacify", 0.8], ["pacifying", 0.8], ["ventilating", 0.8], ["leg cleanse", 0.8], ["talks big", 0.7]],
+      },
+      action_posture_alignment: {
+        low: [["leans in", 0.8], ["leans forward", 0.8], ["engaged", 0.6]],
+        high: [["leans back", 0.8], ["feet toward the exit", 0.9], ["feet pointing", 0.7], ["turtle", 0.8], ["pulls back", 0.7], ["distancing", 0.7]],
+      },
+      baseline_deviation: {
+        low: [["baseline", 0.5], ["calm", 0.6], ["still", 0.5], ["neutral", 0.5]],
+        high: [["happy feet", 0.9], ["bouncing", 0.7], ["gravity-defying", 0.9], ["eyebrows", 0.6], ["chest puffs", 0.7], ["sudden", 0.6]],
+      },
+      micro_macro_sync: {
+        low: [["pupil", 0.7], ["eye block", 0.9], ["eye blocking", 0.9], ["instant", 0.6], ["micro", 0.7]],
+        high: [["forced smile", 0.9], ["stare down", 0.8], ["stares down", 0.8], ["delayed", 0.6], ["exaggerated", 0.7], ["staged", 0.7]],
+      },
+    },
     llmAxesByDefault: true,
   },
   {
@@ -313,7 +398,7 @@ export interface AxisHitDetail {
 /** Per-axis pole weights; axes without any hit are omitted. Word-bounded, case-insensitive. */
 export function lexicalAxisDetail(text: string, profile: DomainProfile): Record<string, AxisHitDetail> {
   const dict = profile.axisDictionaries;
-  if (!dict) return {};
+  if (!dict) return profile.numericAxes ? profile.numericAxes(text) : {};
   const hay = text.toLowerCase().replace(/\s+/g, " ");
   const out: Record<string, AxisHitDetail> = {};
   for (const axis of profile.axes) {
@@ -327,6 +412,7 @@ export function lexicalAxisDetail(text: string, profile: DomainProfile): Record<
     const score = Math.round((0.5 + (hi / total - 0.5) * confidence) * 100) / 100;
     out[axis.key] = { score, low: lo, high: hi };
   }
+  if (profile.numericAxes) Object.assign(out, profile.numericAxes(text));
   return out;
 }
 
