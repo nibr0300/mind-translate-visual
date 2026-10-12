@@ -75,13 +75,38 @@ function isNoise(text: string): string | null {
   return null;
 }
 
+const VALUE_OR_STATUS =
+  /[$€£]\s?\d|\b\d[\d,.]*\s?(?:usd|eur|sek|kr)\b|\bP[1-5]\b|\b(?:accepted|resolved|triaged|duplicate|informative|n\/a|not applicable|awarded|bounty|outcome|debate|disputed|closed|fixed|wontfix|won't fix)\b/i;
+
+type LineKind = "heading" | "table_row" | "bullet" | "text" | "blank";
+
+function classifyLine(line: string): LineKind {
+  const t = line.trim();
+  if (!t) return "blank";
+  if (/^#{1,6}\s+\S/.test(t)) return "heading";
+  if (/^\|.*\|$/.test(t) || (t.match(/\|/g)?.length ?? 0) >= 2 || /\t/.test(line)) return "table_row";
+  if (/^(?:[-*•▪◦]|\d{1,2}[.)])\s+\S/.test(t)) return "bullet";
+  return "text";
+}
+
+function cleanRow(t: string): string {
+  return t
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^\||\|$/g, "")
+    .split(/\s*\|\s*|\t+/)
+    .map((c) => c.trim())
+    .filter((c) => c && !/^:?-{2,}:?$/.test(c))
+    .join(" · ");
+}
+
 /**
- * Pull structural units out of a text, then return the remaining prose split
- * into sentences. Structural matches are blanked out of the prose stream so a
- * path is never cut in half by sentence splitting.
+ * Pull structural units (endpoints, hosts, params…) out of a text as their own
+ * nodes, and split the prose by line structure: every table row, bullet and
+ * heading becomes its own unit so a scope table never collapses into one node.
+ * Prose keeps its full text — structural tokens are never cut in half.
  */
 export function extractSecurityUnits(raw: string): SecurityExtraction {
-  const text = raw.normalize("NFC").replace(/[ \t\u00a0]+/g, " ");
+  const text = raw.normalize("NFC").replace(/\r\n?/g, "\n").replace(/[ \u00a0]+/g, " ");
   const units: StructuralUnit[] = [];
   const dropped: NoiseDrop[] = [];
   const taken: boolean[] = new Array(text.length).fill(false);
@@ -101,39 +126,55 @@ export function extractSecurityUnits(raw: string): SecurityExtraction {
     }
   }
 
-  // Prose = everything not consumed by a structural match.
-  let buffer = "";
-  let bufferStart = 0;
-  const flush = (end: number) => {
-    const chunk = buffer.trim();
-    buffer = "";
+  const keepOrDrop = (s: string, start: number, end: number, kind: LineKind) => {
+    if (kind === "heading") {
+      if (s.length >= 2) units.push({ text: s, unitType: "prose", start, end });
+      return;
+    }
+    const reason = isNoise(s);
+    if (reason && !(reason === "too short" && VALUE_OR_STATUS.test(s))) {
+      dropped.push({ text: s.slice(0, 120), reason });
+      return;
+    }
+    const minChars = kind === "table_row" || kind === "bullet" ? 8 : 25;
+    if (s.length < minChars && !VALUE_OR_STATUS.test(s)) {
+      dropped.push({ text: s.slice(0, 120), reason: "below min_chars" });
+      return;
+    }
+    units.push({ text: s, unitType: "prose", start, end });
+  };
+
+  let para = "";
+  let paraStart = 0;
+  const flushPara = (end: number) => {
+    const chunk = para.trim();
+    para = "";
     if (!chunk) return;
-    for (const sentence of chunk.split(/(?<=[.!?])\s+|\n{2,}/)) {
+    for (const sentence of chunk.split(/(?<=[.!?])\s+(?=[A-Z0-9#*(\[\u00C0-\u00DE"'`])/)) {
       const s = sentence.trim();
-      if (!s) continue;
-      const reason = isNoise(s);
-      if (reason) {
-        dropped.push({ text: s.slice(0, 120), reason });
-        continue;
-      }
-      if (s.length < 25) {
-        dropped.push({ text: s.slice(0, 120), reason: "below min_chars" });
-        continue;
-      }
-      units.push({ text: s, unitType: "prose", start: bufferStart, end });
+      if (s) keepOrDrop(s, paraStart, end, "text");
     }
   };
 
-  for (let i = 0; i < text.length; i++) {
-    if (taken[i]) {
-      flush(i);
-      bufferStart = i + 1;
+  let pos = 0;
+  for (const line of text.split("\n")) {
+    const lineStart = pos;
+    const lineEnd = pos + line.length;
+    pos = lineEnd + 1;
+    const kind = classifyLine(line);
+    if (kind === "blank") {
+      flushPara(lineStart);
       continue;
     }
-    if (!buffer) bufferStart = i;
-    buffer += text[i];
+    if (kind === "text") {
+      if (!para) paraStart = lineStart;
+      para += (para ? " " : "") + line.trim();
+      continue;
+    }
+    flushPara(lineStart);
+    keepOrDrop(cleanRow(line.trim()), lineStart, lineEnd, kind);
   }
-  flush(text.length);
+  flushPara(text.length);
 
   units.sort((a, b) => a.start - b.start || a.text.localeCompare(b.text));
   return { units, dropped };
