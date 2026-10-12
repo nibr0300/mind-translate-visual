@@ -14,7 +14,7 @@ import { chunkUnits, type Chunk } from "./chunker";
 import { sha256Hex } from "./contentHash";
 import { getActiveDomainId, getDomainProfile, getActiveSourceClass } from "./domainProfiles";
 import { extractSecurityUnits, dedupeNearDuplicates, corpusHash, type NoiseDrop } from "./inputAdapters/securityExtractor";
-import { applyLexicalAxes, applySourceWeight } from "./domainLayer";
+import { applyLexicalAxes, applySourceWeight, recalibrateFz, axisClusterLabels } from "./domainLayer";
 
 interface SecurityMeta {
   dropped: NoiseDrop[];
@@ -26,7 +26,9 @@ interface SecurityMeta {
 /** Deterministic domain layer: lexical axes, source-class weight, provenance stats. */
 function applyDomainLayer(field: GeometricField, meta: SecurityMeta | null) {
   const profile = getDomainProfile(field.domain);
-  applyLexicalAxes(field.units, profile);
+  const details = applyLexicalAxes(field.units, profile);
+  if (profile.fzCalibration) recalibrateFz(field.units, details, profile.fzCalibration);
+  if (profile.axisDictionaries) axisClusterLabels(field.units, field.clusters, profile);
   const sourceClass = getActiveSourceClass(profile.id);
   if (sourceClass) {
     applySourceWeight(field.units, sourceClass.weight);
