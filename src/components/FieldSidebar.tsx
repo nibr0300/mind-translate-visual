@@ -463,22 +463,31 @@ export default function FieldSidebar({
         const weights = axisWeights(axisUnits, keys);
         const frictions = axisFrictions(axisUnits, keys, 3);
         const label = (k: string) => profile.axes.find((a) => a.key === k)?.label ?? k;
+        const familyOf = (k: string) => profile.axes.find((a) => a.key === k)?.family ?? "";
+        const families = [...new Set(weights.map((w) => familyOf(w.key)))];
+        const sec = field.stats.security;
         return (
           <div className="p-4 border-b border-border">
             <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-2">
               Domain axes · {profile.label}
+              {field.stats.sourceClass && ` · source ${field.stats.sourceClass.id} (${field.stats.sourceClass.weight.toFixed(1)})`}
             </label>
-            <ul className="flex flex-col gap-1 mb-2">
-              {weights.map((w) => (
-                <li key={w.key} className="flex items-center gap-2 text-[11px] font-mono">
-                  <div className="flex-1 truncate text-foreground">{label(w.key)}</div>
-                  <div className="w-16 h-1.5 rounded bg-secondary overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: `${w.weight * 100}%` }} />
-                  </div>
-                  <span className="w-10 text-right text-muted-foreground">{w.weight.toFixed(2)}</span>
-                </li>
-              ))}
-            </ul>
+            {families.map((fam) => (
+              <div key={fam || "_"} className="mb-2">
+                {fam && <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60 mb-1">{fam}</div>}
+                <ul className="flex flex-col gap-1">
+                  {weights.filter((w) => familyOf(w.key) === fam).map((w) => (
+                    <li key={w.key} className="flex items-center gap-2 text-[11px] font-mono">
+                      <div className="flex-1 truncate text-foreground">{label(w.key)}</div>
+                      <div className="w-16 h-1.5 rounded bg-secondary overflow-hidden">
+                        <div className="h-full bg-primary" style={{ width: `${w.weight * 100}%` }} />
+                      </div>
+                      <span className="w-10 text-right text-muted-foreground">{w.weight.toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
             {frictions.length > 0 && (
               <ul className="flex flex-col gap-0.5 text-[10px] font-mono text-muted-foreground">
                 {frictions.map((f, i) => (
@@ -487,6 +496,19 @@ export default function FieldSidebar({
                   </li>
                 ))}
               </ul>
+            )}
+            {sec && (
+              <details className="mt-2 text-[10px] font-mono text-muted-foreground">
+                <summary className="cursor-pointer">
+                  Units: {Object.entries(sec.byType).map(([t, n]) => `${t} ${n}`).join(" · ")} · fingerprint {sec.corpusHash}
+                </summary>
+                <div className="mt-1">Removed as noise: {sec.noiseDropped} · near-duplicates merged: {sec.nearDuplicates}</div>
+                <ul className="mt-1 max-h-32 overflow-y-auto">
+                  {sec.droppedSample.map((d, i) => (
+                    <li key={i} className="truncate">✕ {d.text} <span className="text-muted-foreground/60">({d.reason})</span></li>
+                  ))}
+                </ul>
+              </details>
             )}
           </div>
         );
