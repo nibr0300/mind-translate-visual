@@ -22,9 +22,11 @@ const ACCEPT =
 
 const MAX_BYTES = 64 * 1024 * 1024; // 64MB cap across types — large books run 20–60MB
 
-/** Mobile browsers (esp. iOS Safari) kill the tab well below the desktop limit. */
+/** Mobile browsers (esp. iOS Safari) kill the tab well below the desktop limit.
+ *  Pages are cleaned up per-page during extraction, so peak memory stays low —
+ *  but very large files can still OOM, hence a soft limit with an override. */
 const IS_MOBILE = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const MOBILE_SOFT_LIMIT = 8 * 1024 * 1024;
+const MOBILE_SOFT_LIMIT = 24 * 1024 * 1024;
 const BREADCRUMB_KEY = "gvtd:ingest-in-progress";
 
 export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
@@ -33,6 +35,7 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
+  const [oversizedFile, setOversizedFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { isAdmin } = useIsAdmin();
   const [domainId, setDomainId] = useState(getActiveDomainId);
@@ -61,19 +64,21 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   }, []);
 
   const processFile = useCallback(
-    async (file: File) => {
+    async (file: File, force = false) => {
       if (file.size > MAX_BYTES) {
         setError(`File too large (max ${MAX_BYTES / 1024 / 1024}MB)`);
         return;
       }
-      if (IS_MOBILE && file.size > MOBILE_SOFT_LIMIT) {
+      if (!force && IS_MOBILE && file.size > MOBILE_SOFT_LIMIT) {
+        setOversizedFile(file);
         setError(
-          `${(file.size / 1024 / 1024).toFixed(1)}MB is too large for a mobile browser (limit ~${
+          `${(file.size / 1024 / 1024).toFixed(1)}MB is over the mobile comfort limit (~${
             MOBILE_SOFT_LIMIT / 1024 / 1024
-          }MB) — the tab will crash. Use a desktop browser or a smaller file.`
+          }MB). It often works anyway since pages are cleaned up as they are read — but the tab may reload if memory runs out.`
         );
         return;
       }
+      setOversizedFile(null);
 
       setError(null);
       setIsProcessing(true);
@@ -248,6 +253,15 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
       )}
 
       {error && <p className="font-mono text-[10px] text-destructive mt-2">{error}</p>}
+      {oversizedFile && (
+        <button
+          type="button"
+          onClick={() => processFile(oversizedFile, true)}
+          className="mt-1 font-mono text-[10px] underline text-primary"
+        >
+          Försök ändå ({(oversizedFile.size / 1024 / 1024).toFixed(1)}MB)
+        </button>
+      )}
 
       <DrivePicker
         open={drivePickerOpen}
