@@ -47,6 +47,7 @@ export interface DomainProfile {
   description: string;
   guidance: string;
   axes: DomainAxis[];
+  questionTemplates?: Record<string, { high: { threshold: number; templates: string[] }; medium?: { threshold: number; templates: string[] } }>;
   sourceClasses?: SourceClass[];
   axisDictionaries?: AxisDictionary;
   /** Numeric parser: numbers in the text set axis scores and override dictionary hits. */
@@ -59,6 +60,31 @@ export interface DomainProfile {
    */
   llmAxesByDefault?: boolean;
 }
+
+export const pokerAxisTemplates: NonNullable<DomainProfile["questionTemplates"]> = {
+  stack_urgency: {
+    high: { threshold: 0.7, templates: ["Hur ska jag justera min öppnings- och push/fold-strategi när stackdjupet krymper under 15 BB?", "Vilka händer har tillräcklig blocker-effekt för att gå all-in med när jag är shortstacked?", "Hur undviker jag att bli utbluffad när min stack inte tillåter komplexa postflop-linjer?"] },
+    medium: { threshold: 0.4, templates: ["Hur påverkar mitt nuvarande stackdjup vilka händer jag kan syna med i position?", "När är det lönsamt att offra en del av stacken för att se en flop med spekulativa händer?"] },
+  },
+  icm_pressure: {
+    high: { threshold: 0.7, templates: ["Hur påverkar ICM-trycket vid bubblan mitt syn-intervall mot en aggressiv spelare?", "När ska jag vägra syna en all-in även med en stark hand nära utbetalningsstrukturen?", "Hur balanserar jag mellan att säkra en plats i pengarna och att maximera förväntat värde?"] },
+    medium: { threshold: 0.4, templates: ["Hur ska jag justera min strategi när vi närmar oss de betalda platserna?", "Vilka händer är för starka att lägga vid bubblan även mot tighta spelare?"] },
+  },
+  bluff_math: { high: { threshold: 0.6, templates: ["Hur beräknar jag den optimala bluff-frekvensen för att göra motståndarens syn indifferent?", "När är en semi-bluff mer lönsam än en ren bluff på turn?", "Hur använder jag blocker-effekter för att avgöra om en bluff har tillräcklig fold-equity?"] } },
+  range_polarity: {
+    high: { threshold: 0.7, templates: ["Hur polariserar jag mitt betting-intervall på river för att maximera värdet från både value-bets och bluffar?", "När ska jag använda en liten bet-storlek med ett polariserat range jämfört med en stor bet?", "Hur undviker jag att bli förutsägbar när jag använder samma betting-storlek för både starka och svaga händer?"] },
+    medium: { threshold: 0.4, templates: ["Hur breddar jag mitt öppnings-intervall i sen position utan att bli för löst?", "När är det lämpligt att använda en linjär betting-strategi istället för en polariserad?"] },
+  },
+  exploit: {
+    high: { threshold: 0.7, templates: ["Hur exploaterar jag en spelare som överviker mot c-bets på turn?", "Vilka justeringar gör jag mot en spelare som synar för mycket med svaga händer?", "Hur straffar jag en motståndare som lägger för ofta mot continuation-bets?"] },
+    medium: { threshold: 0.4, templates: ["Hur identifierar jag en spelares tendenser under de första 20 händerna vid bordet?", "När ska jag avvika från GTO-strategin för att exploatera en specifik motståndare?"] },
+  },
+  multiway_viability: { high: { threshold: 0.7, templates: ["Vilka händer har tillräckligt multiway-värde för att syna i en stor pott med flera spelare?", "Hur justerar jag min strategi när potten blir multiway och positionen försämras?", "När är det lönsamt att lägga en stark men sårbar hand i en multiway-pott?"] } },
+  speculative_threshold: { high: { threshold: 0.7, templates: ["Hur bedömer jag om implicita odds rättfärdigar en syn med en spekulativ hand?", "När är tröskeln för att syna med suited connectors tillräckligt låg för att vara lönsam?", "Hur beräknar jag break-even-punkten för att syna med små par för att träffa set?"] } },
+  defensive_honesty: { high: { threshold: 0.6, templates: ["Hur skyddar jag min hand mot draws utan att överinvestera i potten?", "När är det bättre att checka och kontrollera pot-storleken istället för att betta för protection?", "Hur undviker jag att bli utbluffad när jag har en medelstark hand i en stor pott?"] } },
+  aggression_decay: { high: { threshold: 0.6, templates: ["Hur justerar jag min aggressionsnivå när motståndaren visar styrka över flera betting-rundor?", "När ska jag ge upp på en bluff när motståndaren inte viker sig på turn?", "Hur identifierar jag punkten där min aggression inte längre genererar tillräcklig fold-equity?"] } },
+  combinatorial_density: { high: { threshold: 0.7, templates: ["Hur hanterar jag komplexiteten i att balansera mitt betting-intervall på en brickad board?", "När är det värt att använda en mixed strategy med samma handtyp i samma situation?", "Hur förenklar jag beslutsträdet när antalet möjliga kombinationer blir för stort?"] } },
+};
 
 export const DOMAIN_PROFILES: DomainProfile[] = [
   {
@@ -75,6 +101,7 @@ export const DOMAIN_PROFILES: DomainProfile[] = [
   {
     id: "poker",
     label: "Poker",
+    questionTemplates: pokerAxisTemplates,
     description: "Poker math first: sizing, stats, stack depth and ICM.",
     guidance:
       "The text concerns poker (hand histories, strategy, HUD stats, tournament structure). Read units as decision signals anchored in math: bet sizing vs required bluff success, VPIP/PFR, c-bet by street, fold to 3-bet, combinatorics and blockers, stack depth (CSI/M), bubble factor, multiway. High tension marks where two measures contradict each other.",
