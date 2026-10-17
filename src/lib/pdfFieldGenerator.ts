@@ -36,15 +36,22 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 export async function extractTextFromPDF(file: File): Promise<string[]> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  return extractTextFromDocument(pdf);
+  try {
+    return await extractTextFromDocument(pdf);
+  } finally {
+    await pdf.destroy();
+  }
 }
 
 /** Line-preserving text (newline on EOL or y-change) — keeps table rows apart. */
 export async function extractLinesFromPDF(file: File): Promise<string> {
   const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
   const pages: string[] = [];
+  try {
   for (let i = 1; i <= pdf.numPages; i++) {
-    const content = await (await pdf.getPage(i)).getTextContent();
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    page.cleanup();
     let out = "";
     let lastY: number | null = null;
     for (const item of content.items as any[]) {
