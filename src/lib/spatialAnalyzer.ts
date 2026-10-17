@@ -76,6 +76,7 @@ export async function extractSpatialTextFromDocument(
         pageWidth: viewport.width,
         pageHeight: viewport.height,
       });
+      pageItems++;
     }
   }
 

@@ -214,8 +214,16 @@ export async function generateFieldFromPDF(
   // Open one PDF document and walk it for both text and layout. Previously two
   // simultaneous PDF.js documents doubled peak memory on mobile.
   const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-  const rawSentences = await extractTextFromDocument(pdf);
-  const spatialItems = await extractSpatialTextFromDocument(pdf);
+  let rawSentences: string[];
+  let spatialItems: Awaited<ReturnType<typeof extractSpatialTextFromDocument>>;
+  try {
+    rawSentences = await extractTextFromDocument(pdf);
+    spatialItems = await extractSpatialTextFromDocument(pdf);
+  } finally {
+    // Release the parsed document (fonts, xref tables, page cache) before the
+    // heavy analysis phase — on large books this is tens of MB.
+    await pdf.destroy();
+  }
 
   let spatialGroups = detectSpatialGroups(spatialItems);
   let ocrTextUnits: string[] = [];
