@@ -67,6 +67,9 @@ async function extractTextFromDocument(pdf: Awaited<ReturnType<typeof pdfjsLib.g
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
+    // Free the page's parsed resources immediately — on a 500+ page book the
+    // accumulated text-content cache is what OOMs the tab.
+    page.cleanup();
     const pageText = content.items
       .filter((item: any) => "str" in item)
       .map((item: any) => item.str)

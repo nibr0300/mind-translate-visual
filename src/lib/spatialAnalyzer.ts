@@ -43,10 +43,19 @@ export async function extractSpatialTextFromDocument(
 ): Promise<SpatialTextItem[]> {
   const items: SpatialTextItem[] = [];
 
-  for (let i = 1; i <= pdf.numPages; i++) {
+  // Layout/diagram detection does not need every page of a long book: sample
+  // pages evenly and cap items per page so a 1000-page prose PDF cannot fill
+  // memory with hundreds of thousands of text boxes.
+  const MAX_SPATIAL_PAGES = 200;
+  const MAX_ITEMS_PER_PAGE = 250;
+  const stride = Math.max(1, Math.ceil(pdf.numPages / MAX_SPATIAL_PAGES));
+
+  for (let i = 1; i <= pdf.numPages; i += stride) {
     const page = await pdf.getPage(i);
     const viewport = page.getViewport({ scale: 1.0 });
     const content = await page.getTextContent();
+    page.cleanup();
+    let pageItems = 0;
 
     for (const item of content.items) {
       if (!("str" in item) || !item.str.trim()) continue;
