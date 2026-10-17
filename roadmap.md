@@ -5,6 +5,7 @@
 - [ ] Uppladdning hoppar tillbaka till startläge — blockerad: behöver den exakta filen som fallerar för att återskapa felet.
 
 ## Expansion (efter grunden)
+- [ ] Träningsdata: frågemallar, topologisk kontext, granskning och JSONL-export för SFT/DPO
 - [x] Domänprofiler (General, Poker, Research, Law & policy, Dialogue & therapy) med två egna axlar var
 - [x] A1 domänaxlar med corpus-vikt + A4 fält-API (ingest, field, tensions, project)
 - [x] Kalibrering: domän per dokument, riktiga kvalitetsmått, axelvy, kalibreringstester
