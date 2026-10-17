@@ -8,6 +8,7 @@ import PdfUploader from "./PdfUploader";
 import SearchPanel from "./SearchPanel";
 import AccountPanel from "./AccountPanel";
 import FieldGuide from "./FieldGuide";
+import DatasetExportDialog from "./DatasetExportDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -574,6 +575,7 @@ export default function FieldSidebar({
 
       {/* Export / Import */}
       <div className="p-4 border-t border-border flex gap-2 flex-wrap">
+        <DatasetExportDialog field={field} fileName={uploadedFileName} enabled={useCase === "uploaded"} />
         <button
           onClick={handleExport}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-border font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
