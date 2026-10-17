@@ -253,6 +253,15 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
       )}
 
       {error && <p className="font-mono text-[10px] text-destructive mt-2">{error}</p>}
+      {oversizedFile && (
+        <button
+          type="button"
+          onClick={() => processFile(oversizedFile, true)}
+          className="mt-1 font-mono text-[10px] underline text-primary"
+        >
+          Försök ändå ({(oversizedFile.size / 1024 / 1024).toFixed(1)}MB)
+        </button>
+      )}
 
       <DrivePicker
         open={drivePickerOpen}
