@@ -22,9 +22,11 @@ const ACCEPT =
 
 const MAX_BYTES = 64 * 1024 * 1024; // 64MB cap across types — large books run 20–60MB
 
-/** Mobile browsers (esp. iOS Safari) kill the tab well below the desktop limit. */
+/** Mobile browsers (esp. iOS Safari) kill the tab well below the desktop limit.
+ *  Pages are cleaned up per-page during extraction, so peak memory stays low —
+ *  but very large files can still OOM, hence a soft limit with an override. */
 const IS_MOBILE = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const MOBILE_SOFT_LIMIT = 8 * 1024 * 1024;
+const MOBILE_SOFT_LIMIT = 24 * 1024 * 1024;
 const BREADCRUMB_KEY = "gvtd:ingest-in-progress";
 
 export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
