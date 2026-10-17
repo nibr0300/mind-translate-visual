@@ -58,6 +58,7 @@ export async function extractSpatialTextFromDocument(
     let pageItems = 0;
 
     for (const item of content.items) {
+      if (pageItems >= MAX_ITEMS_PER_PAGE) break;
       if (!("str" in item) || !item.str.trim()) continue;
 
       const typedItem = item as any;
