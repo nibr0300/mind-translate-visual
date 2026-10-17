@@ -64,19 +64,21 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   }, []);
 
   const processFile = useCallback(
-    async (file: File) => {
+    async (file: File, force = false) => {
       if (file.size > MAX_BYTES) {
         setError(`File too large (max ${MAX_BYTES / 1024 / 1024}MB)`);
         return;
       }
-      if (IS_MOBILE && file.size > MOBILE_SOFT_LIMIT) {
+      if (!force && IS_MOBILE && file.size > MOBILE_SOFT_LIMIT) {
+        setOversizedFile(file);
         setError(
-          `${(file.size / 1024 / 1024).toFixed(1)}MB is too large for a mobile browser (limit ~${
+          `${(file.size / 1024 / 1024).toFixed(1)}MB is over the mobile comfort limit (~${
             MOBILE_SOFT_LIMIT / 1024 / 1024
-          }MB) — the tab will crash. Use a desktop browser or a smaller file.`
+          }MB). It often works anyway since pages are cleaned up as they are read — but the tab may reload if memory runs out.`
         );
         return;
       }
+      setOversizedFile(null);
 
       setError(null);
       setIsProcessing(true);
