@@ -10,3 +10,6 @@
 - Domain profiles may carry source classes and lexical axis dictionaries; the lexical layer (src/lib/domainLayer.ts) overrides LLM axis scores. Why: deterministic ground first, LLM only fills gaps.
 - Bug bounty structural extraction lives in src/lib/inputAdapters/securityExtractor.ts and bypasses the prose chunker. Why: endpoints/hosts must stay intact as their own units.
 - Domain profiles may carry a `numericAxes` parser (poker: src/lib/pokerMath.ts) whose hits override dictionary hits; why: numbers are the hardest ground, then words, then the LLM.
+- Domain question templates stay on domain profiles; pure dataset selection and serialization live in `src/lib/datasetExporter.ts`; why: UI-independent, repeatable curation without changing field analysis.
+- Training export uses graph-linked, scored context and requires explicit human approval; training JSONL excludes provenance metadata, which is downloaded separately; why: tension is not truth or preference and training providers have different schemas.
+- Vite deduplicates React and React DOM and pre-optimizes training-dialog UI dependencies; why: late dependency discovery must not mix hook and renderer instances in the live preview.
