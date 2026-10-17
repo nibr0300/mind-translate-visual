@@ -65,6 +65,9 @@ export async function extractLinesFromPDF(file: File): Promise<string> {
     }
     pages.push(out);
   }
+  } finally {
+    await pdf.destroy();
+  }
   return pages.join("\n\n");
 }
 

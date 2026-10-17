@@ -118,6 +118,7 @@ export async function extractOcrUnitsFromPDF(
     }
   } finally {
     await worker.terminate();
+    await pdf.destroy();
   }
 
   return {
