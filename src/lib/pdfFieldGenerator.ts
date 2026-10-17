@@ -36,15 +36,22 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 export async function extractTextFromPDF(file: File): Promise<string[]> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  return extractTextFromDocument(pdf);
+  try {
+    return await extractTextFromDocument(pdf);
+  } finally {
+    await pdf.destroy();
+  }
 }
 
 /** Line-preserving text (newline on EOL or y-change) — keeps table rows apart. */
 export async function extractLinesFromPDF(file: File): Promise<string> {
   const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
   const pages: string[] = [];
+  try {
   for (let i = 1; i <= pdf.numPages; i++) {
-    const content = await (await pdf.getPage(i)).getTextContent();
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    page.cleanup();
     let out = "";
     let lastY: number | null = null;
     for (const item of content.items as any[]) {
@@ -58,6 +65,9 @@ export async function extractLinesFromPDF(file: File): Promise<string> {
     }
     pages.push(out);
   }
+  } finally {
+    await pdf.destroy();
+  }
   return pages.join("\n\n");
 }
 
@@ -67,6 +77,9 @@ async function extractTextFromDocument(pdf: Awaited<ReturnType<typeof pdfjsLib.g
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
+    // Free the page's parsed resources immediately — on a 500+ page book the
+    // accumulated text-content cache is what OOMs the tab.
+    page.cleanup();
     const pageText = content.items
       .filter((item: any) => "str" in item)
       .map((item: any) => item.str)
@@ -211,8 +224,16 @@ export async function generateFieldFromPDF(
   // Open one PDF document and walk it for both text and layout. Previously two
   // simultaneous PDF.js documents doubled peak memory on mobile.
   const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-  const rawSentences = await extractTextFromDocument(pdf);
-  const spatialItems = await extractSpatialTextFromDocument(pdf);
+  let rawSentences: string[];
+  let spatialItems: Awaited<ReturnType<typeof extractSpatialTextFromDocument>>;
+  try {
+    rawSentences = await extractTextFromDocument(pdf);
+    spatialItems = await extractSpatialTextFromDocument(pdf);
+  } finally {
+    // Release the parsed document (fonts, xref tables, page cache) before the
+    // heavy analysis phase — on large books this is tens of MB.
+    await pdf.destroy();
+  }
 
   let spatialGroups = detectSpatialGroups(spatialItems);
   let ocrTextUnits: string[] = [];

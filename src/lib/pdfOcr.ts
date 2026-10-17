@@ -76,6 +76,7 @@ export async function extractOcrUnitsFromPDF(
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const canvas = await renderPageToCanvas(page);
+      page.cleanup();
       const result = await worker.recognize(canvas, {}, { blocks: true });
       const blocks = Array.isArray(result.data.blocks) ? result.data.blocks : [];
 
@@ -117,6 +118,7 @@ export async function extractOcrUnitsFromPDF(
     }
   } finally {
     await worker.terminate();
+    await pdf.destroy();
   }
 
   return {

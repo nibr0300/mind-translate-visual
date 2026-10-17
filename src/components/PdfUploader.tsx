@@ -20,7 +20,7 @@ const ACCEPT =
   ".mp3,.wav,.m4a,.ogg,.flac,.webm," +
   ".zip";
 
-const MAX_BYTES = 50 * 1024 * 1024; // 50MB cap across types
+const MAX_BYTES = 64 * 1024 * 1024; // 64MB cap across types — large books run 20–60MB
 
 /** Mobile browsers (esp. iOS Safari) kill the tab well below the desktop limit. */
 const IS_MOBILE = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
