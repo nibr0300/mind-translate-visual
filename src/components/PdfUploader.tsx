@@ -35,6 +35,7 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
+  const [oversizedFile, setOversizedFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { isAdmin } = useIsAdmin();
   const [domainId, setDomainId] = useState(getActiveDomainId);
