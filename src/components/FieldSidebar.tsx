@@ -180,7 +180,7 @@ export default function FieldSidebar({
     }
   };
   return (
-    <aside className="w-full md:w-80 md:min-w-64 md:max-w-[60vw] md:resize-x md:flex-shrink-0 md:h-full max-h-[70vh] resize-y md:max-h-none bg-card border-b md:border-b-0 md:border-r border-border flex flex-col overflow-y-auto [scrollbar-gutter:stable]" title="Dra i hörnet för att ändra storlek">
+    <aside className="w-full md:w-80 md:min-w-64 md:max-w-[60vw] md:resize-x md:flex-shrink-0 md:h-full max-h-[70vh] resize-y md:max-h-none bg-card border-b md:border-b-0 md:border-r border-border flex flex-col overflow-y-auto [scrollbar-gutter:stable]">
       {/* Header */}
       <div className="p-5 border-b border-border">
         <div className="flex items-center gap-2 mb-1">
