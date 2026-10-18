@@ -360,20 +360,23 @@ export function buildCrossCorpusDpoCandidates(a: GeometricField, b: GeometricFie
     if (!best) continue;
     usedRejected.add(best.p.r);
     const r = best.p.r.u;
-    const causalEdge = s.pairing === "causal" ? causalLinks(c.u, r)[0] : undefined;
+    const causal = s.pairing === "causal";
+    // A curated mechanism edge annotates the pair when both sides happen to
+    // carry tags, but the pairing itself never depends on tags.
+    const causalEdge = causal ? causalLinks(c.u, r)[0] : undefined;
     out.push({
-      id: `${s.pairing ?? "axis"}:cross:${c.f}:${c.u.id}:${best.p.r.f}:${r.id}`, mode: "dpo", prompt: causalEdge ? `Situation: ${r.text.trim()}\n\nVilket nästa beslut är motiverat, och varför? Ange vilka uppgifter som saknas.` : best.p.prompt,
-      answer: causalEdge ? "" : c.u.text.trim(), rejected: r.text.trim(), approved: false, silent_chosen: false,
+      id: `${s.pairing ?? "axis"}:cross:${c.f}:${c.u.id}:${best.p.r.f}:${r.id}`, mode: "dpo", prompt: causal ? `Situation: ${r.text.trim()}\n\nVilket nästa beslut är motiverat, och varför? Ange vilka uppgifter som saknas.` : best.p.prompt,
+      answer: causal ? "" : c.u.text.trim(), rejected: r.text.trim(), approved: false, silent_chosen: false,
       metadata: {
         domain, node_id: c.u.id, context_nodes: [c.u.id], source_paths: [c.u.sourcePath, r.sourcePath].filter(Boolean) as string[],
         domain_axes: c.u.domainAxes ?? {}, dominant_axis: best.p.axis, cti: c.u.cti ?? 0,
         epistemic_certainty: c.u.intention?.epistemicCertainty ?? 0, speech_act: c.u.intention?.speechAct ?? "",
         rejected_node: r.id, rejected_cti: r.cti, edge_similarity: best.sim,
-        ...(causalEdge ? { ...mechanismsForUnit(c.u), causal_edge: causalEdge, anchor_text: c.u.text.trim(), anchor_field: c.f,
+        ...(causal ? { ...mechanismsForUnit(c.u), causal_pair: true as const, ...(causalEdge ? { causal_edge: causalEdge } : {}), anchor_text: c.u.text.trim(), anchor_field: c.f,
           rejected_field: best.p.r.f, anchor_domain: (c.f === "A" ? a : b).domain ?? "general", rejected_domain: (best.p.r.f === "A" ? a : b).domain ?? "general",
           bridge_validated: false, bridge_reason: "", style_reviewed: false, silent_chosen: false, style_variant: "explicit_analytical" as const } : {}),
       },
-      match: { axis: best.p.axis, level: best.p.level, semantic: best.sim, chosenAct: "assertive", rejectedAct: r.intention?.speechAct ?? "", promptMatch: !causalEdge, chosenField: c.f, causalEdge },
+      match: { axis: best.p.axis, level: best.p.level, semantic: best.sim, chosenAct: "assertive", rejectedAct: r.intention?.speechAct ?? "", promptMatch: !causal, chosenField: c.f, causalEdge },
     });
   }
   return out;
