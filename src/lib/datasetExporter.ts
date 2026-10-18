@@ -43,6 +43,8 @@ export interface DatasetCandidate {
     mechanisms?: string[];
     primaryMechanism?: string;
     causal_edge?: MechanismEdge;
+    /** Causal cross-corpus pair: always requires bridge validation, even without a curated edge. */
+    causal_pair?: boolean;
     anchor_text?: string;
     anchor_field?: "A" | "B";
     rejected_field?: "A" | "B";
@@ -156,7 +158,7 @@ export function buildDatasetCandidates(field: GeometricField, settings: DatasetS
 export function canApproveCandidate(c: DatasetCandidate): boolean {
   return Boolean(c.prompt.trim() && c.answer.trim()
     && (c.mode !== "dpo" || (c.rejected?.trim() && c.rejected.trim() !== c.answer.trim()))
-    && (!c.metadata.causal_edge || (c.metadata.bridge_validated && c.metadata.bridge_reason?.trim() && c.metadata.style_reviewed))
+    && (!c.metadata.causal_pair || (c.metadata.bridge_validated && c.metadata.bridge_reason?.trim() && c.metadata.style_reviewed))
     && (!c.silent_chosen || !containsMechanismJargon(c.answer)));
 }
 export function serializeDataset(candidates: DatasetCandidate[], system: string): string {
