@@ -347,22 +347,27 @@ export function buildCrossCorpusDpoCandidates(a: GeometricField, b: GeometricFie
     for (const p of options) {
       if (usedRejected.has(p.r)) continue;
       const value = sim?.(c, p.r);
-      if (value == null || value < s.similarity) continue;
-      if (!best || value > best.sim || (value === best.sim && p.r.u.id < best.p.r.u.id)) best = { p, sim: value };
+      if (s.pairing !== "causal" && (value == null || value < s.similarity)) continue;
+      const rank = value ?? 0;
+      if (!best || rank > best.sim || (rank === best.sim && p.r.u.id < best.p.r.u.id)) best = { p, sim: rank };
     }
     if (!best) continue;
     usedRejected.add(best.p.r);
     const r = best.p.r.u;
+    const causalEdge = s.pairing === "causal" ? causalLinks(c.u, r)[0] : undefined;
     out.push({
-      id: `cross:${c.f}:${c.u.id}:${best.p.r.f}:${r.id}`, mode: "dpo", prompt: best.p.prompt,
-      answer: c.u.text.trim(), rejected: r.text.trim(), approved: false,
+      id: `${s.pairing ?? "axis"}:cross:${c.f}:${c.u.id}:${best.p.r.f}:${r.id}`, mode: "dpo", prompt: causalEdge ? `Situation: ${r.text.trim()}\n\nVilket nästa beslut är motiverat, och varför? Ange vilka uppgifter som saknas.` : best.p.prompt,
+      answer: causalEdge ? "" : c.u.text.trim(), rejected: r.text.trim(), approved: false, silent_chosen: false,
       metadata: {
         domain, node_id: c.u.id, context_nodes: [c.u.id], source_paths: [c.u.sourcePath, r.sourcePath].filter(Boolean) as string[],
         domain_axes: c.u.domainAxes ?? {}, dominant_axis: best.p.axis, cti: c.u.cti ?? 0,
         epistemic_certainty: c.u.intention?.epistemicCertainty ?? 0, speech_act: c.u.intention?.speechAct ?? "",
         rejected_node: r.id, rejected_cti: r.cti, edge_similarity: best.sim,
+        ...(causalEdge ? { ...mechanismsForUnit(c.u), causal_edge: causalEdge, anchor_text: c.u.text.trim(), anchor_field: c.f,
+          rejected_field: best.p.r.f, anchor_domain: (c.f === "A" ? a : b).domain ?? "general", rejected_domain: (best.p.r.f === "A" ? a : b).domain ?? "general",
+          bridge_validated: false, bridge_reason: "", style_reviewed: false, silent_chosen: false, style_variant: "explicit_analytical" as const } : {}),
       },
-      match: { axis: best.p.axis, level: best.p.level, semantic: best.sim, chosenAct: "assertive", rejectedAct: r.intention?.speechAct ?? "", promptMatch: true, chosenField: c.f },
+      match: { axis: best.p.axis, level: best.p.level, semantic: best.sim, chosenAct: "assertive", rejectedAct: r.intention?.speechAct ?? "", promptMatch: !causalEdge, chosenField: c.f, causalEdge },
     });
   }
   return out;
