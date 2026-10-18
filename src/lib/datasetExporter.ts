@@ -211,6 +211,40 @@ export function cosine(a: Map<string, number>, b: Map<string, number>): number {
  * Four-step pairing across two saved fields:
  * 1 shared axis, 2 text similarity, 3 diverging intention, 4 same template level (identical prompt).
  */
+export interface CrossCorpusFunnel {
+  chosen: number;
+  rejected: number;
+  chosenWithQuestion: number;
+  sameAxisLevel: number;
+  enoughCtiGap: number;
+  bestSimilarity: number;
+}
+
+/** Counts how many nodes/pairs survive each cross-corpus step, so an empty
+ *  result can say which check removed everything. Same rules as the builder. */
+export function crossCorpusFunnel(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS): CrossCorpusFunnel {
+  const domain = a.domain ?? b.domain ?? "general";
+  const all = [...a.units.map(u => ({ u, f: "A" as const })), ...b.units.map(u => ({ u, f: "B" as const }))].filter(x => validUnit(x.u));
+  const chosen = all.filter(x => x.u.intention?.speechAct === "assertive" && (x.u.cti ?? 1) <= s.chosenMaxCti
+    && (x.u.intention?.epistemicCertainty ?? 0) >= s.chosenCertainty);
+  const rejected = all.filter(x => ["directive", "expressive"].includes(x.u.intention?.speechAct ?? "") && (x.u.cti ?? 0) >= s.rejectedMinCti);
+  const withQ = chosen.flatMap(c => { const q = questionForUnit(c.u, domain); const level = q && axisLevel(c.u, q.axis, domain); return q && level ? [{ c, axis: q.axis, level }] : []; });
+  const pairs: Array<[typeof all[number], typeof all[number]]> = [];
+  let sameAxisLevel = 0;
+  for (const { c, axis, level } of withQ) for (const r of rejected) {
+    if (r.f === c.f || axisLevel(r.u, axis, domain) !== level || r.u.text.trim() === c.u.text.trim()) continue;
+    sameAxisLevel++;
+    if ((r.u.cti ?? 0) - (c.u.cti ?? 0) >= s.deltaCti) pairs.push([c, r]);
+  }
+  let bestSimilarity = 0;
+  if (pairs.length) {
+    const vecs = buildTfIdf(all.map(x => x.u.text));
+    const at = new Map(all.map((x, i) => [x.u.text, i]));
+    for (const [c, r] of pairs) bestSimilarity = Math.max(bestSimilarity, cosine(vecs[at.get(c.u.text)!], vecs[at.get(r.u.text)!]));
+  }
+  return { chosen: chosen.length, rejected: rejected.length, chosenWithQuestion: withQ.length, sameAxisLevel, enoughCtiGap: pairs.length, bestSimilarity };
+}
+
 export function buildCrossCorpusDpoCandidates(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS): Array<DatasetCandidate & { match: CrossMatch }> {
   const domain = a.domain ?? b.domain ?? "general";
   const all = [...a.units.map(u => ({ u, f: "A" as const })), ...b.units.map(u => ({ u, f: "B" as const }))].filter(x => validUnit(x.u));

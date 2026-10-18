@@ -43,12 +43,15 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
   const candidates: Array<DatasetCandidate & { match?: CrossMatch }> = useMemo(() => cross
     ? (fieldB ? buildCrossCorpusDpoCandidates(field, fieldB.field, crossSettings) : [])
     : buildDatasetCandidates(field, settings, fileName ?? ""), [field, settings, fileName, cross, fieldB, crossSettings]);
+  const funnel = useMemo(() => cross && fieldB && candidates.length === 0 ? crossCorpusFunnel(field, fieldB.field, crossSettings) : null,
+    [cross, fieldB, candidates.length, field, crossSettings]);
   const changeCross = (next: CrossCorpusSettings) => { setCrossSettings(next); setEdits({}); setIndex(0); };
   const loadFieldB = (file?: File) => {
     if (!file) return;
     file.text().then(t => {
       const parsed = parseFieldImport(t);
       setFieldB({ field: parsed, name: file.name }); setEdits({}); setIndex(0);
+      toast.success(`Fält B inläst: ${parsed.units.length} noder`);
     }).catch(() => toast.error("Filen är inte ett sparat fält (.json)"));
   };
   const rows = candidates.map(c => ({ ...c, ...(edits[c.id] ?? {}) }) as DatasetCandidate & { match?: CrossMatch });
@@ -94,8 +97,10 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
       <div className="space-y-5">
         {cross ? <>
           <label className="block text-xs space-y-2"><span>Fält B (sparad .json)</span>
-            <input type="file" accept=".json,application/json" aria-label="Fält B" className="block w-full text-xs" onChange={e => { loadFieldB(e.target.files?.[0]); e.target.value = ""; }} /></label>
-          <p className="text-[11px] font-mono text-muted-foreground break-words">A: {fileName ?? "aktuellt fält"}<br />B: {fieldB?.name ?? "—"}</p>
+            <input type="file" accept=".json,application/json" aria-label="Fält B" className="sr-only" onChange={e => { loadFieldB(e.target.files?.[0]); e.target.value = ""; }} />
+            <span className="flex h-9 w-full items-center justify-center rounded-md border border-border text-xs font-mono cursor-pointer hover:border-primary/40">{fieldB ? "Byt fält B…" : "Välj fält B…"}</span></label>
+          <p className="text-[11px] font-mono text-muted-foreground break-words">A: {fileName ?? "aktuellt fält"} · {field.units.length} noder<br />
+            B: {fieldB ? <span className="text-primary">✓ {fieldB.name} · {fieldB.field.units.length} noder</span> : "ej vald"}</p>
           <Threshold label="Textlikhet minst" value={crossSettings.similarity} onChange={v => changeCross({ ...crossSettings, similarity: v })} />
           <Threshold label="Föredraget: CTI högst" value={crossSettings.chosenMaxCti} onChange={v => changeCross({ ...crossSettings, chosenMaxCti: v })} />
           <Threshold label="Föredraget: säkerhet minst" value={crossSettings.chosenCertainty} onChange={v => changeCross({ ...crossSettings, chosenCertainty: v })} />
@@ -124,7 +129,15 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
           {cross && !fieldB ? "Ladda ett andra sparat fält för att para noder mellan korpusarna. " : ""}{settings.mode === "dpo" ? "Preferenser är ännu inte märkta. Hög CTI är inte ett felaktigt svar." : "Urvalet är inte faktagranskat. Kontrollera att svaret verkligen besvarar frågan."}
         </div>
         {!profile.questionTemplates && <p className="text-sm text-muted-foreground">Frågemallar saknas för {profile.label}. Poker är den första profilen med mallar.</p>}
-        {!current ? <p role="status" className="py-10 text-sm text-muted-foreground">Inga kandidater matchar urvalet i detta fält.</p> : <>
+        {!current && cross && funnel ? <div role="status" className="py-4 space-y-2 text-xs font-mono text-muted-foreground">
+          <p className="text-sm font-sans text-foreground">Inga par klarade alla fyra kontrollerna. Så här många gick vidare i varje steg:</p>
+          <p>Föredragna svar (påstående, låg CTI, hög säkerhet): <span className="text-primary">{funnel.chosen}</span></p>
+          <p>Avvisade svar (uppmaning/känsla, hög CTI): <span className="text-primary">{funnel.rejected}</span></p>
+          <p>Föredragna med en frågemall (axel): <span className="text-primary">{funnel.chosenWithQuestion}</span></p>
+          <p>Par på samma axel och nivå: <span className="text-primary">{funnel.sameAxisLevel}</span></p>
+          <p>…med tillräcklig CTI-skillnad: <span className="text-primary">{funnel.enoughCtiGap}</span></p>
+          <p>Högsta textlikhet bland dem: <span className="text-primary">{funnel.bestSimilarity.toFixed(2)}</span> (krav {crossSettings.similarity.toFixed(2)})</p>
+        </div> : !current ? <p role="status" className="py-10 text-sm text-muted-foreground">Inga kandidater matchar urvalet i detta fält.</p> : <>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono">{currentIndex + 1} / {rows.length} · {current.metadata.node_id}</span>
             <div className="flex gap-1">
