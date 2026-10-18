@@ -186,6 +186,13 @@ export const CROSS_CORPUS_DEFAULTS: CrossCorpusSettings = {
 /** Starting threshold for AI meaning similarity (unrelated poker texts score ~0.70, same idea ~0.90). */
 export const MEANING_SIMILARITY_DEFAULT = 0.8;
 
+/**
+ * Lower default for causal cross-domain pairing: structural analogies across
+ * domains share few surface words, so symptom↔mechanism pairs typically score
+ * 0.55–0.65. Pairing is topological (intention + CTI gap) plus meaning, never lexical.
+ */
+export const CAUSAL_MEANING_SIMILARITY_DEFAULT = 0.6;
+
 export interface CrossMatch {
   axis: string;
   level: "high" | "medium";

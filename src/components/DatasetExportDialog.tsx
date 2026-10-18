@@ -3,7 +3,7 @@ import { fieldKey, loadTrainingSession, saveTrainingSession, type StoredTraining
 import { ArrowLeft, ArrowRight, Check, Download, FileJson, RotateCcw } from "lucide-react";
 import type { GeometricField } from "@/lib/fieldData";
 import { getDomainProfile } from "@/lib/domainProfiles";
-import { buildCrossCorpusDpoCandidates, crossCorpusFunnel, buildDatasetCandidates, CROSS_CORPUS_DEFAULTS, MEANING_SIMILARITY_DEFAULT, DATASET_PRESETS, canApproveCandidate, serializeDataset, type CrossCorpusSettings, type CrossMatch, type DatasetCandidate, type DatasetSettings } from "@/lib/datasetExporter";
+import { buildCrossCorpusDpoCandidates, crossCorpusFunnel, buildDatasetCandidates, CROSS_CORPUS_DEFAULTS, MEANING_SIMILARITY_DEFAULT, CAUSAL_MEANING_SIMILARITY_DEFAULT, DATASET_PRESETS, canApproveCandidate, serializeDataset, type CrossCorpusSettings, type CrossMatch, type DatasetCandidate, type DatasetSettings } from "@/lib/datasetExporter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -41,7 +41,9 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
   const [rights, setRights] = useState(false);
   const [cross, setCross] = useState(initial?.cross ?? false);
   const [fieldB, setFieldB] = useState<{ field: GeometricField; name: string } | null>(initial?.fieldB ?? null);
-  const [crossSettings, setCrossSettings] = useState<CrossCorpusSettings>({ ...CROSS_CORPUS_DEFAULTS, similarity: MEANING_SIMILARITY_DEFAULT, ...(initial?.crossSettings ?? {}) });
+  const [crossSettings, setCrossSettings] = useState<CrossCorpusSettings>({ ...CROSS_CORPUS_DEFAULTS,
+    similarity: (initial?.crossSettings?.pairing ?? "axis") === "causal" ? CAUSAL_MEANING_SIMILARITY_DEFAULT : MEANING_SIMILARITY_DEFAULT,
+    ...(initial?.crossSettings ?? {}) });
   const causal = cross && crossSettings.pairing === "causal";
   const meaning = useMeaningScores(field, fieldB?.field ?? null, crossSettings, cross);
   const candidates: Array<DatasetCandidate & { match?: CrossMatch }> = useMemo(() => cross
@@ -118,7 +120,7 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
     <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
       <div className="space-y-5">
         {cross ? <>
-          <Select value={crossSettings.pairing ?? "axis"} onValueChange={v => changeCross({ ...crossSettings, pairing: v === "causal" ? "causal" : "axis" })}>
+          <Select value={crossSettings.pairing ?? "axis"} onValueChange={v => changeCross({ ...crossSettings, pairing: v === "causal" ? "causal" : "axis", similarity: v === "causal" ? CAUSAL_MEANING_SIMILARITY_DEFAULT : MEANING_SIMILARITY_DEFAULT })}>
             <SelectTrigger aria-label="Parningsmetod"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="axis">Domänaxel + mening</SelectItem><SelectItem value="causal">Kausal mekanism · tvärdomän</SelectItem></SelectContent>
           </Select>
