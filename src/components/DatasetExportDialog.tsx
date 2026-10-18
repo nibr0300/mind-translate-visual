@@ -122,15 +122,15 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
             <SelectTrigger aria-label="Parningsmetod"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="axis">Domänaxel + mening</SelectItem><SelectItem value="causal">Kausal mekanism · tvärdomän</SelectItem></SelectContent>
           </Select>
-          <Button asChild variant="outline" size="sm"><a href="/fixtures/trading_tilt_transfer.json" download><Download />Trading · testfält</a></Button>
+          <Button variant="outline" size="sm" onClick={loadFixtureB}><Download />Läs in Trading · testfält som fält B</Button>
           <p className="text-[11px] text-muted-foreground">Trading-testfältet är syntetiskt och har manuella analysvärden. Håll det utanför träningen för ett osedd-data-test.</p>
           <label className="block text-xs space-y-2"><span>Fält B (sparad .json)</span>
             <input type="file" accept=".json,application/json" aria-label="Fält B" className="sr-only" onChange={e => { loadFieldB(e.target.files?.[0]); e.target.value = ""; }} />
             <span className="flex h-9 w-full items-center justify-center rounded-md border border-border text-xs font-mono cursor-pointer hover:border-primary/40">{fieldB ? "Byt fält B…" : "Välj fält B…"}</span></label>
           <p className="text-[11px] font-mono text-muted-foreground break-words">A: {fileName ?? "aktuellt fält"} · {field.units.length} noder<br />
             B: {fieldB ? <span className="text-primary">✓ {fieldB.name} · {fieldB.field.units.length} noder</span> : "ej vald"}</p>
-          {!causal && <Threshold label="Meningslikhet minst (AI)" value={crossSettings.similarity} onChange={v => changeCross({ ...crossSettings, similarity: v })} />}
-          {!causal && fieldB && <p className="text-[11px] font-mono text-muted-foreground" aria-live="polite">
+          <Threshold label="Meningslikhet minst (AI)" value={crossSettings.similarity} onChange={v => changeCross({ ...crossSettings, similarity: v })} />
+          {fieldB && <p className="text-[11px] font-mono text-muted-foreground" aria-live="polite">
             {meaning.status === "loading" ? "Jämför betydelse med AI…" : meaning.status === "error" ? <span className="text-destructive">{meaning.error} <Button variant="ghost" size="sm" onClick={meaning.retry}>Försök igen</Button></span> : meaning.status === "ready" ? `Betydelse jämförd för ${meaning.scores.size} par.` : ""}
             {meaning.skipped > 0 && ` ${meaning.skipped} par över gränsen jämfördes inte – skärp reglagen nedan.`}</p>}
           <Threshold label="Föredraget: CTI högst" value={crossSettings.chosenMaxCti} onChange={v => changeCross({ ...crossSettings, chosenMaxCti: v })} />
