@@ -166,9 +166,9 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
           <p>Föredragna svar (påstående, låg CTI, hög säkerhet): <span className="text-primary">{funnel.chosen}</span></p>
           <p>Avvisade svar (uppmaning/känsla, hög CTI): <span className="text-primary">{funnel.rejected}</span></p>
           <p>Föredragna med en frågemall: <span className="text-primary">{funnel.chosenWithQuestion}</span></p>
-          <p>{causal ? "Par med en riktad mekanismlänk:" : "Par på samma axel och nivå:"} <span className="text-primary">{funnel.sameAxisLevel}</span></p>
+          <p>{causal ? "Par kvar efter intentionskrav:" : "Par på samma axel och nivå:"} <span className="text-primary">{funnel.sameAxisLevel}</span></p>
           <p>…med tillräcklig CTI-skillnad: <span className="text-primary">{funnel.enoughCtiGap}</span></p>
-          {!causal && <p>Högsta meningslikhet bland dem: <span className="text-primary">{funnel.bestSimilarity.toFixed(2)}</span> (krav {crossSettings.similarity.toFixed(2)})</p>}
+          <p>Högsta meningslikhet bland dem: <span className="text-primary">{funnel.bestSimilarity.toFixed(2)}</span> (krav {crossSettings.similarity.toFixed(2)})</p>
         </div> : !current ? <p role="status" className="py-10 text-sm text-muted-foreground">Inga kandidater matchar urvalet i detta fält.</p> : <>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono">{currentIndex + 1} / {rows.length} · {current.metadata.node_id}</span>
@@ -179,13 +179,13 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
           </div>
           {current.match && <p className="flex flex-wrap gap-1 font-mono text-[11px]" aria-label="Matchningspoäng">
             <span className="border border-border px-1.5 py-0.5">{causal ? "Mekanism" : "Axel"}: {current.match.axis} · {current.match.level}</span>
-            {!causal && <span className="border border-border px-1.5 py-0.5">Mening: {current.match.semantic.toFixed(2)} ✓</span>}
+            <span className="border border-border px-1.5 py-0.5">Mening: {current.match.semantic.toFixed(2)} ✓</span>
             <span className="border border-border px-1.5 py-0.5">Intention: {current.match.chosenAct} → {current.match.rejectedAct} ✓</span>
             <span className="border border-border px-1.5 py-0.5">{causal ? "Situation från friktionsnoden" : "Prompt: samma mall ✓"}</span>
             <span className="border border-border px-1.5 py-0.5">{causal ? "Ankare" : "Föredraget"} från fält {current.match.chosenField}</span>
           </p>}
-          {current.metadata.causal_edge && <section className="space-y-3 border-l-2 border-primary pl-3 text-xs">
-            <p className="font-mono break-words">{current.metadata.causal_edge.source} → {current.metadata.causal_edge.relation} → {current.metadata.causal_edge.target}</p>
+          {current.metadata.causal_pair && <section className="space-y-3 border-l-2 border-primary pl-3 text-xs">
+            {current.metadata.causal_edge && <p className="font-mono break-words">{current.metadata.causal_edge.source} → {current.metadata.causal_edge.relation} → {current.metadata.causal_edge.target}</p>}
             <p className="text-field-fz">Föreslagen länk, inte bevisad orsak. Ankaret är underlag, inte ett färdigt svar.</p>
             <p className="text-muted-foreground break-words">Ankare · {current.metadata.anchor_domain}: {current.metadata.anchor_text}</p>
             <p className="text-muted-foreground">Situation · {current.metadata.rejected_domain}</p>
