@@ -180,7 +180,7 @@ export default function FieldSidebar({
     }
   };
   return (
-    <aside className="w-full md:w-80 md:flex-shrink-0 md:h-full max-h-[50vh] md:max-h-none bg-card border-b md:border-b-0 md:border-r border-border flex flex-col overflow-y-auto md:overflow-hidden">
+    <aside className="w-full md:w-80 md:min-w-64 md:max-w-[60vw] md:resize-x md:flex-shrink-0 md:h-full max-h-[70vh] resize-y md:max-h-none bg-card border-b md:border-b-0 md:border-r border-border flex flex-col overflow-y-auto [scrollbar-gutter:stable]" title="Dra i hörnet för att ändra storlek">
       {/* Header */}
       <div className="p-5 border-b border-border">
         <div className="flex items-center gap-2 mb-1">
@@ -518,7 +518,7 @@ export default function FieldSidebar({
       })()}
 
       {/* Clusters */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="shrink-0 p-4">
         <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-3">
           Eigenstates (Clusters)
         </label>
