@@ -1,7 +1,7 @@
 # Roadmap
 
 ## Grunden (först)
-- [ ] JSON-import av pokerboken: begränsa kartans grafik och verifiera import + öppning av Cross-Corpus DPO med riktiga fält.
+- [x] JSON-import av pokerboken: begränsad kartgrafik, 35 tester godkända; riktig 600-nodersbok importerad, zoom och Cross-Corpus DPO med akademiskt fält verifierade i mobilstorlek (0 par vid starttrösklar). Fysisk mobil återstår att bekräfta.
 - [x] Djup AI-spänning (llmTension/CTI) blev alltid 0 — analysen avbröts innan den hann klart. Åtgärdat + synlig varning vid låg täckning.
 - [ ] Uppladdning hoppar tillbaka till startläge — blockerad: behöver den exakta filen som fallerar för att återskapa felet.
 
