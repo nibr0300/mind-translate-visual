@@ -43,7 +43,7 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
   const [fieldB, setFieldB] = useState<{ field: GeometricField; name: string } | null>(initial?.fieldB ?? null);
   const [crossSettings, setCrossSettings] = useState<CrossCorpusSettings>({ ...CROSS_CORPUS_DEFAULTS, similarity: MEANING_SIMILARITY_DEFAULT, ...(initial?.crossSettings ?? {}) });
   const causal = cross && crossSettings.pairing === "causal";
-  const meaning = useMeaningScores(field, fieldB?.field ?? null, crossSettings, cross && !causal);
+  const meaning = useMeaningScores(field, fieldB?.field ?? null, crossSettings, cross);
   const candidates: Array<DatasetCandidate & { match?: CrossMatch }> = useMemo(() => cross
     ? (fieldB ? buildCrossCorpusDpoCandidates(field, fieldB.field, crossSettings, meaning.scores) : [])
     : buildDatasetCandidates(field, settings, fileName ?? ""), [field, settings, fileName, cross, fieldB, crossSettings, meaning.scores]);
@@ -60,6 +60,18 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
       setFieldB(next); setEdits({}); setIndex(0);
       toast.success(`Fält B inläst: ${parsed.units.length} noder`);
     }).catch(() => toast.error("Filen är inte ett sparat fält (.json)"));
+  };
+  const loadFixtureB = () => {
+    fetch("/fixtures/trading_tilt_transfer.json").then(r => {
+      if (!r.ok) throw new Error(String(r.status));
+      return r.text();
+    }).then(t => {
+      const parsed = { ...parseFieldImport(t), edges: [] };
+      const next = { field: parsed, name: "Trading · testfält" };
+      onPersist({ fieldB: next, cross: true, open: true });
+      setFieldB(next); setEdits({}); setIndex(0);
+      toast.success(`Fält B inläst: ${parsed.units.length} noder`);
+    }).catch(() => toast.error("Kunde inte läsa testfältet"));
   };
   const rows = candidates.map(c => ({ ...c, ...(edits[c.id] ?? {}) }) as DatasetCandidate & { match?: CrossMatch });
   const currentIndex = Math.min(index, Math.max(0, rows.length - 1));
