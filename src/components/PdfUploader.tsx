@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { generateFieldFromFile } from "@/lib/fieldGenerator";
 import type { GeometricField } from "@/lib/fieldData";
+import { parseFieldImport, looksLikeSavedField } from "@/lib/fieldImport";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import DrivePicker from "./DrivePicker";
 import {
@@ -79,6 +80,23 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
         return;
       }
       setOversizedFile(null);
+
+      // A saved field export is already analysed: open it as-is instead of
+      // chunking its JSON as prose (thousands of chunks → mobile tab crash).
+      if (/\.json$/i.test(file.name)) {
+        let text: string | null = null;
+        try { text = await file.text(); } catch { /* fall through to normal ingest */ }
+        if (text && looksLikeSavedField(text)) {
+          try {
+            onFieldGenerated(parseFieldImport(text), file.name.replace(/\.json$/i, ""));
+            setError(null);
+          } catch {
+            setError("Filen ser ut som ett sparat fält men är skadad eller ofullständig. Det öppna fältet behålls.");
+          }
+          return;
+        }
+      }
+
 
       setError(null);
       setIsProcessing(true);
