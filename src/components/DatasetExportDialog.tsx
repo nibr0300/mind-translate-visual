@@ -92,7 +92,7 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
       <DialogDescription>{profile.label} · {field.units.length} noder · {analyzed} med djupanalys</DialogDescription>
     </DialogHeader>
     <div className="flex flex-wrap items-center gap-2 border-b border-border pb-4">
-      <Select value={cross ? "cross" : settings.mode} onValueChange={value => { setCross(value === "cross"); changeSettings({ ...settings, mode: value === "sft" ? "sft" : "dpo" }); }}>
+      <Select value={cross ? "cross" : settings.mode} onValueChange={value => { setCross(value === "cross"); onPersist({ cross: value === "cross" }); changeSettings({ ...settings, mode: value === "sft" ? "sft" : "dpo" }); }}>
         <SelectTrigger aria-label="Exporttyp" className="w-48"><SelectValue /></SelectTrigger>
         <SelectContent><SelectItem value="sft">SFT · Fråga och svar</SelectItem><SelectItem value="dpo">DPO · Preferenspar</SelectItem><SelectItem value="cross">DPO · Mellan två fält</SelectItem></SelectContent>
       </Select>
