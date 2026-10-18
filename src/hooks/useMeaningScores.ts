@@ -26,24 +26,27 @@ export function useMeaningScores(a: GeometricField, b: GeometricField | null, se
     if (!enabled || !b || blocked.current) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
-      const { texts, pairs, keys, skipped: over } = crossCorpusPairsToScore(a, b, settings, new Set(cache.current.keys()));
-      setSkipped(over);
-      if (!pairs.length) { setStatus("ready"); return; }
       setStatus("loading"); setError(null);
-      const { data, error: fnError } = await supabase.functions.invoke("pair-similarity", { body: { texts, pairs } });
-      if (cancelled) return;
-      if (fnError || !Array.isArray(data?.scores)) {
-        let message = "Meningsjämförelsen misslyckades.";
-        try {
-          const body = await (fnError as { context?: Response })?.context?.json?.();
-          if (body?.error) message = body.code === "credits" ? `AI-krediterna är slut: ${body.error}` : body.error;
-        } catch { /* keep generic message */ }
-        blocked.current = true;
-        setError(message); setStatus("error");
-        return;
+      for (let round = 0; round < 40; round++) {
+        const { texts, pairs, keys, skipped: over } = crossCorpusPairsToScore(a, b, settings, new Set(cache.current.keys()));
+        setSkipped(over);
+        if (!pairs.length) break;
+        const { data, error: fnError } = await supabase.functions.invoke("pair-similarity", { body: { texts, pairs } });
+        if (cancelled) return;
+        if (fnError || !Array.isArray(data?.scores)) {
+          let message = "Meningsjämförelsen misslyckades.";
+          try {
+            const body = await (fnError as { context?: Response })?.context?.json?.();
+            if (body?.error) message = body.code === "credits" ? `AI-krediterna är slut: ${body.error}` : body.error;
+          } catch { /* keep generic message */ }
+          blocked.current = true;
+          setError(message); setStatus("error");
+          return;
+        }
+        data.scores.forEach((score: number, i: number) => cache.current.set(keys[i], score));
+        setScores(new Map(cache.current));
+        if (!over) break;
       }
-      data.scores.forEach((score: number, i: number) => cache.current.set(keys[i], score));
-      setScores(new Map(cache.current));
       setStatus("ready");
     }, 700);
     return () => { cancelled = true; window.clearTimeout(timer); };

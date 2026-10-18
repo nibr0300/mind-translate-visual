@@ -299,7 +299,9 @@ function pairSimilarity(pool: PairPool, meaning?: Map<string, number>): (c: Tagg
 }
 
 /** Pairs that still need a meaning score for the current settings, as unique texts plus index pairs. */
-export function crossCorpusPairsToScore(a: GeometricField, b: GeometricField, s: CrossCorpusSettings, known: ReadonlySet<string>, cap = 400) {
+export const MEANING_MAX_PAIRS = 5_000;
+/** One request's worth of unscored pairs within server limits; `skipped` = pairs left for later requests. */
+export function crossCorpusPairsToScore(a: GeometricField, b: GeometricField, s: CrossCorpusSettings, known: ReadonlySet<string>, cap = 400, pairCap = MEANING_MAX_PAIRS) {
   const texts: string[] = [];
   const at = new Map<string, number>();
   const pairs: Array<[number, number]> = [];
@@ -316,6 +318,7 @@ export function crossCorpusPairsToScore(a: GeometricField, b: GeometricField, s:
   for (const { c, r } of crossCorpusPairPool(a, b, s).pairs) {
     const key = pairKey(c.u.text, r.u.text);
     if (known.has(key) || queued.has(key)) continue;
+    if (pairs.length >= pairCap) { skipped++; continue; }
     const i = index(c.u.text), j = index(r.u.text);
     if (i < 0 || j < 0) { skipped++; continue; }
     pairs.push([i, j]); keys.push(key); queued.add(key);
