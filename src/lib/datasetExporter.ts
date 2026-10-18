@@ -207,10 +207,68 @@ export function cosine(a: Map<string, number>, b: Map<string, number>): number {
   return Math.round(dot * 1000) / 1000;
 }
 
-/**
- * Four-step pairing across two saved fields:
- * 1 shared axis, 2 text similarity, 3 diverging intention, 4 same template level (identical prompt).
- */
+/** Dense cosine for meaning vectors (embeddings). */
+export function denseCosine(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < Math.min(a.length, b.length); i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  return na && nb ? Math.round((dot / Math.sqrt(na * nb)) * 1000) / 1000 : 0;
+}
+
+type Tagged = { u: FieldUnit; f: "A" | "B" };
+interface PairPool {
+  domain: string;
+  all: Tagged[];
+  chosen: number;
+  rejected: number;
+  chosenWithQuestion: number;
+  sameAxisLevel: number;
+  /** Pairs that pass axis, level (prompt symmetry), intention and CTI gap; similarity still unchecked. */
+  pairs: Array<{ c: Tagged; r: Tagged; axis: string; level: "high" | "medium"; prompt: string }>;
+}
+
+/** Steps 1, 3 and 4 of cross-corpus pairing — everything except similarity. */
+function crossCorpusPairPool(a: GeometricField, b: GeometricField, s: CrossCorpusSettings): PairPool {
+  const domain = a.domain ?? b.domain ?? "general";
+  const all: Tagged[] = [...a.units.map(u => ({ u, f: "A" as const })), ...b.units.map(u => ({ u, f: "B" as const }))].filter(x => validUnit(x.u));
+  const chosen = all.filter(x => x.u.intention?.speechAct === "assertive" && (x.u.cti ?? 1) <= s.chosenMaxCti
+    && (x.u.intention?.epistemicCertainty ?? 0) >= s.chosenCertainty);
+  const rejected = all.filter(x => ["directive", "expressive"].includes(x.u.intention?.speechAct ?? "") && (x.u.cti ?? 0) >= s.rejectedMinCti);
+  const withQ = chosen.flatMap(c => {
+    const q = questionForUnit(c.u, domain);
+    const level = q && axisLevel(c.u, q.axis, domain);
+    return q && level ? [{ c, axis: q.axis, level, prompt: q.prompt }] : [];
+  });
+  const pairs: PairPool["pairs"] = [];
+  let sameAxisLevel = 0;
+  for (const { c, axis, level, prompt } of withQ) for (const r of rejected) {
+    if (r.f === c.f || axisLevel(r.u, axis, domain) !== level || r.u.text.trim() === c.u.text.trim()) continue;
+    sameAxisLevel++;
+    if ((r.u.cti ?? 0) - (c.u.cti ?? 0) >= s.deltaCti) pairs.push({ c, r, axis, level, prompt });
+  }
+  return { domain, all, chosen: chosen.length, rejected: rejected.length, chosenWithQuestion: withQ.length, sameAxisLevel, pairs };
+}
+
+/** Similarity per pair: meaning vectors when given (keyed by trimmed text), else word-overlap TF-IDF. */
+function pairSimilarity(pool: PairPool, meaning?: Map<string, number[]>): (c: Tagged, r: Tagged) => number | null {
+  if (meaning) return (c, r) => {
+    const va = meaning.get(c.u.text.trim()), vb = meaning.get(r.u.text.trim());
+    return va && vb ? denseCosine(va, vb) : null;
+  };
+  const vecs = buildTfIdf(pool.all.map(x => x.u.text));
+  const at = new Map(pool.all.map((x, i) => [x, i]));
+  return (c, r) => cosine(vecs[at.get(c)!], vecs[at.get(r)!]);
+}
+
+/** Unique texts that need meaning vectors for the current settings (capped, deterministic order). */
+export function crossCorpusTextsToEmbed(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS, cap = 400): string[] {
+  const texts: string[] = [];
+  const seen = new Set<string>();
+  for (const { c, r } of crossCorpusPairPool(a, b, s).pairs) for (const t of [c.u.text.trim(), r.u.text.trim()]) {
+    if (!seen.has(t) && texts.length < cap) { seen.add(t); texts.push(t); }
+  }
+  return texts;
+}
+
 export interface CrossCorpusFunnel {
   chosen: number;
   rejected: number;
@@ -222,68 +280,48 @@ export interface CrossCorpusFunnel {
 
 /** Counts how many nodes/pairs survive each cross-corpus step, so an empty
  *  result can say which check removed everything. Same rules as the builder. */
-export function crossCorpusFunnel(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS): CrossCorpusFunnel {
-  const domain = a.domain ?? b.domain ?? "general";
-  const all = [...a.units.map(u => ({ u, f: "A" as const })), ...b.units.map(u => ({ u, f: "B" as const }))].filter(x => validUnit(x.u));
-  const chosen = all.filter(x => x.u.intention?.speechAct === "assertive" && (x.u.cti ?? 1) <= s.chosenMaxCti
-    && (x.u.intention?.epistemicCertainty ?? 0) >= s.chosenCertainty);
-  const rejected = all.filter(x => ["directive", "expressive"].includes(x.u.intention?.speechAct ?? "") && (x.u.cti ?? 0) >= s.rejectedMinCti);
-  const withQ = chosen.flatMap(c => { const q = questionForUnit(c.u, domain); const level = q && axisLevel(c.u, q.axis, domain); return q && level ? [{ c, axis: q.axis, level }] : []; });
-  const pairs: Array<[typeof all[number], typeof all[number]]> = [];
-  let sameAxisLevel = 0;
-  for (const { c, axis, level } of withQ) for (const r of rejected) {
-    if (r.f === c.f || axisLevel(r.u, axis, domain) !== level || r.u.text.trim() === c.u.text.trim()) continue;
-    sameAxisLevel++;
-    if ((r.u.cti ?? 0) - (c.u.cti ?? 0) >= s.deltaCti) pairs.push([c, r]);
-  }
+export function crossCorpusFunnel(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS, meaning?: Map<string, number[]>): CrossCorpusFunnel {
+  const pool = crossCorpusPairPool(a, b, s);
+  const sim = pool.pairs.length ? pairSimilarity(pool, meaning) : null;
   let bestSimilarity = 0;
-  if (pairs.length) {
-    const vecs = buildTfIdf(all.map(x => x.u.text));
-    const at = new Map(all.map((x, i) => [x.u.text, i]));
-    for (const [c, r] of pairs) bestSimilarity = Math.max(bestSimilarity, cosine(vecs[at.get(c.u.text)!], vecs[at.get(r.u.text)!]));
-  }
-  return { chosen: chosen.length, rejected: rejected.length, chosenWithQuestion: withQ.length, sameAxisLevel, enoughCtiGap: pairs.length, bestSimilarity };
+  if (sim) for (const { c, r } of pool.pairs) bestSimilarity = Math.max(bestSimilarity, sim(c, r) ?? 0);
+  return { chosen: pool.chosen, rejected: pool.rejected, chosenWithQuestion: pool.chosenWithQuestion, sameAxisLevel: pool.sameAxisLevel, enoughCtiGap: pool.pairs.length, bestSimilarity };
 }
 
-export function buildCrossCorpusDpoCandidates(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS): Array<DatasetCandidate & { match: CrossMatch }> {
-  const domain = a.domain ?? b.domain ?? "general";
-  const all = [...a.units.map(u => ({ u, f: "A" as const })), ...b.units.map(u => ({ u, f: "B" as const }))].filter(x => validUnit(x.u));
-  const vecs = buildTfIdf(all.map(x => x.u.text));
-  const idx = new Map(all.map((x, i) => [`${x.f}:${x.u.id}`, i]));
-  const chosen = all.filter(x => x.u.intention?.speechAct === "assertive" && (x.u.cti ?? 1) <= s.chosenMaxCti
-    && (x.u.intention?.epistemicCertainty ?? 0) >= s.chosenCertainty);
-  const rejected = all.filter(x => ["directive", "expressive"].includes(x.u.intention?.speechAct ?? "") && (x.u.cti ?? 0) >= s.rejectedMinCti);
+/**
+ * Four-step pairing across two saved fields:
+ * 1 shared axis, 2 similarity (meaning vectors when given, else word overlap),
+ * 3 diverging intention, 4 same template level (identical prompt).
+ */
+export function buildCrossCorpusDpoCandidates(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS, meaning?: Map<string, number[]>): Array<DatasetCandidate & { match: CrossMatch }> {
+  const pool = crossCorpusPairPool(a, b, s);
+  const { domain } = pool;
+  const sim = pool.pairs.length ? pairSimilarity(pool, meaning) : null;
+  const byChosen = new Map<Tagged, PairPool["pairs"]>();
+  for (const p of pool.pairs) byChosen.set(p.c, [...(byChosen.get(p.c) ?? []), p]);
   const out: Array<DatasetCandidate & { match: CrossMatch }> = [];
-  const usedRejected = new Set<string>();
-  for (const c of chosen) {
-    const q = questionForUnit(c.u, domain);
-    if (!q) continue;
-    const level = axisLevel(c.u, q.axis, domain);
-    if (!level) continue;
-    const cv = vecs[idx.get(`${c.f}:${c.u.id}`)!];
-    let best: { r: typeof all[number]; sim: number } | null = null;
-    for (const r of rejected) {
-      if (r.f === c.f || usedRejected.has(`${r.f}:${r.u.id}`)) continue;
-      if ((r.u.cti ?? 0) - (c.u.cti ?? 0) < s.deltaCti) continue;
-      if (axisLevel(r.u, q.axis, domain) !== level) continue;
-      if (r.u.text.trim() === c.u.text.trim()) continue;
-      const sim = cosine(cv, vecs[idx.get(`${r.f}:${r.u.id}`)!]);
-      if (sim < s.similarity) continue;
-      if (!best || sim > best.sim || (sim === best.sim && r.u.id < best.r.u.id)) best = { r, sim };
+  const usedRejected = new Set<Tagged>();
+  for (const [c, options] of byChosen) {
+    let best: { p: PairPool["pairs"][number]; sim: number } | null = null;
+    for (const p of options) {
+      if (usedRejected.has(p.r)) continue;
+      const value = sim?.(c, p.r);
+      if (value == null || value < s.similarity) continue;
+      if (!best || value > best.sim || (value === best.sim && p.r.u.id < best.p.r.u.id)) best = { p, sim: value };
     }
     if (!best) continue;
-    usedRejected.add(`${best.r.f}:${best.r.u.id}`);
-    const r = best.r.u;
+    usedRejected.add(best.p.r);
+    const r = best.p.r.u;
     out.push({
-      id: `cross:${c.f}:${c.u.id}:${best.r.f}:${r.id}`, mode: "dpo", prompt: q.prompt,
+      id: `cross:${c.f}:${c.u.id}:${best.p.r.f}:${r.id}`, mode: "dpo", prompt: best.p.prompt,
       answer: c.u.text.trim(), rejected: r.text.trim(), approved: false,
       metadata: {
         domain, node_id: c.u.id, context_nodes: [c.u.id], source_paths: [c.u.sourcePath, r.sourcePath].filter(Boolean) as string[],
-        domain_axes: c.u.domainAxes ?? {}, dominant_axis: q.axis, cti: c.u.cti ?? 0,
+        domain_axes: c.u.domainAxes ?? {}, dominant_axis: best.p.axis, cti: c.u.cti ?? 0,
         epistemic_certainty: c.u.intention?.epistemicCertainty ?? 0, speech_act: c.u.intention?.speechAct ?? "",
         rejected_node: r.id, rejected_cti: r.cti, edge_similarity: best.sim,
       },
-      match: { axis: q.axis, level, semantic: best.sim, chosenAct: "assertive", rejectedAct: r.intention?.speechAct ?? "", promptMatch: true, chosenField: c.f },
+      match: { axis: best.p.axis, level: best.p.level, semantic: best.sim, chosenAct: "assertive", rejectedAct: r.intention?.speechAct ?? "", promptMatch: true, chosenField: c.f },
     });
   }
   return out;
