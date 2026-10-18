@@ -207,13 +207,6 @@ export function cosine(a: Map<string, number>, b: Map<string, number>): number {
   return Math.round(dot * 1000) / 1000;
 }
 
-/** Dense cosine for meaning vectors (embeddings). */
-export function denseCosine(a: number[], b: number[]): number {
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < Math.min(a.length, b.length); i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
-  return na && nb ? Math.round((dot / Math.sqrt(na * nb)) * 1000) / 1000 : 0;
-}
-
 type Tagged = { u: FieldUnit; f: "A" | "B" };
 interface PairPool {
   domain: string;
@@ -248,25 +241,39 @@ function crossCorpusPairPool(a: GeometricField, b: GeometricField, s: CrossCorpu
   return { domain, all, chosen: chosen.length, rejected: rejected.length, chosenWithQuestion: withQ.length, sameAxisLevel, pairs };
 }
 
-/** Similarity per pair: meaning vectors when given (keyed by trimmed text), else word-overlap TF-IDF. */
-function pairSimilarity(pool: PairPool, meaning?: Map<string, number[]>): (c: Tagged, r: Tagged) => number | null {
-  if (meaning) return (c, r) => {
-    const va = meaning.get(c.u.text.trim()), vb = meaning.get(r.u.text.trim());
-    return va && vb ? denseCosine(va, vb) : null;
-  };
+/** Key for a scored chosen/rejected text pair. */
+export const pairKey = (chosen: string, rejected: string) => `${chosen.trim()}\u0001${rejected.trim()}`;
+
+/** Similarity per pair: meaning scores when given (from pairKey), else word-overlap TF-IDF. */
+function pairSimilarity(pool: PairPool, meaning?: Map<string, number>): (c: Tagged, r: Tagged) => number | null {
+  if (meaning) return (c, r) => meaning.get(pairKey(c.u.text, r.u.text)) ?? null;
   const vecs = buildTfIdf(pool.all.map(x => x.u.text));
   const at = new Map(pool.all.map((x, i) => [x, i]));
   return (c, r) => cosine(vecs[at.get(c)!], vecs[at.get(r)!]);
 }
 
-/** Unique texts that need meaning vectors for the current settings (capped, deterministic order). */
-export function crossCorpusTextsToEmbed(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS, cap = 400): string[] {
+/** Pairs that still need a meaning score for the current settings, as unique texts plus index pairs. */
+export function crossCorpusPairsToScore(a: GeometricField, b: GeometricField, s: CrossCorpusSettings, known: ReadonlySet<string>, cap = 400) {
   const texts: string[] = [];
-  const seen = new Set<string>();
-  for (const { c, r } of crossCorpusPairPool(a, b, s).pairs) for (const t of [c.u.text.trim(), r.u.text.trim()]) {
-    if (!seen.has(t) && texts.length < cap) { seen.add(t); texts.push(t); }
+  const at = new Map<string, number>();
+  const pairs: Array<[number, number]> = [];
+  const keys: string[] = [];
+  const queued = new Set<string>();
+  let skipped = 0;
+  const index = (t: string) => {
+    const key = t.trim();
+    if (at.has(key)) return at.get(key)!;
+    if (texts.length >= cap) return -1;
+    at.set(key, texts.length); texts.push(key); return texts.length - 1;
+  };
+  for (const { c, r } of crossCorpusPairPool(a, b, s).pairs) {
+    const key = pairKey(c.u.text, r.u.text);
+    if (known.has(key) || queued.has(key)) continue;
+    const i = index(c.u.text), j = index(r.u.text);
+    if (i < 0 || j < 0) { skipped++; continue; }
+    pairs.push([i, j]); keys.push(key); queued.add(key);
   }
-  return texts;
+  return { texts, pairs, keys, skipped };
 }
 
 export interface CrossCorpusFunnel {
@@ -280,7 +287,7 @@ export interface CrossCorpusFunnel {
 
 /** Counts how many nodes/pairs survive each cross-corpus step, so an empty
  *  result can say which check removed everything. Same rules as the builder. */
-export function crossCorpusFunnel(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS, meaning?: Map<string, number[]>): CrossCorpusFunnel {
+export function crossCorpusFunnel(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS, meaning?: Map<string, number>): CrossCorpusFunnel {
   const pool = crossCorpusPairPool(a, b, s);
   const sim = pool.pairs.length ? pairSimilarity(pool, meaning) : null;
   let bestSimilarity = 0;
@@ -293,7 +300,7 @@ export function crossCorpusFunnel(a: GeometricField, b: GeometricField, s: Cross
  * 1 shared axis, 2 similarity (meaning vectors when given, else word overlap),
  * 3 diverging intention, 4 same template level (identical prompt).
  */
-export function buildCrossCorpusDpoCandidates(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS, meaning?: Map<string, number[]>): Array<DatasetCandidate & { match: CrossMatch }> {
+export function buildCrossCorpusDpoCandidates(a: GeometricField, b: GeometricField, s: CrossCorpusSettings = CROSS_CORPUS_DEFAULTS, meaning?: Map<string, number>): Array<DatasetCandidate & { match: CrossMatch }> {
   const pool = crossCorpusPairPool(a, b, s);
   const { domain } = pool;
   const sim = pool.pairs.length ? pairSimilarity(pool, meaning) : null;
