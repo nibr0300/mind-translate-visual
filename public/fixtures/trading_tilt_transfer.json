@@ -1,0 +1,463 @@
+{
+  "domain": "trading",
+  "useCase": "truth-seeking",
+  "units": [
+    {
+      "id": "trading-01",
+      "text": "Jag vann på en oplanerad affär. Därför var beslutet rätt och jag ska dubbla nästa position.",
+      "pos": {
+        "x": 1.0,
+        "y": 0.0
+      },
+      "vector2d": [
+        1.0,
+        0.0
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "resulting"
+      ],
+      "primaryMechanism": "resulting",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-02",
+      "text": "Affären följde planen men förlorade pengar. Strategin är alltså dålig; kasta bort riskreglerna.",
+      "pos": {
+        "x": -0.833,
+        "y": 0.763
+      },
+      "vector2d": [
+        -0.833,
+        0.763
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "resulting"
+      ],
+      "primaryMechanism": "resulting",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-03",
+      "text": "Efter denna oväntade förlust måste jag ta revansch. Dubbla positionen och ta tillbaka pengarna nu.",
+      "pos": {
+        "x": 0.11,
+        "y": -1.255
+      },
+      "vector2d": [
+        0.11,
+        -1.255
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "reward-prediction-error"
+      ],
+      "primaryMechanism": "reward-prediction-error",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-04",
+      "text": "En bad beat på marknaden gör mig rasande. Revenge trading är enda sättet att återställa balansen.",
+      "pos": {
+        "x": 0.846,
+        "y": 1.103
+      },
+      "vector2d": [
+        0.846,
+        1.103
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "reward-prediction-error"
+      ],
+      "primaryMechanism": "reward-prediction-error",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-05",
+      "text": "Fyra röda dagar i rad betyder att marknaden måste vända. Köp utan ny analys.",
+      "pos": {
+        "x": -1.497,
+        "y": -0.265
+      },
+      "vector2d": [
+        -1.497,
+        -0.265
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "gamblers-fallacy"
+      ],
+      "primaryMechanism": "gamblers-fallacy",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-06",
+      "text": "Efter min förlustsvit är en vinst garanterad. Öka hävstången tills turen kommer.",
+      "pos": {
+        "x": 1.392,
+        "y": -0.885
+      },
+      "vector2d": [
+        1.392,
+        -0.885
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "gamblers-fallacy"
+      ],
+      "primaryMechanism": "gamblers-fallacy",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-07",
+      "text": "Jag har redan investerat för mycket för att sälja. Snitta ned i denna fallande kniv, oavsett ny information.",
+      "pos": {
+        "x": -0.462,
+        "y": 1.719
+      },
+      "vector2d": [
+        -0.462,
+        1.719
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "sunk-cost"
+      ],
+      "primaryMechanism": "sunk-cost",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-08",
+      "text": "Pengarna jag redan satsat måste räddas. Behåll positionen även när den ursprungliga tesen har fallit.",
+      "pos": {
+        "x": -0.88,
+        "y": -1.695
+      },
+      "vector2d": [
+        -0.88,
+        -1.695
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "sunk-cost"
+      ],
+      "primaryMechanism": "sunk-cost",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-09",
+      "text": "Jag kan inte acceptera en förlust. Flytta stop-loss längre bort varje gång priset närmar sig.",
+      "pos": {
+        "x": 1.916,
+        "y": 0.7
+      },
+      "vector2d": [
+        1.916,
+        0.7
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "loss-aversion"
+      ],
+      "primaryMechanism": "loss-aversion",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-10",
+      "text": "Att realisera förlusten gör för ont. Ignorera den förutbestämda exitregeln och hoppas.",
+      "pos": {
+        "x": -2.006,
+        "y": 0.827
+      },
+      "vector2d": [
+        -2.006,
+        0.827
+      ],
+      "clusterId": 0,
+      "type": "paragraph",
+      "fz": 0.65,
+      "fy": 0.4,
+      "cti": 0.55,
+      "intention": {
+        "speechAct": "expressive",
+        "epistemicCertainty": 0.55,
+        "intentionalForce": 0.8,
+        "truthTension": 0.6
+      },
+      "mechanisms": [
+        "loss-aversion"
+      ],
+      "primaryMechanism": "loss-aversion",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-11",
+      "text": "Stop-loss är en förutbestämd regel, inte en känsla. Följ riskplanen och beakta att gap och slippage kan påverka utfallet.",
+      "pos": {
+        "x": 0.976,
+        "y": -2.083
+      },
+      "vector2d": [
+        0.976,
+        -2.083
+      ],
+      "clusterId": 1,
+      "type": "paragraph",
+      "fz": 0.08,
+      "fy": 0.85,
+      "cti": 0.08,
+      "intention": {
+        "speechAct": "assertive",
+        "epistemicCertainty": 0.95,
+        "intentionalForce": 0.4,
+        "truthTension": 0.08
+      },
+      "mechanisms": [
+        "loss-aversion"
+      ],
+      "primaryMechanism": "loss-aversion",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-12",
+      "text": "Bedöm beslutets kvalitet med informationen som fanns före affären, inte med ett enskilt utfall. En vinst bevisar inte att risken var motiverad.",
+      "pos": {
+        "x": 0.726,
+        "y": 2.319
+      },
+      "vector2d": [
+        0.726,
+        2.319
+      ],
+      "clusterId": 1,
+      "type": "paragraph",
+      "fz": 0.08,
+      "fy": 0.85,
+      "cti": 0.08,
+      "intention": {
+        "speechAct": "assertive",
+        "epistemicCertainty": 0.95,
+        "intentionalForce": 0.4,
+        "truthTension": 0.08
+      },
+      "mechanisms": [
+        "resulting"
+      ],
+      "primaryMechanism": "resulting",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-13",
+      "text": "Pausa efter en oväntad förlust och återgå till den förutbestämda riskbudgeten. Nästa positions storlek ska inte bestämmas av behovet av revansch.",
+      "pos": {
+        "x": -2.214,
+        "y": -1.285
+      },
+      "vector2d": [
+        -2.214,
+        -1.285
+      ],
+      "clusterId": 1,
+      "type": "paragraph",
+      "fz": 0.08,
+      "fy": 0.85,
+      "cti": 0.08,
+      "intention": {
+        "speechAct": "assertive",
+        "epistemicCertainty": 0.95,
+        "intentionalForce": 0.4,
+        "truthTension": 0.08
+      },
+      "mechanisms": [
+        "reward-prediction-error"
+      ],
+      "primaryMechanism": "reward-prediction-error",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-14",
+      "text": "Pengarna som redan förlorats återkommer inte genom att öka risken. Pröva nästa beslut mot ny information och återstående riskbudget.",
+      "pos": {
+        "x": 2.628,
+        "y": -0.576
+      },
+      "vector2d": [
+        2.628,
+        -0.576
+      ],
+      "clusterId": 1,
+      "type": "paragraph",
+      "fz": 0.08,
+      "fy": 0.85,
+      "cti": 0.08,
+      "intention": {
+        "speechAct": "assertive",
+        "epistemicCertainty": 0.95,
+        "intentionalForce": 0.4,
+        "truthTension": 0.08
+      },
+      "mechanisms": [
+        "sunk-cost"
+      ],
+      "primaryMechanism": "sunk-cost",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    },
+    {
+      "id": "trading-15",
+      "text": "Diversifiering är ett matematiskt skydd, inte en tro. Bedöm korrelationer och risk; en förlustsvit garanterar inte nästa vinst och marknadsutfall är inte alltid oberoende.",
+      "pos": {
+        "x": -1.623,
+        "y": 2.306
+      },
+      "vector2d": [
+        -1.623,
+        2.306
+      ],
+      "clusterId": 1,
+      "type": "paragraph",
+      "fz": 0.08,
+      "fy": 0.85,
+      "cti": 0.08,
+      "intention": {
+        "speechAct": "assertive",
+        "epistemicCertainty": 0.95,
+        "intentionalForce": 0.4,
+        "truthTension": 0.08
+      },
+      "mechanisms": [
+        "gamblers-fallacy"
+      ],
+      "primaryMechanism": "gamblers-fallacy",
+      "sourcePath": "synthetic/trading_tilt_transfer"
+    }
+  ],
+  "clusters": [
+    {
+      "id": 0,
+      "label": "Impuls och eskalering",
+      "description": "Syntetiska testexempel med manuellt tilldelade värden.",
+      "center": [
+        0,
+        0
+      ],
+      "unitCount": 10,
+      "avgFZ": 0.65,
+      "avgFY": 0.4
+    },
+    {
+      "id": 1,
+      "label": "Rationella riskregler",
+      "description": "Syntetiska testexempel med manuellt tilldelade värden.",
+      "center": [
+        0,
+        0
+      ],
+      "unitCount": 5,
+      "avgFZ": 0.08,
+      "avgFY": 0.85
+    }
+  ],
+  "edges": [],
+  "stats": {
+    "totalUnits": 15,
+    "boundaryUnits": 0,
+    "avgFZ": 0.46,
+    "avgFY": 0.55,
+    "notes": [
+      "Syntetisk testkorpus; CTI, säkerhet, mekanismer och positioner är manuellt tilldelade, inte analyserade eller empiriskt validerade.",
+      "Inte investeringsråd. Reserv för transfer-utvärdering: export till träning innebär att exemplen inte längre kan användas som osedd zero-shot-testdata."
+    ]
+  }
+}
