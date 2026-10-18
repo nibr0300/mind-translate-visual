@@ -512,8 +512,8 @@ export default function FieldCanvas({
               <motion.div
                 key={`cl-${i}`}
                 className="absolute select-none"
-                style={{ left: pos.x, top: pos.y, transform: "translate(-50%, -50%)" }}
-                animate={{ opacity: isActive ? 0.5 : 0.1 }}
+                style={{ left: pos.x, top: pos.y, transform: "translate(-50%, -50%)", ...(lite ? { opacity: isActive ? 0.5 : 0.1 } : {}) }}
+                {...(lite ? {} : { animate: { opacity: isActive ? 0.5 : 0.1 } })}
               >
                 <div
                   className="rounded-full pointer-events-none"
@@ -627,16 +627,23 @@ export default function FieldCanvas({
             const isSelected = selectedUnit?.id === unit.id;
             const isHovered = hoveredUnit?.id === unit.id;
             const isMatch = matches.has(unit.id);
+            const nodeOpacity = normalizedQuery
+              ? isMatch ? 1 : 0.15
+              : isActive ? (0.7 + unit.fy * 0.3) * depthOpacity : 0.1;
+            const nodeScale = isSelected ? 1.6 : isHovered ? 1.3 : isMatch ? 1.4 : 1;
+            // Large/mobile fields: static styles. Hundreds of simultaneous
+            // per-node animations each get their own GPU layer and crash phones.
             return (
               <motion.button
                 key={unit.id}
-                className="absolute rounded-full border-0 cursor-pointer focus:outline-none transition-[left,top,width,height,filter] duration-700 ease-out"
+                className={`absolute rounded-full border-0 cursor-pointer focus:outline-none ${lite ? "" : "transition-[left,top,width,height,filter] duration-700 ease-out"}`}
                 style={{
                   left: pctX(i),
                   top: pctY(i),
                   width: size,
                   height: size,
-                  transform: "translate(-50%, -50%)",
+                  transform: lite ? `translate(-50%, -50%) scale(${nodeScale})` : "translate(-50%, -50%)",
+                  ...(lite ? { opacity: nodeOpacity } : {}),
                   background: CLUSTER_COLORS[unit.clusterId],
                   filter: blur > 0.05 ? `blur(${blur}px)` : undefined,
                   boxShadow: isMatch
@@ -654,13 +661,7 @@ export default function FieldCanvas({
                     ? 20
                     : 2 + Math.round((depth + 1) * 4),
                 }}
-                animate={{
-                  opacity: normalizedQuery
-                    ? isMatch ? 1 : 0.15
-                    : isActive ? (0.7 + unit.fy * 0.3) * depthOpacity : 0.1,
-                  scale: isSelected ? 1.6 : isHovered ? 1.3 : isMatch ? 1.4 : 1,
-                }}
-                transition={{ duration: 0.2 }}
+                {...(lite ? {} : { animate: { opacity: nodeOpacity, scale: nodeScale }, transition: { duration: 0.2 } })}
                 onMouseEnter={() => setHoveredUnit(unit)}
                 onMouseLeave={() => setHoveredUnit(null)}
                 onClick={(e) => {
