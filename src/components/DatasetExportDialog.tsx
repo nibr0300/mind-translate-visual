@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Download, FileJson, RotateCcw } from "lucide-react";
 import type { GeometricField } from "@/lib/fieldData";
 import { getDomainProfile } from "@/lib/domainProfiles";
-import { buildCrossCorpusDpoCandidates, crossCorpusFunnel, buildDatasetCandidates, CROSS_CORPUS_DEFAULTS, DATASET_PRESETS, serializeDataset, type CrossCorpusSettings, type CrossMatch, type DatasetCandidate, type DatasetSettings } from "@/lib/datasetExporter";
+import { buildCrossCorpusDpoCandidates, crossCorpusFunnel, buildDatasetCandidates, CROSS_CORPUS_DEFAULTS, MEANING_SIMILARITY_DEFAULT, DATASET_PRESETS, serializeDataset, type CrossCorpusSettings, type CrossMatch, type DatasetCandidate, type DatasetSettings } from "@/lib/datasetExporter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { parseFieldImport } from "@/lib/fieldImport";
+import { useMeaningScores } from "@/hooks/useMeaningScores";
 
 function download(content: string, name: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -39,12 +40,13 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
   const [rights, setRights] = useState(false);
   const [cross, setCross] = useState(false);
   const [fieldB, setFieldB] = useState<{ field: GeometricField; name: string } | null>(null);
-  const [crossSettings, setCrossSettings] = useState<CrossCorpusSettings>({ ...CROSS_CORPUS_DEFAULTS });
+  const [crossSettings, setCrossSettings] = useState<CrossCorpusSettings>({ ...CROSS_CORPUS_DEFAULTS, similarity: MEANING_SIMILARITY_DEFAULT });
+  const meaning = useMeaningScores(field, fieldB?.field ?? null, crossSettings, cross);
   const candidates: Array<DatasetCandidate & { match?: CrossMatch }> = useMemo(() => cross
-    ? (fieldB ? buildCrossCorpusDpoCandidates(field, fieldB.field, crossSettings) : [])
-    : buildDatasetCandidates(field, settings, fileName ?? ""), [field, settings, fileName, cross, fieldB, crossSettings]);
-  const funnel = useMemo(() => cross && fieldB && candidates.length === 0 ? crossCorpusFunnel(field, fieldB.field, crossSettings) : null,
-    [cross, fieldB, candidates.length, field, crossSettings]);
+    ? (fieldB ? buildCrossCorpusDpoCandidates(field, fieldB.field, crossSettings, meaning.scores) : [])
+    : buildDatasetCandidates(field, settings, fileName ?? ""), [field, settings, fileName, cross, fieldB, crossSettings, meaning.scores]);
+  const funnel = useMemo(() => cross && fieldB && candidates.length === 0 ? crossCorpusFunnel(field, fieldB.field, crossSettings, meaning.scores) : null,
+    [cross, fieldB, candidates.length, field, crossSettings, meaning.scores]);
   const changeCross = (next: CrossCorpusSettings) => { setCrossSettings(next); setEdits({}); setIndex(0); };
   const loadFieldB = (file?: File) => {
     if (!file) return;
@@ -101,7 +103,10 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
             <span className="flex h-9 w-full items-center justify-center rounded-md border border-border text-xs font-mono cursor-pointer hover:border-primary/40">{fieldB ? "Byt fält B…" : "Välj fält B…"}</span></label>
           <p className="text-[11px] font-mono text-muted-foreground break-words">A: {fileName ?? "aktuellt fält"} · {field.units.length} noder<br />
             B: {fieldB ? <span className="text-primary">✓ {fieldB.name} · {fieldB.field.units.length} noder</span> : "ej vald"}</p>
-          <Threshold label="Textlikhet minst" value={crossSettings.similarity} onChange={v => changeCross({ ...crossSettings, similarity: v })} />
+          <Threshold label="Meningslikhet minst (AI)" value={crossSettings.similarity} onChange={v => changeCross({ ...crossSettings, similarity: v })} />
+          {fieldB && <p className="text-[11px] font-mono text-muted-foreground" aria-live="polite">
+            {meaning.status === "loading" ? "Jämför betydelse med AI…" : meaning.status === "error" ? <span className="text-destructive">{meaning.error} <button type="button" className="underline" onClick={meaning.retry}>Försök igen</button></span> : meaning.status === "ready" ? `Betydelse jämförd för ${meaning.scores.size} par.` : ""}
+            {meaning.skipped > 0 && ` ${meaning.skipped} par över gränsen jämfördes inte – skärp reglagen nedan.`}</p>}
           <Threshold label="Föredraget: CTI högst" value={crossSettings.chosenMaxCti} onChange={v => changeCross({ ...crossSettings, chosenMaxCti: v })} />
           <Threshold label="Föredraget: säkerhet minst" value={crossSettings.chosenCertainty} onChange={v => changeCross({ ...crossSettings, chosenCertainty: v })} />
           <Threshold label="Avvisat: CTI minst" value={crossSettings.rejectedMinCti} onChange={v => changeCross({ ...crossSettings, rejectedMinCti: v })} />
@@ -136,7 +141,7 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
           <p>Föredragna med en frågemall (axel): <span className="text-primary">{funnel.chosenWithQuestion}</span></p>
           <p>Par på samma axel och nivå: <span className="text-primary">{funnel.sameAxisLevel}</span></p>
           <p>…med tillräcklig CTI-skillnad: <span className="text-primary">{funnel.enoughCtiGap}</span></p>
-          <p>Högsta textlikhet bland dem: <span className="text-primary">{funnel.bestSimilarity.toFixed(2)}</span> (krav {crossSettings.similarity.toFixed(2)})</p>
+          <p>Högsta meningslikhet bland dem: <span className="text-primary">{funnel.bestSimilarity.toFixed(2)}</span> (krav {crossSettings.similarity.toFixed(2)})</p>
         </div> : !current ? <p role="status" className="py-10 text-sm text-muted-foreground">Inga kandidater matchar urvalet i detta fält.</p> : <>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono">{currentIndex + 1} / {rows.length} · {current.metadata.node_id}</span>
@@ -147,7 +152,7 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
           </div>
           {current.match && <p className="flex flex-wrap gap-1 font-mono text-[11px]" aria-label="Matchningspoäng">
             <span className="border border-border px-1.5 py-0.5">Axel: {current.match.axis} · {current.match.level} ✓</span>
-            <span className="border border-border px-1.5 py-0.5">Semantik: {current.match.semantic.toFixed(2)} ✓</span>
+            <span className="border border-border px-1.5 py-0.5">Mening: {current.match.semantic.toFixed(2)} ✓</span>
             <span className="border border-border px-1.5 py-0.5">Intention: {current.match.chosenAct} → {current.match.rejectedAct} ✓</span>
             <span className="border border-border px-1.5 py-0.5">Prompt: samma mall ✓</span>
             <span className="border border-border px-1.5 py-0.5">Föredraget från fält {current.match.chosenField}</span>

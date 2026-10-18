@@ -3,7 +3,7 @@
 ## Grunden (först)
 - [x] JSON-import av pokerboken: begränsad kartgrafik, 35 tester godkända; riktig 600-nodersbok importerad, zoom och Cross-Corpus DPO med akademiskt fält verifierade i mobilstorlek (0 par vid starttrösklar). Fysisk mobil återstår att bekräfta.
 - [x] Djup AI-spänning (llmTension/CTI) blev alltid 0 — analysen avbröts innan den hann klart. Åtgärdat + synlig varning vid låg täckning.
-- [ ] Uppladdning hoppar tillbaka till startläge — blockerad: behöver den exakta filen som fallerar för att återskapa felet.
+- [x] Uppladdning/import hoppar tillbaka till startläge på mobil — orsak: förhandsvisningen laddade om sidan när filväljaren tog appen i bakgrunden. Åtgärdat (återansluter utan omladdning, senaste fält sparas).
 
 ## Expansion (efter grunden)
 - [x] Träningsdata: pokerfrågemallar, topologisk kontext, mänsklig granskning och JSONL-export för SFT/generisk DPO; 25 tester, SFT-nedladdning verifierad med riktig pokerbok (12 kandidater, 0 DPO-par med strikt urval)
@@ -13,6 +13,8 @@
 - [ ] Kalibreringstest 1 och 3 — väntar på ≥2 pokerdokument markerade som Poker
 - [x] Bug bounty-profil steg 1: 14 axlar i tre familjer, källklasser med vikt, strukturella enheter, brusfilter med logg, ordlista först, 8 tester
 - [x] Bug bounty: fyra kalibreringstest (positiva och negativa) mot riktiga scope/rapporter — alla godkända
+- [x] Cross-corpus DPO: fält B-bekräftelse, stegräkning vid 0 par, AI-meningslikhet (tröskel 0.80) i stället för ordlikhet
+- [ ] Akademiska texten omanalyserad i annan domän — väntar på användaren; obs: parning kräver att båda fälten har pokeraxlar
 - [ ] A3 deformation + A5 versionshistorik
 - [ ] App B navigatör (separat projekt)
 - [ ] Agentloop: situation → projicera → mäta → resonera → handla → observera → deformera fältet
