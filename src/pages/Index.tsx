@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { loadLastField, saveLastField } from "@/lib/lastFieldStore";
 import { generateDemoField, type FieldUnit, type GeometricField } from "@/lib/fieldData";
 import FieldCanvas from "@/components/FieldCanvas";
 import FieldSidebar from "@/components/FieldSidebar";
@@ -41,6 +42,22 @@ export default function Index() {
     setActiveCluster(null);
     setSelectedUnit(null);
     setAnchorUnitId(null);
+    void saveLastField(newField, fileName).catch(() => { /* restore is best-effort */ });
+  }, []);
+
+  // Bring back the last opened field after a reload (mobile tab discard or
+  // the preview reconnecting after the file picker backgrounded the tab).
+  useEffect(() => {
+    let cancelled = false;
+    loadLastField()
+      .then((stored) => {
+        if (cancelled || !stored?.field?.units?.length) return;
+        setUploadedField((current) => current ?? stored.field);
+        setUploadedFileName((current) => current ?? stored.fileName);
+        setUseCase((current) => (current === "uploaded" ? current : "uploaded"));
+      })
+      .catch(() => { /* nothing stored */ });
+    return () => { cancelled = true; };
   }, []);
 
   return (
