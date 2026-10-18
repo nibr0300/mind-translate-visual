@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Download, FileJson, RotateCcw } from "lucide-react";
 import type { GeometricField } from "@/lib/fieldData";
 import { getDomainProfile } from "@/lib/domainProfiles";
-import { buildDatasetCandidates, DATASET_PRESETS, serializeDataset, type DatasetCandidate, type DatasetSettings } from "@/lib/datasetExporter";
+import { buildCrossCorpusDpoCandidates, buildDatasetCandidates, CROSS_CORPUS_DEFAULTS, DATASET_PRESETS, serializeDataset, type CrossCorpusSettings, type CrossMatch, type DatasetCandidate, type DatasetSettings } from "@/lib/datasetExporter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,8 +36,22 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
     ? "Du är en rådgivare inom pokerstrategi, spelteori och turneringsmatematik. Ange villkor och osäkerheter; utlova inte vinster."
     : `Du besvarar frågor inom ${profile.label}. Ange villkor och osäkerheter.`);
   const [rights, setRights] = useState(false);
-  const candidates = useMemo(() => buildDatasetCandidates(field, settings, fileName ?? ""), [field, settings, fileName]);
-  const rows = candidates.map(c => edits[c.id] ?? c);
+  const [cross, setCross] = useState(false);
+  const [fieldB, setFieldB] = useState<{ field: GeometricField; name: string } | null>(null);
+  const [crossSettings, setCrossSettings] = useState<CrossCorpusSettings>({ ...CROSS_CORPUS_DEFAULTS });
+  const candidates: Array<DatasetCandidate & { match?: CrossMatch }> = useMemo(() => cross
+    ? (fieldB ? buildCrossCorpusDpoCandidates(field, fieldB.field, crossSettings) : [])
+    : buildDatasetCandidates(field, settings, fileName ?? ""), [field, settings, fileName, cross, fieldB, crossSettings]);
+  const changeCross = (next: CrossCorpusSettings) => { setCrossSettings(next); setEdits({}); setIndex(0); };
+  const loadFieldB = (file?: File) => {
+    if (!file) return;
+    file.text().then(t => {
+      const parsed = JSON.parse(t) as GeometricField;
+      if (!parsed.units?.length) throw new Error();
+      setFieldB({ field: parsed, name: file.name }); setEdits({}); setIndex(0);
+    }).catch(() => toast.error("Filen är inte ett sparat fält (.json)"));
+  };
+  const rows = candidates.map(c => ({ ...c, ...(edits[c.id] ?? {}) }) as DatasetCandidate & { match?: CrossMatch });
   const currentIndex = Math.min(index, Math.max(0, rows.length - 1));
   const current = rows[currentIndex];
   const approved = rows.filter(c => c.approved && c.prompt.trim() && c.answer.trim() && (c.mode === "sft" || (c.rejected?.trim() && c.rejected.trim() !== c.answer.trim())));
@@ -69,15 +83,25 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
       <DialogDescription>{profile.label} · {field.units.length} noder · {analyzed} med djupanalys</DialogDescription>
     </DialogHeader>
     <div className="flex flex-wrap items-center gap-2 border-b border-border pb-4">
-      <Select value={settings.mode} onValueChange={value => changeSettings({ ...settings, mode: value === "dpo" ? "dpo" : "sft" })}>
+      <Select value={cross ? "cross" : settings.mode} onValueChange={value => { setCross(value === "cross"); changeSettings({ ...settings, mode: value === "sft" ? "sft" : "dpo" }); }}>
         <SelectTrigger aria-label="Exporttyp" className="w-48"><SelectValue /></SelectTrigger>
-        <SelectContent><SelectItem value="sft">SFT · Fråga och svar</SelectItem><SelectItem value="dpo">DPO · Preferenspar</SelectItem></SelectContent>
+        <SelectContent><SelectItem value="sft">SFT · Fråga och svar</SelectItem><SelectItem value="dpo">DPO · Preferenspar</SelectItem><SelectItem value="cross">DPO · Mellan två fält</SelectItem></SelectContent>
       </Select>
-      {(Object.keys(DATASET_PRESETS) as Array<keyof typeof DATASET_PRESETS>).map(name =>
+      {!cross && (Object.keys(DATASET_PRESETS) as Array<keyof typeof DATASET_PRESETS>).map(name =>
         <Button key={name} variant="outline" size="sm" onClick={() => changeSettings({ ...DATASET_PRESETS[name] })}>{name}</Button>)}
     </div>
     <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
       <div className="space-y-5">
+        {cross ? <>
+          <label className="block text-xs space-y-2"><span>Fält B (sparad .json)</span>
+            <input type="file" accept=".json,application/json" aria-label="Fält B" className="block w-full text-xs" onChange={e => { loadFieldB(e.target.files?.[0]); e.target.value = ""; }} /></label>
+          <p className="text-[11px] font-mono text-muted-foreground break-words">A: {fileName ?? "aktuellt fält"}<br />B: {fieldB?.name ?? "—"}</p>
+          <Threshold label="Textlikhet minst" value={crossSettings.similarity} onChange={v => changeCross({ ...crossSettings, similarity: v })} />
+          <Threshold label="Föredraget: CTI högst" value={crossSettings.chosenMaxCti} onChange={v => changeCross({ ...crossSettings, chosenMaxCti: v })} />
+          <Threshold label="Föredraget: säkerhet minst" value={crossSettings.chosenCertainty} onChange={v => changeCross({ ...crossSettings, chosenCertainty: v })} />
+          <Threshold label="Avvisat: CTI minst" value={crossSettings.rejectedMinCti} onChange={v => changeCross({ ...crossSettings, rejectedMinCti: v })} />
+          <Threshold label="CTI-skillnad minst" value={crossSettings.deltaCti} onChange={v => changeCross({ ...crossSettings, deltaCti: v })} />
+        </> : <>
         <Threshold label="Säkerhet över" value={settings.certainty} onChange={v => changeSettings({ ...settings, certainty: v })} />
         <Threshold label="CTI under (svar)" value={settings.maxCti} onChange={v => changeSettings({ ...settings, maxCti: v })} />
         {settings.mode === "dpo" && <>
@@ -89,6 +113,7 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
           <SelectTrigger aria-label="Kontextgrannar"><SelectValue /></SelectTrigger>
           <SelectContent>{[0, 1, 2].map(n => <SelectItem key={n} value={String(n)}>{n} kontextgrannar</SelectItem>)}</SelectContent>
         </Select>
+        </>}
         <div className="border-t border-border pt-4 space-y-1 font-mono text-xs" aria-live="polite">
           <p><span className="text-primary">{rows.length}</span> kandidater</p>
           <p><span className="text-primary">{approved.length}</span> godkända för export</p>
@@ -96,7 +121,7 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
       </div>
       <div className="min-w-0 space-y-4">
         <div className="text-xs text-field-fz border-l-2 border-field-fz pl-3 leading-relaxed">
-          {settings.mode === "dpo" ? "Preferenser är ännu inte märkta. Hög CTI är inte ett felaktigt svar." : "Urvalet är inte faktagranskat. Kontrollera att svaret verkligen besvarar frågan."}
+          {cross && !fieldB ? "Ladda ett andra sparat fält för att para noder mellan korpusarna. " : ""}{settings.mode === "dpo" ? "Preferenser är ännu inte märkta. Hög CTI är inte ett felaktigt svar." : "Urvalet är inte faktagranskat. Kontrollera att svaret verkligen besvarar frågan."}
         </div>
         {!profile.questionTemplates && <p className="text-sm text-muted-foreground">Frågemallar saknas för {profile.label}. Poker är den första profilen med mallar.</p>}
         {!current ? <p role="status" className="py-10 text-sm text-muted-foreground">Inga kandidater matchar urvalet i detta fält.</p> : <>
@@ -107,6 +132,13 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
               <Button aria-label="Nästa exempel" title="Nästa exempel" size="icon" variant="ghost" disabled={currentIndex >= rows.length - 1} onClick={() => setIndex(currentIndex + 1)}><ArrowRight /></Button>
             </div>
           </div>
+          {current.match && <p className="flex flex-wrap gap-1 font-mono text-[11px]" aria-label="Matchningspoäng">
+            <span className="border border-border px-1.5 py-0.5">Axel: {current.match.axis} · {current.match.level} ✓</span>
+            <span className="border border-border px-1.5 py-0.5">Semantik: {current.match.semantic.toFixed(2)} ✓</span>
+            <span className="border border-border px-1.5 py-0.5">Intention: {current.match.chosenAct} → {current.match.rejectedAct} ✓</span>
+            <span className="border border-border px-1.5 py-0.5">Prompt: samma mall ✓</span>
+            <span className="border border-border px-1.5 py-0.5">Föredraget från fält {current.match.chosenField}</span>
+          </p>}
           <p className="font-mono text-[11px] text-muted-foreground break-words">{current.metadata.dominant_axis} · CTI {current.metadata.cti.toFixed(2)} · säkerhet {current.metadata.epistemic_certainty.toFixed(2)} · kontext {current.metadata.context_nodes.join(", ")}</p>
           <label className="block text-xs space-y-2"><span>Fråga</span><Textarea aria-label="Fråga" value={current.prompt} onChange={e => edit({ prompt: e.target.value })} className="min-h-20" /></label>
           <label className="block text-xs space-y-2"><span>{settings.mode === "sft" ? "Svar" : "Föredraget svar (förslag)"}</span><Textarea aria-label="Svar" value={current.answer} onChange={e => edit({ answer: e.target.value })} className="min-h-40" /></label>

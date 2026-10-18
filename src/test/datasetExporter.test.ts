@@ -86,3 +86,32 @@ describe("dataset selection rules", () => {
     expect(parsed.messages[2].content).toBe(f.units[0].text);
   });
 });
+describe("cross-corpus DPO", () => {
+  const chosen = (id: string, text: string, patch: Partial<FieldUnit> = {}) => unit(id, { text, cti: 0.1, intention: { speechAct: "assertive", epistemicCertainty: 0.9, intentionalForce: 0.5, truthTension: 0.1 }, ...patch });
+  const rej = (id: string, text: string, patch: Partial<FieldUnit> = {}) => unit(id, { text, cti: 0.5, intention: { speechAct: "expressive", epistemicCertainty: 0.5, intentionalForce: 0.5, truthTension: 0.5 }, ...patch });
+  const t1 = "bubble icm pressure short stack fold equity tournament payout";
+  const t2 = "bubble icm pressure short stack shove tournament payout panic";
+  it("pairs across fields with shared axis, similarity, diverging intention and same template level", async () => {
+    const { buildCrossCorpusDpoCandidates } = await import("../lib/datasetExporter");
+    const out = buildCrossCorpusDpoCandidates(field([chosen("a", t1)]), field([rej("b", t2)]));
+    expect(out).toHaveLength(1);
+    expect(out[0].match.axis).toBe("icm_pressure");
+  });
+  it("rejects pairs on a different template level (prompt asymmetry)", async () => {
+    const { buildCrossCorpusDpoCandidates } = await import("../lib/datasetExporter");
+    expect(buildCrossCorpusDpoCandidates(field([chosen("a", t1)]), field([rej("b", t2, { domainAxes: { icm_pressure: 0.5 } })]))).toHaveLength(0);
+  });
+  it("requires CTI difference of at least 0.25", async () => {
+    const { buildCrossCorpusDpoCandidates } = await import("../lib/datasetExporter");
+    expect(buildCrossCorpusDpoCandidates(field([chosen("a", t1, { cti: 0.2 })]), field([rej("b", t2, { cti: 0.4 })]))).toHaveLength(0);
+  });
+  it("never pairs within the same field and rejects unrelated text", async () => {
+    const { buildCrossCorpusDpoCandidates } = await import("../lib/datasetExporter");
+    expect(buildCrossCorpusDpoCandidates(field([chosen("a", t1), rej("b", t2)]), field([]))).toHaveLength(0);
+    expect(buildCrossCorpusDpoCandidates(field([chosen("a", t1)]), field([rej("b", "garden flowers bloom spring weather")]))).toHaveLength(0);
+  });
+  it("rejected side must be directive or expressive", async () => {
+    const { buildCrossCorpusDpoCandidates } = await import("../lib/datasetExporter");
+    expect(buildCrossCorpusDpoCandidates(field([chosen("a", t1)]), field([rej("b", t2, { intention: { speechAct: "assertive", epistemicCertainty: 0.5, intentionalForce: 0.5, truthTension: 0.5 } })]))).toHaveLength(0);
+  });
+});
