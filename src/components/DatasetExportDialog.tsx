@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { fieldKey, loadTrainingSession, saveTrainingSession, type StoredTrainingSession } from "@/lib/lastFieldStore";
 import { ArrowLeft, ArrowRight, Check, Download, FileJson, RotateCcw } from "lucide-react";
 import type { GeometricField } from "@/lib/fieldData";
 import { getDomainProfile } from "@/lib/domainProfiles";
@@ -29,8 +30,8 @@ function Threshold({ label, value, onChange }: { label: string; value: number; o
   </div>;
 }
 
-function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?: string | null }) {
-  const [settings, setSettings] = useState<DatasetSettings>({ ...DATASET_PRESETS["Strict SFT"] });
+function ExportWorkspace({ field, fileName, initial, onPersist }: { field: GeometricField; fileName?: string | null; initial: StoredTrainingSession | null; onPersist: (patch: Partial<StoredTrainingSession>) => void }) {
+  const [settings, setSettings] = useState<DatasetSettings>({ ...DATASET_PRESETS[initial?.cross ? "Balanced DPO" : "Strict SFT"] });
   const [edits, setEdits] = useState<Record<string, DatasetCandidate>>({});
   const [index, setIndex] = useState(0);
   const profile = getDomainProfile(field.domain);
@@ -38,21 +39,24 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
     ? "Du är en rådgivare inom pokerstrategi, spelteori och turneringsmatematik. Ange villkor och osäkerheter; utlova inte vinster."
     : `Du besvarar frågor inom ${profile.label}. Ange villkor och osäkerheter.`);
   const [rights, setRights] = useState(false);
-  const [cross, setCross] = useState(false);
-  const [fieldB, setFieldB] = useState<{ field: GeometricField; name: string } | null>(null);
-  const [crossSettings, setCrossSettings] = useState<CrossCorpusSettings>({ ...CROSS_CORPUS_DEFAULTS, similarity: MEANING_SIMILARITY_DEFAULT });
+  const [cross, setCross] = useState(initial?.cross ?? false);
+  const [fieldB, setFieldB] = useState<{ field: GeometricField; name: string } | null>(initial?.fieldB ?? null);
+  const [crossSettings, setCrossSettings] = useState<CrossCorpusSettings>({ ...CROSS_CORPUS_DEFAULTS, similarity: MEANING_SIMILARITY_DEFAULT, ...(initial?.crossSettings ?? {}) });
   const meaning = useMeaningScores(field, fieldB?.field ?? null, crossSettings, cross);
   const candidates: Array<DatasetCandidate & { match?: CrossMatch }> = useMemo(() => cross
     ? (fieldB ? buildCrossCorpusDpoCandidates(field, fieldB.field, crossSettings, meaning.scores) : [])
     : buildDatasetCandidates(field, settings, fileName ?? ""), [field, settings, fileName, cross, fieldB, crossSettings, meaning.scores]);
   const funnel = useMemo(() => cross && fieldB && candidates.length === 0 ? crossCorpusFunnel(field, fieldB.field, crossSettings, meaning.scores) : null,
     [cross, fieldB, candidates.length, field, crossSettings, meaning.scores]);
-  const changeCross = (next: CrossCorpusSettings) => { setCrossSettings(next); setEdits({}); setIndex(0); };
+  const changeCross = (next: CrossCorpusSettings) => { setCrossSettings(next); setEdits({}); setIndex(0); onPersist({ crossSettings: { ...next } }); };
   const loadFieldB = (file?: File) => {
     if (!file) return;
     file.text().then(t => {
-      const parsed = parseFieldImport(t);
-      setFieldB({ field: parsed, name: file.name }); setEdits({}); setIndex(0);
+      // Field B only contributes its nodes; its saved links are never used here.
+      const parsed = { ...parseFieldImport(t), edges: [] };
+      const next = { field: parsed, name: file.name };
+      onPersist({ fieldB: next, cross: true, open: true });
+      setFieldB(next); setEdits({}); setIndex(0);
       toast.success(`Fält B inläst: ${parsed.units.length} noder`);
     }).catch(() => toast.error("Filen är inte ett sparat fält (.json)"));
   };
