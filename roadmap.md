@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Grunden (först)
+- [ ] JSON-import av pokerboken: begränsa kartans grafik och verifiera import + öppning av Cross-Corpus DPO med riktiga fält.
 - [x] Djup AI-spänning (llmTension/CTI) blev alltid 0 — analysen avbröts innan den hann klart. Åtgärdat + synlig varning vid låg täckning.
 - [ ] Uppladdning hoppar tillbaka till startläge — blockerad: behöver den exakta filen som fallerar för att återskapa felet.
 

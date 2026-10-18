@@ -13,3 +13,4 @@
 - Domain question templates stay on domain profiles; pure dataset selection and serialization live in `src/lib/datasetExporter.ts`; why: UI-independent, repeatable curation without changing field analysis.
 - Training export uses graph-linked, scored context and requires explicit human approval; training JSONL excludes provenance metadata, which is downloaded separately; why: tension is not truth or preference and training providers have different schemas.
 - Vite deduplicates React and React DOM and pre-optimizes training-dialog UI dependencies; why: late dependency discovery must not mix hook and renderer instances in the live preview.
+- Saved JSON fields use shared validation in fieldImport; display-only graph and cluster budgets live in fieldRendering, leaving the full saved topology intact for exports; why: invalid imports must not crash rendering and mobile graphics must stay bounded.

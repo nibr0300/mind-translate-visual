@@ -12,6 +12,7 @@ import DatasetExportDialog from "./DatasetExportDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
 import { toast } from "sonner";
+import { parseFieldImport } from "@/lib/fieldImport";
 
 const CLUSTER_COLORS = [
   "hsl(180, 70%, 50%)",
@@ -92,12 +93,13 @@ export default function FieldSidebar({
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const parsed = JSON.parse(reader.result as string) as GeometricField;
-        if (parsed.units && parsed.clusters && parsed.stats) {
-          onUploadField(parsed, file.name.replace(/\.json$/, ""));
-        }
-      } catch { /* ignore invalid JSON */ }
+        const parsed = parseFieldImport(String(reader.result));
+        onUploadField(parsed, file.name.replace(/\.json$/, ""));
+      } catch {
+        toast.error("Filen är inte ett giltigt sparat fält (.json). Det öppna fältet behålls.");
+      }
     };
+    reader.onerror = () => toast.error("Filen kunde inte läsas. Försök välja den igen.");
     reader.readAsText(file);
     e.target.value = "";
   };
