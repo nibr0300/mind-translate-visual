@@ -182,3 +182,15 @@ describe("causal pairing defaults", () => {
     expect(CAUSAL_MEANING_SIMILARITY_DEFAULT).toBeLessThan(MEANING_SIMILARITY_DEFAULT);
   });
 });
+
+describe("meaning request size", () => {
+  it("never puts more than the pair cap into one request", async () => {
+    const { crossCorpusPairsToScore, CROSS_CORPUS_DEFAULTS } = await import("../lib/datasetExporter");
+    const mk = (id: string, cti: number, act: string, cert: number) => unit(id, { text: `${id} unik text`, cti, domainAxes: {}, intention: { speechAct: act as any, epistemicCertainty: cert, intentionalForce: 0.5, truthTension: 0.1 } });
+    const a = field(Array.from({ length: 30 }, (_, i) => mk(`a${i}`, 0.1, "assertive", 0.9)));
+    const b = field(Array.from({ length: 30 }, (_, i) => mk(`b${i}`, 0.5, "expressive", 0.5)));
+    const out = crossCorpusPairsToScore(a, b, { ...CROSS_CORPUS_DEFAULTS, pairing: "causal" }, new Set(), 400, 100);
+    expect(out.pairs.length).toBeLessThanOrEqual(100);
+    if (out.pairs.length === 100) expect(out.skipped).toBeGreaterThan(0);
+  });
+});
