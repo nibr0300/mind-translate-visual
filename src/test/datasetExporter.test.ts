@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDatasetCandidates, DATASET_PRESETS, expandContext, questionForUnit, serializeDataset } from "../lib/datasetExporter";
+import { buildDatasetCandidates, CROSS_CORPUS_DEFAULTS as CROSS_CORPUS_DEFAULTS_FOR_TEST, DATASET_PRESETS, expandContext, questionForUnit, serializeDataset } from "../lib/datasetExporter";
 import { pokerAxisTemplates } from "../lib/domainProfiles";
 import type { FieldUnit, GeometricField } from "../lib/fieldData";
 
