@@ -110,6 +110,16 @@ describe("cross-corpus DPO", () => {
     expect(buildCrossCorpusDpoCandidates(field([chosen("a", t1), rej("b", t2)]), field([]))).toHaveLength(0);
     expect(buildCrossCorpusDpoCandidates(field([chosen("a", t1)]), field([rej("b", "garden flowers bloom spring weather")]))).toHaveLength(0);
   });
+  it("with AI meaning scores, pairs texts that share no words when the score reaches 0.80", async () => {
+    const { buildCrossCorpusDpoCandidates, pairKey, MEANING_SIMILARITY_DEFAULT, CROSS_CORPUS_DEFAULTS } = await import("../lib/datasetExporter");
+    expect(MEANING_SIMILARITY_DEFAULT).toBe(0.8);
+    const other = "garden flowers bloom spring weather";
+    const s = { ...CROSS_CORPUS_DEFAULTS, similarity: MEANING_SIMILARITY_DEFAULT };
+    const a = field([chosen("a", t1)]), b = field([rej("b", other)]);
+    expect(buildCrossCorpusDpoCandidates(a, b, s, new Map([[pairKey(t1, other), 0.8]]))).toHaveLength(1);
+    expect(buildCrossCorpusDpoCandidates(a, b, s, new Map([[pairKey(t1, other), 0.79]]))).toHaveLength(0);
+    expect(buildCrossCorpusDpoCandidates(a, b, s, new Map())).toHaveLength(0);
+  });
   it("rejected side must be directive or expressive", async () => {
     const { buildCrossCorpusDpoCandidates } = await import("../lib/datasetExporter");
     expect(buildCrossCorpusDpoCandidates(field([chosen("a", t1)]), field([rej("b", t2, { intention: { speechAct: "assertive", epistemicCertainty: 0.5, intentionalForce: 0.5, truthTension: 0.5 } })]))).toHaveLength(0);
