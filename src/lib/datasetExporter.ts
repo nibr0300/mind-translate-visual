@@ -258,8 +258,10 @@ function crossCorpusPairPool(a: GeometricField, b: GeometricField, s: CrossCorpu
   const rejected = all.filter(x => ["directive", "expressive"].includes(x.u.intention?.speechAct ?? "") && (x.u.cti ?? 0) >= s.rejectedMinCti);
   const withQ = chosen.flatMap(c => {
     if (s.pairing === "causal") {
+      // Asymmetric causal pairing: the anchor needs no mechanism tag and no
+      // domain-axis question — the prompt is built from the friction situation.
       const mechanism = mechanismsForUnit(c.u).primaryMechanism;
-      return mechanism ? [{ c, axis: mechanism, level: "high" as const, prompt: mechanismQuestion(mechanism) }] : [];
+      return [{ c, axis: mechanism ?? "semantisk matchning", level: "high" as const, prompt: mechanism ? mechanismQuestion(mechanism) : "" }];
     }
     const q = questionForUnit(c.u, domain);
     const level = q && axisLevel(c.u, q.axis, domain);
