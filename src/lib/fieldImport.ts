@@ -22,6 +22,8 @@ export function parseFieldImport(text: string): GeometricField {
   for (const unit of field.units) {
     if (!record(unit) || typeof unit.id !== "string" || ids.has(unit.id) || typeof unit.text !== "string" || !vector(unit.vector2d) || !finite(unit.clusterId) || !finite(unit.fz) || !finite(unit.fy)) throw new Error("Ogiltig nod i fältet");
     ids.add(unit.id);
+    if (unit.mechanisms != null && (!Array.isArray(unit.mechanisms) || !unit.mechanisms.every(m => typeof m === "string"))) throw new Error("Ogiltiga mekanismer");
+    if (unit.primaryMechanism != null && typeof unit.primaryMechanism !== "string") throw new Error("Ogiltig primär mekanism");
     for (const key of ["intention", "triangulation"] as const) {
       const annotation = unit[key];
       if (annotation != null && (!record(annotation) || Object.entries(annotation).some(([name, value]) => name !== "speechAct" && !finite(value)))) throw new Error("Ogiltig analys i fältet");

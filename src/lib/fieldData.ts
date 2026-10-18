@@ -37,6 +37,9 @@ export interface FieldUnit {
   weightedCentrality?: number;
   /** 0-1 scores on the domain profile axes used when the field was built. */
   domainAxes?: Record<string, number>;
+  /** Optional annotations; inferred at export for older saved fields. */
+  mechanisms?: string[];
+  primaryMechanism?: string;
 }
 
 /** Edge in the kNN graph computed in the original vector space (not the 2D projection). */

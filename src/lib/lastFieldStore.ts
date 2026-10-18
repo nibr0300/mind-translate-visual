@@ -59,7 +59,7 @@ export interface StoredTrainingSession {
   open: boolean;
   cross: boolean;
   fieldB: { field: GeometricField; name: string } | null;
-  crossSettings?: Record<string, number>;
+  crossSettings?: Partial<import("./datasetExporter").CrossCorpusSettings>;
 }
 
 export const saveTrainingSession = (session: StoredTrainingSession) => put(TRAINING_KEY, session);
