@@ -6,6 +6,7 @@ import { computeDepths, applyHelm } from "@/lib/helmMath";
 import HelmWheel from "./HelmWheel";
 import { getDomainProfile } from "@/lib/domainProfiles";
 import { axisLayout } from "@/lib/axisLayout";
+import { displayEdges, clusterDiameter } from "@/lib/fieldRendering";
 
 
 
@@ -164,13 +165,7 @@ export default function FieldCanvas({
   // 600 units), which exhausted mobile memory exactly when upload completed.
   const visibleEdges = useMemo(() => {
     if (field.edges?.length) {
-      return field.edges.flatMap((edge) => {
-        const source = indexByUnitId.get(edge.source);
-        const target = indexByUnitId.get(edge.target);
-        return source === undefined || target === undefined
-          ? []
-          : [{ source, target, similarity: edge.similarity }];
-      });
+      return displayEdges(field.edges, field.units, lite);
     }
 
     // Demo/legacy fields may not carry edges. They are small, but keep a hard
@@ -185,8 +180,8 @@ export default function FieldCanvas({
         if (distance <= 2) fallback.push({ source, target, similarity: Math.max(0.05, 1 - distance / 2) });
       }
     }
-    return fallback;
-  }, [field.edges, field.units, indexByUnitId]);
+    return fallback.slice(0, lite ? 400 : 1200);
+  }, [field.edges, field.units, lite]);
 
   const pctX = (i: number) => `${unitPositions[i].x}%`;
   const pctY = (i: number) => `${unitPositions[i].y}%`;
@@ -303,7 +298,9 @@ export default function FieldCanvas({
     if (pointers.current.size === 2) {
       const [a, b] = Array.from(pointers.current.values());
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const rect = viewportRef.current!.getBoundingClientRect();
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      const rect = viewport.getBoundingClientRect();
       pinchRef.current = {
         dist,
         cx: (a.x + b.x) / 2 - rect.left,
@@ -521,8 +518,8 @@ export default function FieldCanvas({
                 <div
                   className="rounded-full pointer-events-none"
                   style={{
-                    width: `${cluster.unitCount * 25 + 60}px`,
-                    height: `${cluster.unitCount * 25 + 60}px`,
+                    width: `${clusterDiameter(cluster.unitCount, lite)}px`,
+                    height: `${clusterDiameter(cluster.unitCount, lite)}px`,
                     background: CLUSTER_COLORS_DIM[i],
                     border: `1px solid ${CLUSTER_COLORS[i]}22`,
                   }}

@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { parseFieldImport } from "@/lib/fieldImport";
 
 function download(content: string, name: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -46,8 +47,7 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
   const loadFieldB = (file?: File) => {
     if (!file) return;
     file.text().then(t => {
-      const parsed = JSON.parse(t) as GeometricField;
-      if (!parsed.units?.length) throw new Error();
+      const parsed = parseFieldImport(t);
       setFieldB({ field: parsed, name: file.name }); setEdits({}); setIndex(0);
     }).catch(() => toast.error("Filen är inte ett sparat fält (.json)"));
   };
