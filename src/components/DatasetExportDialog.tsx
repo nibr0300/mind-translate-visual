@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Download, FileJson, RotateCcw } from "lucide-react";
 import type { GeometricField } from "@/lib/fieldData";
 import { getDomainProfile } from "@/lib/domainProfiles";
-import { buildCrossCorpusDpoCandidates, buildDatasetCandidates, CROSS_CORPUS_DEFAULTS, DATASET_PRESETS, serializeDataset, type CrossCorpusSettings, type CrossMatch, type DatasetCandidate, type DatasetSettings } from "@/lib/datasetExporter";
+import { buildCrossCorpusDpoCandidates, crossCorpusFunnel, buildDatasetCandidates, CROSS_CORPUS_DEFAULTS, DATASET_PRESETS, serializeDataset, type CrossCorpusSettings, type CrossMatch, type DatasetCandidate, type DatasetSettings } from "@/lib/datasetExporter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
