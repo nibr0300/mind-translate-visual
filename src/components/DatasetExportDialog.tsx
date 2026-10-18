@@ -184,10 +184,33 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
 
 export default function DatasetExportDialog(props: { field: GeometricField; fileName?: string | null; enabled: boolean }) {
   const [open, setOpen] = useState(false);
-  return <Dialog open={open} onOpenChange={setOpen}>
+  const key = fieldKey(props.field, props.fileName);
+  // The session that belongs to this field A; null until checked, so a reload
+  // never opens the workspace before the stored field B is back.
+  const [session, setSession] = useState<StoredTrainingSession | null | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    setSession(undefined);
+    loadTrainingSession().then(stored => {
+      if (cancelled) return;
+      const mine = stored?.fieldKey === key ? stored : null;
+      setSession(mine);
+      if (mine?.open && props.enabled) setOpen(true);
+    }).catch(() => { if (!cancelled) setSession(null); });
+    return () => { cancelled = true; };
+  }, [key, props.enabled]);
+  const persist = useCallback((patch: Partial<StoredTrainingSession>) => {
+    setSession(previous => {
+      const next: StoredTrainingSession = { fieldKey: key, open: true, cross: false, fieldB: null, ...(previous ?? {}), ...patch };
+      void saveTrainingSession(next).catch(() => { /* restore is best-effort */ });
+      return next;
+    });
+  }, [key]);
+  const changeOpen = (next: boolean) => { setOpen(next); persist({ open: next }); };
+  return <Dialog open={open} onOpenChange={changeOpen}>
     <DialogTrigger asChild><Button variant="outline" size="sm" className="basis-full font-mono text-xs" disabled={!props.enabled}><FileJson />Träningsdata · SFT / DPO</Button></DialogTrigger>
     <DialogContent className="w-[calc(100%-2rem)] max-w-4xl max-h-[90dvh] overflow-y-auto p-5">
-      {open && <ExportWorkspace field={props.field} fileName={props.fileName} />}
+      {open && session !== undefined && <ExportWorkspace field={props.field} fileName={props.fileName} initial={session} onPersist={persist} />}
     </DialogContent>
   </Dialog>;
 }
