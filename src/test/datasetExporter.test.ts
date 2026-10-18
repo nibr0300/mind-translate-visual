@@ -135,3 +135,42 @@ describe("crossCorpusFunnel", () => {
     expect(crossForTest(empty, empty)).toHaveLength(0);
   });
 });
+
+describe("asymmetric causal pairing", () => {
+  const anchor = (id: string, text: string) => unit(id, { text, cti: 0.1, intention: { speechAct: "assertive", epistemicCertainty: 0.9, intentionalForce: 0.5, truthTension: 0.1 }, domainAxes: {} });
+  const friction = (id: string, text: string) => unit(id, { text, cti: 0.5, intention: { speechAct: "expressive", epistemicCertainty: 0.5, intentionalForce: 0.5, truthTension: 0.5 }, domainAxes: {} });
+  const causalSettings = { ...CROSS_CORPUS_DEFAULTS_FOR_TEST, pairing: "causal" as const, similarity: 0.8 };
+  it("pairs anchor and friction with no mechanism tags when meaning reaches the threshold", async () => {
+    const { buildCrossCorpusDpoCandidates, pairKey } = await import("../lib/datasetExporter");
+    const a = field([anchor("a", "Beslutskvalitet bedöms med informationen före utfallet, inte av ett enskilt resultat.")]);
+    const b = field([friction("b", "Jag vann på en oplanerad affär, alltså var beslutet rätt.")]);
+    const meaning = new Map([[pairKey(a.units[0].text, b.units[0].text), 0.85]]);
+    const out = buildCrossCorpusDpoCandidates(a, b, causalSettings, meaning);
+    expect(out).toHaveLength(1);
+    expect(out[0].metadata.causal_pair).toBe(true);
+    expect(out[0].metadata.causal_edge).toBeUndefined();
+    expect(out[0].prompt).toContain("Situation:");
+  });
+  it("meaning similarity gates causal pairs too", async () => {
+    const { buildCrossCorpusDpoCandidates, pairKey } = await import("../lib/datasetExporter");
+    const a = field([anchor("a", "Beslutskvalitet bedöms med informationen före utfallet.")]);
+    const b = field([friction("b", "Jag vann, alltså var beslutet rätt.")]);
+    const low = new Map([[pairKey(a.units[0].text, b.units[0].text), 0.5]]);
+    expect(buildCrossCorpusDpoCandidates(a, b, causalSettings, low)).toHaveLength(0);
+    expect(buildCrossCorpusDpoCandidates(a, b, causalSettings, new Map())).toHaveLength(0);
+  });
+  it("causal pairs always require bridge validation before approval", async () => {
+    const { buildCrossCorpusDpoCandidates, pairKey, canApproveCandidate } = await import("../lib/datasetExporter");
+    const a = field([anchor("a", "Beslutskvalitet bedöms med informationen före utfallet.")]);
+    const b = field([friction("b", "Jag vann, alltså var beslutet rätt.")]);
+    const meaning = new Map([[pairKey(a.units[0].text, b.units[0].text), 0.9]]);
+    const [candidate] = buildCrossCorpusDpoCandidates(a, b, causalSettings, meaning);
+    candidate.approved = true;
+    candidate.answer = "Ett tillämpat svar.";
+    expect(canApproveCandidate(candidate)).toBe(false);
+    candidate.metadata.bridge_validated = true;
+    candidate.metadata.bridge_reason = "Ankaret förklarar utfallsbias i situationen.";
+    candidate.metadata.style_reviewed = true;
+    expect(canApproveCandidate(candidate)).toBe(true);
+  });
+});
