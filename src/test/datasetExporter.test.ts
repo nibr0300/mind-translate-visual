@@ -174,3 +174,11 @@ describe("asymmetric causal pairing", () => {
     expect(canApproveCandidate(candidate)).toBe(true);
   });
 });
+
+describe("causal pairing defaults", () => {
+  it("causal cross-domain meaning threshold is lower than the same-domain axis threshold", async () => {
+    const { CAUSAL_MEANING_SIMILARITY_DEFAULT, MEANING_SIMILARITY_DEFAULT } = await import("../lib/datasetExporter");
+    expect(CAUSAL_MEANING_SIMILARITY_DEFAULT).toBe(0.6);
+    expect(CAUSAL_MEANING_SIMILARITY_DEFAULT).toBeLessThan(MEANING_SIMILARITY_DEFAULT);
+  });
+});
