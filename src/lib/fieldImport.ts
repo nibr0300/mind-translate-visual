@@ -4,6 +4,16 @@ const record = (value: unknown): value is Record<string, unknown> => typeof valu
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const vector = (value: unknown) => Array.isArray(value) && value.length === 2 && value.every(finite);
 
+/** Cheap shape check: does this JSON text look like a saved field export? */
+export function looksLikeSavedField(text: string): boolean {
+  try {
+    const value: unknown = JSON.parse(text);
+    return record(value) && Array.isArray(value.units) && Array.isArray(value.clusters) && record(value.stats);
+  } catch {
+    return false;
+  }
+}
+
 /** Validate saved fields without regenerating or changing their analysis. */
 export function parseFieldImport(text: string): GeometricField {
   const field: unknown = JSON.parse(text);

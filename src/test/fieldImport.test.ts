@@ -33,3 +33,13 @@ describe("saved field import", () => {
     expect(clusterDiameter(10000, false)).toBe(600);
   });
 });
+import { looksLikeSavedField } from "../lib/fieldImport";
+describe("looksLikeSavedField", () => {
+  it("recognises a saved field export", () => {
+    expect(looksLikeSavedField(JSON.stringify({ units: [], clusters: [], stats: {} }))).toBe(true);
+  });
+  it("rejects ordinary JSON documents", () => {
+    expect(looksLikeSavedField(JSON.stringify({ title: "hand history", hands: [] }))).toBe(false);
+    expect(looksLikeSavedField("not json")).toBe(false);
+  });
+});
