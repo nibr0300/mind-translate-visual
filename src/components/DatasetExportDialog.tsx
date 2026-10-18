@@ -152,7 +152,7 @@ function ExportWorkspace({ field, fileName }: { field: GeometricField; fileName?
           </div>
           {current.match && <p className="flex flex-wrap gap-1 font-mono text-[11px]" aria-label="Matchningspoäng">
             <span className="border border-border px-1.5 py-0.5">Axel: {current.match.axis} · {current.match.level} ✓</span>
-            <span className="border border-border px-1.5 py-0.5">Semantik: {current.match.semantic.toFixed(2)} ✓</span>
+            <span className="border border-border px-1.5 py-0.5">Mening: {current.match.semantic.toFixed(2)} ✓</span>
             <span className="border border-border px-1.5 py-0.5">Intention: {current.match.chosenAct} → {current.match.rejectedAct} ✓</span>
             <span className="border border-border px-1.5 py-0.5">Prompt: samma mall ✓</span>
             <span className="border border-border px-1.5 py-0.5">Föredraget från fält {current.match.chosenField}</span>
