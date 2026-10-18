@@ -115,3 +115,13 @@ describe("cross-corpus DPO", () => {
     expect(buildCrossCorpusDpoCandidates(field([chosen("a", t1)]), field([rej("b", t2, { intention: { speechAct: "assertive", epistemicCertainty: 0.5, intentionalForce: 0.5, truthTension: 0.5 } })]))).toHaveLength(0);
   });
 });
+
+import { crossCorpusFunnel as funnelForTest, buildCrossCorpusDpoCandidates as crossForTest } from "../lib/datasetExporter";
+describe("crossCorpusFunnel", () => {
+  it("reports zero pairs at every step when field B has no units passing the rules", () => {
+    const empty = { units: [], clusters: [], edges: [], stats: { totalUnits: 0, boundaryUnits: 0, avgFZ: 0, avgFY: 0 }, domain: "poker" } as any;
+    const f = funnelForTest(empty, empty);
+    expect(f).toEqual({ chosen: 0, rejected: 0, chosenWithQuestion: 0, sameAxisLevel: 0, enoughCtiGap: 0, bestSimilarity: 0 });
+    expect(crossForTest(empty, empty)).toHaveLength(0);
+  });
+});
