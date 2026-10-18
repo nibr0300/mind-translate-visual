@@ -157,6 +157,9 @@ export const CROSS_CORPUS_DEFAULTS: CrossCorpusSettings = {
   similarity: 0.45, chosenMaxCti: 0.2, chosenCertainty: 0.85, rejectedMinCti: 0.35, deltaCti: 0.25,
 };
 
+/** Starting threshold for AI meaning similarity (unrelated poker texts score ~0.70, same idea ~0.90). */
+export const MEANING_SIMILARITY_DEFAULT = 0.8;
+
 export interface CrossMatch {
   axis: string;
   level: "high" | "medium";
