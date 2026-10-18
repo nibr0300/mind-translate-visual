@@ -70,7 +70,9 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
   const changeSettings = (next: DatasetSettings) => { setSettings(next); setEdits({}); setIndex(0); };
   const edit = (patch: Partial<DatasetCandidate>) => {
     if (!current) return;
-    setEdits(previous => ({ ...previous, [current.id]: { ...current, ...patch, metadata: { ...current.metadata, ...patch.metadata }, approved: patch.approved ?? false } }));
+    const contentChanged = patch.prompt !== undefined || patch.answer !== undefined || patch.rejected !== undefined;
+    setEdits(previous => ({ ...previous, [current.id]: { ...current, ...patch, metadata: { ...current.metadata, ...patch.metadata,
+      ...(contentChanged && current.metadata.causal_edge ? { bridge_validated: false, style_reviewed: false } : {}) }, approved: patch.approved ?? false } }));
   };
   const exportRows = () => {
     if (!approved.length || !rights || !system.trim()) return;
@@ -109,6 +111,7 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
             <SelectContent><SelectItem value="axis">Domänaxel + mening</SelectItem><SelectItem value="causal">Kausal mekanism · tvärdomän</SelectItem></SelectContent>
           </Select>
           <Button asChild variant="outline" size="sm"><a href="/fixtures/trading_tilt_transfer.json" download><Download />Trading · testfält</a></Button>
+          <p className="text-[11px] text-muted-foreground">Trading-testfältet är syntetiskt och har manuella analysvärden. Håll det utanför träningen för ett osedd-data-test.</p>
           <label className="block text-xs space-y-2"><span>Fält B (sparad .json)</span>
             <input type="file" accept=".json,application/json" aria-label="Fält B" className="sr-only" onChange={e => { loadFieldB(e.target.files?.[0]); e.target.value = ""; }} />
             <span className="flex h-9 w-full items-center justify-center rounded-md border border-border text-xs font-mono cursor-pointer hover:border-primary/40">{fieldB ? "Byt fält B…" : "Välj fält B…"}</span></label>
@@ -147,7 +150,7 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
         </div>
         {!profile.questionTemplates && !causal && !settings.mechanisms && <p className="text-sm text-muted-foreground">Frågemallar saknas för {profile.label}. Poker är den första profilen med mallar.</p>}
         {!current && cross && funnel ? <div role="status" className="py-4 space-y-2 text-xs font-mono text-muted-foreground">
-          <p className="text-sm font-sans text-foreground">Inga par klarade alla fyra kontrollerna. Så här många gick vidare i varje steg:</p>
+          <p className="text-sm font-sans text-foreground">{causal ? "Inga kausala förslag matchar urvalet." : "Inga par klarade alla fyra kontrollerna."}</p>
           <p>Föredragna svar (påstående, låg CTI, hög säkerhet): <span className="text-primary">{funnel.chosen}</span></p>
           <p>Avvisade svar (uppmaning/känsla, hög CTI): <span className="text-primary">{funnel.rejected}</span></p>
           <p>Föredragna med en frågemall: <span className="text-primary">{funnel.chosenWithQuestion}</span></p>
