@@ -43,7 +43,7 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
   const [fieldB, setFieldB] = useState<{ field: GeometricField; name: string } | null>(initial?.fieldB ?? null);
   const [crossSettings, setCrossSettings] = useState<CrossCorpusSettings>({ ...CROSS_CORPUS_DEFAULTS, similarity: MEANING_SIMILARITY_DEFAULT, ...(initial?.crossSettings ?? {}) });
   const causal = cross && crossSettings.pairing === "causal";
-  const meaning = useMeaningScores(field, fieldB?.field ?? null, crossSettings, cross && !causal);
+  const meaning = useMeaningScores(field, fieldB?.field ?? null, crossSettings, cross);
   const candidates: Array<DatasetCandidate & { match?: CrossMatch }> = useMemo(() => cross
     ? (fieldB ? buildCrossCorpusDpoCandidates(field, fieldB.field, crossSettings, meaning.scores) : [])
     : buildDatasetCandidates(field, settings, fileName ?? ""), [field, settings, fileName, cross, fieldB, crossSettings, meaning.scores]);
@@ -60,6 +60,18 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
       setFieldB(next); setEdits({}); setIndex(0);
       toast.success(`Fält B inläst: ${parsed.units.length} noder`);
     }).catch(() => toast.error("Filen är inte ett sparat fält (.json)"));
+  };
+  const loadFixtureB = () => {
+    fetch("/fixtures/trading_tilt_transfer.json").then(r => {
+      if (!r.ok) throw new Error(String(r.status));
+      return r.text();
+    }).then(t => {
+      const parsed = { ...parseFieldImport(t), edges: [] };
+      const next = { field: parsed, name: "Trading · testfält" };
+      onPersist({ fieldB: next, cross: true, open: true });
+      setFieldB(next); setEdits({}); setIndex(0);
+      toast.success(`Fält B inläst: ${parsed.units.length} noder`);
+    }).catch(() => toast.error("Kunde inte läsa testfältet"));
   };
   const rows = candidates.map(c => ({ ...c, ...(edits[c.id] ?? {}) }) as DatasetCandidate & { match?: CrossMatch });
   const currentIndex = Math.min(index, Math.max(0, rows.length - 1));
@@ -110,15 +122,15 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
             <SelectTrigger aria-label="Parningsmetod"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="axis">Domänaxel + mening</SelectItem><SelectItem value="causal">Kausal mekanism · tvärdomän</SelectItem></SelectContent>
           </Select>
-          <Button asChild variant="outline" size="sm"><a href="/fixtures/trading_tilt_transfer.json" download><Download />Trading · testfält</a></Button>
+          <Button variant="outline" size="sm" onClick={loadFixtureB}><Download />Läs in Trading · testfält som fält B</Button>
           <p className="text-[11px] text-muted-foreground">Trading-testfältet är syntetiskt och har manuella analysvärden. Håll det utanför träningen för ett osedd-data-test.</p>
           <label className="block text-xs space-y-2"><span>Fält B (sparad .json)</span>
             <input type="file" accept=".json,application/json" aria-label="Fält B" className="sr-only" onChange={e => { loadFieldB(e.target.files?.[0]); e.target.value = ""; }} />
             <span className="flex h-9 w-full items-center justify-center rounded-md border border-border text-xs font-mono cursor-pointer hover:border-primary/40">{fieldB ? "Byt fält B…" : "Välj fält B…"}</span></label>
           <p className="text-[11px] font-mono text-muted-foreground break-words">A: {fileName ?? "aktuellt fält"} · {field.units.length} noder<br />
             B: {fieldB ? <span className="text-primary">✓ {fieldB.name} · {fieldB.field.units.length} noder</span> : "ej vald"}</p>
-          {!causal && <Threshold label="Meningslikhet minst (AI)" value={crossSettings.similarity} onChange={v => changeCross({ ...crossSettings, similarity: v })} />}
-          {!causal && fieldB && <p className="text-[11px] font-mono text-muted-foreground" aria-live="polite">
+          <Threshold label="Meningslikhet minst (AI)" value={crossSettings.similarity} onChange={v => changeCross({ ...crossSettings, similarity: v })} />
+          {fieldB && <p className="text-[11px] font-mono text-muted-foreground" aria-live="polite">
             {meaning.status === "loading" ? "Jämför betydelse med AI…" : meaning.status === "error" ? <span className="text-destructive">{meaning.error} <Button variant="ghost" size="sm" onClick={meaning.retry}>Försök igen</Button></span> : meaning.status === "ready" ? `Betydelse jämförd för ${meaning.scores.size} par.` : ""}
             {meaning.skipped > 0 && ` ${meaning.skipped} par över gränsen jämfördes inte – skärp reglagen nedan.`}</p>}
           <Threshold label="Föredraget: CTI högst" value={crossSettings.chosenMaxCti} onChange={v => changeCross({ ...crossSettings, chosenMaxCti: v })} />
@@ -154,9 +166,9 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
           <p>Föredragna svar (påstående, låg CTI, hög säkerhet): <span className="text-primary">{funnel.chosen}</span></p>
           <p>Avvisade svar (uppmaning/känsla, hög CTI): <span className="text-primary">{funnel.rejected}</span></p>
           <p>Föredragna med en frågemall: <span className="text-primary">{funnel.chosenWithQuestion}</span></p>
-          <p>{causal ? "Par med en riktad mekanismlänk:" : "Par på samma axel och nivå:"} <span className="text-primary">{funnel.sameAxisLevel}</span></p>
+          <p>{causal ? "Par kvar efter intentionskrav:" : "Par på samma axel och nivå:"} <span className="text-primary">{funnel.sameAxisLevel}</span></p>
           <p>…med tillräcklig CTI-skillnad: <span className="text-primary">{funnel.enoughCtiGap}</span></p>
-          {!causal && <p>Högsta meningslikhet bland dem: <span className="text-primary">{funnel.bestSimilarity.toFixed(2)}</span> (krav {crossSettings.similarity.toFixed(2)})</p>}
+          <p>Högsta meningslikhet bland dem: <span className="text-primary">{funnel.bestSimilarity.toFixed(2)}</span> (krav {crossSettings.similarity.toFixed(2)})</p>
         </div> : !current ? <p role="status" className="py-10 text-sm text-muted-foreground">Inga kandidater matchar urvalet i detta fält.</p> : <>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono">{currentIndex + 1} / {rows.length} · {current.metadata.node_id}</span>
@@ -167,13 +179,13 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
           </div>
           {current.match && <p className="flex flex-wrap gap-1 font-mono text-[11px]" aria-label="Matchningspoäng">
             <span className="border border-border px-1.5 py-0.5">{causal ? "Mekanism" : "Axel"}: {current.match.axis} · {current.match.level}</span>
-            {!causal && <span className="border border-border px-1.5 py-0.5">Mening: {current.match.semantic.toFixed(2)} ✓</span>}
+            <span className="border border-border px-1.5 py-0.5">Mening: {current.match.semantic.toFixed(2)} ✓</span>
             <span className="border border-border px-1.5 py-0.5">Intention: {current.match.chosenAct} → {current.match.rejectedAct} ✓</span>
             <span className="border border-border px-1.5 py-0.5">{causal ? "Situation från friktionsnoden" : "Prompt: samma mall ✓"}</span>
             <span className="border border-border px-1.5 py-0.5">{causal ? "Ankare" : "Föredraget"} från fält {current.match.chosenField}</span>
           </p>}
-          {current.metadata.causal_edge && <section className="space-y-3 border-l-2 border-primary pl-3 text-xs">
-            <p className="font-mono break-words">{current.metadata.causal_edge.source} → {current.metadata.causal_edge.relation} → {current.metadata.causal_edge.target}</p>
+          {current.metadata.causal_pair && <section className="space-y-3 border-l-2 border-primary pl-3 text-xs">
+            {current.metadata.causal_edge && <p className="font-mono break-words">{current.metadata.causal_edge.source} → {current.metadata.causal_edge.relation} → {current.metadata.causal_edge.target}</p>}
             <p className="text-field-fz">Föreslagen länk, inte bevisad orsak. Ankaret är underlag, inte ett färdigt svar.</p>
             <p className="text-muted-foreground break-words">Ankare · {current.metadata.anchor_domain}: {current.metadata.anchor_text}</p>
             <p className="text-muted-foreground">Situation · {current.metadata.rejected_domain}</p>

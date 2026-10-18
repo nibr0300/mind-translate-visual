@@ -43,6 +43,8 @@ export interface DatasetCandidate {
     mechanisms?: string[];
     primaryMechanism?: string;
     causal_edge?: MechanismEdge;
+    /** Causal cross-corpus pair: always requires bridge validation, even without a curated edge. */
+    causal_pair?: boolean;
     anchor_text?: string;
     anchor_field?: "A" | "B";
     rejected_field?: "A" | "B";
@@ -156,7 +158,7 @@ export function buildDatasetCandidates(field: GeometricField, settings: DatasetS
 export function canApproveCandidate(c: DatasetCandidate): boolean {
   return Boolean(c.prompt.trim() && c.answer.trim()
     && (c.mode !== "dpo" || (c.rejected?.trim() && c.rejected.trim() !== c.answer.trim()))
-    && (!c.metadata.causal_edge || (c.metadata.bridge_validated && c.metadata.bridge_reason?.trim() && c.metadata.style_reviewed))
+    && (!c.metadata.causal_pair || (c.metadata.bridge_validated && c.metadata.bridge_reason?.trim() && c.metadata.style_reviewed))
     && (!c.silent_chosen || !containsMechanismJargon(c.answer)));
 }
 export function serializeDataset(candidates: DatasetCandidate[], system: string): string {
@@ -256,8 +258,10 @@ function crossCorpusPairPool(a: GeometricField, b: GeometricField, s: CrossCorpu
   const rejected = all.filter(x => ["directive", "expressive"].includes(x.u.intention?.speechAct ?? "") && (x.u.cti ?? 0) >= s.rejectedMinCti);
   const withQ = chosen.flatMap(c => {
     if (s.pairing === "causal") {
+      // Asymmetric causal pairing: the anchor needs no mechanism tag and no
+      // domain-axis question — the prompt is built from the friction situation.
       const mechanism = mechanismsForUnit(c.u).primaryMechanism;
-      return mechanism ? [{ c, axis: mechanism, level: "high" as const, prompt: mechanismQuestion(mechanism) }] : [];
+      return [{ c, axis: mechanism ?? "semantisk matchning", level: "high" as const, prompt: mechanism ? mechanismQuestion(mechanism) : "" }];
     }
     const q = questionForUnit(c.u, domain);
     const level = q && axisLevel(c.u, q.axis, domain);
@@ -267,7 +271,9 @@ function crossCorpusPairPool(a: GeometricField, b: GeometricField, s: CrossCorpu
   let sameAxisLevel = 0;
   for (const { c, axis, level, prompt } of withQ) for (const r of rejected) {
     if (r.f === c.f || r.u.text.trim() === c.u.text.trim()) continue;
-    if (s.pairing === "causal" ? !causalLinks(c.u, r.u).length : axisLevel(r.u, axis, domain) !== level) continue;
+    // Causal mode pairs purely on intention, CTI gap and meaning; axis mode
+    // still requires the same template level (prompt symmetry).
+    if (s.pairing !== "causal" && axisLevel(r.u, axis, domain) !== level) continue;
     sameAxisLevel++;
     if ((r.u.cti ?? 0) - (c.u.cti ?? 0) >= s.deltaCti) pairs.push({ c, r, axis, level, prompt });
   }
@@ -347,27 +353,30 @@ export function buildCrossCorpusDpoCandidates(a: GeometricField, b: GeometricFie
     for (const p of options) {
       if (usedRejected.has(p.r)) continue;
       const value = sim?.(c, p.r);
-      if (s.pairing !== "causal" && (value == null || value < s.similarity)) continue;
+      if (value == null || value < s.similarity) continue;
       const rank = value ?? 0;
       if (!best || rank > best.sim || (rank === best.sim && p.r.u.id < best.p.r.u.id)) best = { p, sim: rank };
     }
     if (!best) continue;
     usedRejected.add(best.p.r);
     const r = best.p.r.u;
-    const causalEdge = s.pairing === "causal" ? causalLinks(c.u, r)[0] : undefined;
+    const causal = s.pairing === "causal";
+    // A curated mechanism edge annotates the pair when both sides happen to
+    // carry tags, but the pairing itself never depends on tags.
+    const causalEdge = causal ? causalLinks(c.u, r)[0] : undefined;
     out.push({
-      id: `${s.pairing ?? "axis"}:cross:${c.f}:${c.u.id}:${best.p.r.f}:${r.id}`, mode: "dpo", prompt: causalEdge ? `Situation: ${r.text.trim()}\n\nVilket nästa beslut är motiverat, och varför? Ange vilka uppgifter som saknas.` : best.p.prompt,
-      answer: causalEdge ? "" : c.u.text.trim(), rejected: r.text.trim(), approved: false, silent_chosen: false,
+      id: `${s.pairing ?? "axis"}:cross:${c.f}:${c.u.id}:${best.p.r.f}:${r.id}`, mode: "dpo", prompt: causal ? `Situation: ${r.text.trim()}\n\nVilket nästa beslut är motiverat, och varför? Ange vilka uppgifter som saknas.` : best.p.prompt,
+      answer: causal ? "" : c.u.text.trim(), rejected: r.text.trim(), approved: false, silent_chosen: false,
       metadata: {
         domain, node_id: c.u.id, context_nodes: [c.u.id], source_paths: [c.u.sourcePath, r.sourcePath].filter(Boolean) as string[],
         domain_axes: c.u.domainAxes ?? {}, dominant_axis: best.p.axis, cti: c.u.cti ?? 0,
         epistemic_certainty: c.u.intention?.epistemicCertainty ?? 0, speech_act: c.u.intention?.speechAct ?? "",
         rejected_node: r.id, rejected_cti: r.cti, edge_similarity: best.sim,
-        ...(causalEdge ? { ...mechanismsForUnit(c.u), causal_edge: causalEdge, anchor_text: c.u.text.trim(), anchor_field: c.f,
+        ...(causal ? { ...mechanismsForUnit(c.u), causal_pair: true as const, ...(causalEdge ? { causal_edge: causalEdge } : {}), anchor_text: c.u.text.trim(), anchor_field: c.f,
           rejected_field: best.p.r.f, anchor_domain: (c.f === "A" ? a : b).domain ?? "general", rejected_domain: (best.p.r.f === "A" ? a : b).domain ?? "general",
           bridge_validated: false, bridge_reason: "", style_reviewed: false, silent_chosen: false, style_variant: "explicit_analytical" as const } : {}),
       },
-      match: { axis: best.p.axis, level: best.p.level, semantic: best.sim, chosenAct: "assertive", rejectedAct: r.intention?.speechAct ?? "", promptMatch: !causalEdge, chosenField: c.f, causalEdge },
+      match: { axis: best.p.axis, level: best.p.level, semantic: best.sim, chosenAct: "assertive", rejectedAct: r.intention?.speechAct ?? "", promptMatch: !causal, chosenField: c.f, causalEdge },
     });
   }
   return out;
