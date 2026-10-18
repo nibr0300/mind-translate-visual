@@ -1,5 +1,6 @@
 import type { FieldUnit, GeometricField } from "./fieldData";
 import { getDomainProfile } from "./domainProfiles";
+import { causalLinks, containsMechanismJargon, mechanismQuestion, mechanismsForUnit, type MechanismEdge } from "./mechanismGraph";
 
 export type ExportMode = "sft" | "dpo";
 export interface DatasetSettings {
@@ -10,6 +11,7 @@ export interface DatasetSettings {
   deltaCti: number;
   similarity: number;
   neighbors: number;
+  mechanisms?: boolean;
 }
 export const DATASET_PRESETS = {
   "Strict SFT": { mode: "sft", certainty: 0.85, maxCti: 0.15, rejectedCti: 0.3, deltaCti: 0.25, similarity: 0.65, neighbors: 2 },
@@ -24,6 +26,7 @@ export interface DatasetCandidate {
   answer: string;
   rejected?: string;
   approved: boolean;
+  silent_chosen?: boolean;
   metadata: {
     domain: string;
     node_id: string;
@@ -37,6 +40,19 @@ export interface DatasetCandidate {
     rejected_node?: string;
     rejected_cti?: number;
     edge_similarity?: number;
+    mechanisms?: string[];
+    primaryMechanism?: string;
+    causal_edge?: MechanismEdge;
+    anchor_text?: string;
+    anchor_field?: "A" | "B";
+    rejected_field?: "A" | "B";
+    anchor_domain?: string;
+    rejected_domain?: string;
+    bridge_validated?: boolean;
+    bridge_reason?: string;
+    style_reviewed?: boolean;
+    silent_chosen?: boolean;
+    style_variant?: "silent_operational" | "explicit_analytical";
   };
 }
 
@@ -94,8 +110,9 @@ export function buildDatasetCandidates(field: GeometricField, settings: DatasetS
   const seen = new Set<string>();
   for (const unit of field.units) {
     if (!validUnit(unit) || (unit.cti ?? 1) >= settings.maxCti || (unit.intention?.epistemicCertainty ?? 0) <= settings.certainty) continue;
-    if (unit.intention?.speechAct !== (settings.mode === "sft" ? "directive" : "assertive")) continue;
-    const question = questionForUnit(unit, domain);
+    if (settings.mechanisms && settings.mode === "sft" ? !["assertive", "directive"].includes(unit.intention?.speechAct ?? "") : unit.intention?.speechAct !== (settings.mode === "sft" ? "directive" : "assertive")) continue;
+    const mechanism = settings.mechanisms ? mechanismsForUnit(unit).primaryMechanism : undefined;
+    const question = mechanism ? { prompt: mechanismQuestion(mechanism), axis: mechanism } : questionForUnit(unit, domain);
     if (!question) continue;
     const context = expandContext(field, unit, settings);
     const answer = context.map(u => u.text.trim()).join("\n\n");
@@ -127,6 +144,7 @@ export function buildDatasetCandidates(field: GeometricField, settings: DatasetS
         domain_axes: unit.domainAxes ?? {}, dominant_axis: question.axis,
         cti: unit.cti ?? 0, epistemic_certainty: unit.intention?.epistemicCertainty ?? 0,
         speech_act: unit.intention?.speechAct ?? "",
+        ...(mechanism ? { ...mechanismsForUnit(unit) } : {}),
         ...(rejectedUnit ? { rejected_node: rejectedUnit.id, rejected_cti: rejectedUnit.cti, edge_similarity: similarity } : {}),
       },
     });
@@ -135,9 +153,14 @@ export function buildDatasetCandidates(field: GeometricField, settings: DatasetS
 }
 
 /** Training rows stay free of provider-specific metadata; provenance is a separate file. */
+export function canApproveCandidate(c: DatasetCandidate): boolean {
+  return Boolean(c.prompt.trim() && c.answer.trim()
+    && (c.mode !== "dpo" || (c.rejected?.trim() && c.rejected.trim() !== c.answer.trim()))
+    && (!c.metadata.causal_edge || (c.metadata.bridge_validated && c.metadata.bridge_reason?.trim() && c.metadata.style_reviewed))
+    && (!c.silent_chosen || !containsMechanismJargon(c.answer)));
+}
 export function serializeDataset(candidates: DatasetCandidate[], system: string): string {
-  return candidates.filter(c => c.approved && c.prompt.trim() && c.answer.trim()
-    && (c.mode !== "dpo" || (c.rejected?.trim() && c.rejected.trim() !== c.answer.trim())))
+  return candidates.filter(c => c.approved && canApproveCandidate(c))
     .map(c => JSON.stringify(c.mode === "sft" ? { messages: [
       { role: "system", content: system.trim() }, { role: "user", content: c.prompt.trim() },
       { role: "assistant", content: c.answer.trim() },
@@ -147,6 +170,7 @@ export function serializeDataset(candidates: DatasetCandidate[], system: string)
 /* ---------------- Cross-corpus DPO ---------------- */
 
 export interface CrossCorpusSettings {
+  pairing?: "axis" | "causal";
   similarity: number;
   chosenMaxCti: number;
   chosenCertainty: number;
@@ -168,6 +192,7 @@ export interface CrossMatch {
   rejectedAct: string;
   promptMatch: boolean;
   chosenField: "A" | "B";
+  causalEdge?: MechanismEdge;
 }
 
 /** Which template level a unit reaches on an axis; null below medium. */
@@ -230,6 +255,10 @@ function crossCorpusPairPool(a: GeometricField, b: GeometricField, s: CrossCorpu
     && (x.u.intention?.epistemicCertainty ?? 0) >= s.chosenCertainty);
   const rejected = all.filter(x => ["directive", "expressive"].includes(x.u.intention?.speechAct ?? "") && (x.u.cti ?? 0) >= s.rejectedMinCti);
   const withQ = chosen.flatMap(c => {
+    if (s.pairing === "causal") {
+      const mechanism = mechanismsForUnit(c.u).primaryMechanism;
+      return mechanism ? [{ c, axis: mechanism, level: "high" as const, prompt: mechanismQuestion(mechanism) }] : [];
+    }
     const q = questionForUnit(c.u, domain);
     const level = q && axisLevel(c.u, q.axis, domain);
     return q && level ? [{ c, axis: q.axis, level, prompt: q.prompt }] : [];
@@ -237,7 +266,8 @@ function crossCorpusPairPool(a: GeometricField, b: GeometricField, s: CrossCorpu
   const pairs: PairPool["pairs"] = [];
   let sameAxisLevel = 0;
   for (const { c, axis, level, prompt } of withQ) for (const r of rejected) {
-    if (r.f === c.f || axisLevel(r.u, axis, domain) !== level || r.u.text.trim() === c.u.text.trim()) continue;
+    if (r.f === c.f || r.u.text.trim() === c.u.text.trim()) continue;
+    if (s.pairing === "causal" ? !causalLinks(c.u, r.u).length : axisLevel(r.u, axis, domain) !== level) continue;
     sameAxisLevel++;
     if ((r.u.cti ?? 0) - (c.u.cti ?? 0) >= s.deltaCti) pairs.push({ c, r, axis, level, prompt });
   }
@@ -252,7 +282,7 @@ function pairSimilarity(pool: PairPool, meaning?: Map<string, number>): (c: Tagg
   if (meaning) return (c, r) => meaning.get(pairKey(c.u.text, r.u.text)) ?? null;
   const vecs = buildTfIdf(pool.all.map(x => x.u.text));
   const at = new Map(pool.all.map((x, i) => [x, i]));
-  return (c, r) => cosine(vecs[at.get(c)!], vecs[at.get(r)!]);
+  return (c, r) => { const ci = at.get(c), ri = at.get(r); return ci === undefined || ri === undefined ? null : cosine(vecs[ci], vecs[ri]); };
 }
 
 /** Pairs that still need a meaning score for the current settings, as unique texts plus index pairs. */
@@ -265,7 +295,8 @@ export function crossCorpusPairsToScore(a: GeometricField, b: GeometricField, s:
   let skipped = 0;
   const index = (t: string) => {
     const key = t.trim();
-    if (at.has(key)) return at.get(key)!;
+    const existing = at.get(key);
+    if (existing !== undefined) return existing;
     if (texts.length >= cap) return -1;
     at.set(key, texts.length); texts.push(key); return texts.length - 1;
   };
