@@ -271,7 +271,9 @@ function crossCorpusPairPool(a: GeometricField, b: GeometricField, s: CrossCorpu
   let sameAxisLevel = 0;
   for (const { c, axis, level, prompt } of withQ) for (const r of rejected) {
     if (r.f === c.f || r.u.text.trim() === c.u.text.trim()) continue;
-    if (s.pairing === "causal" ? !causalLinks(c.u, r.u).length : axisLevel(r.u, axis, domain) !== level) continue;
+    // Causal mode pairs purely on intention, CTI gap and meaning; axis mode
+    // still requires the same template level (prompt symmetry).
+    if (s.pairing !== "causal" && axisLevel(r.u, axis, domain) !== level) continue;
     sameAxisLevel++;
     if ((r.u.cti ?? 0) - (c.u.cti ?? 0) >= s.deltaCti) pairs.push({ c, r, axis, level, prompt });
   }
@@ -351,7 +353,7 @@ export function buildCrossCorpusDpoCandidates(a: GeometricField, b: GeometricFie
     for (const p of options) {
       if (usedRejected.has(p.r)) continue;
       const value = sim?.(c, p.r);
-      if (s.pairing !== "causal" && (value == null || value < s.similarity)) continue;
+      if (value == null || value < s.similarity) continue;
       const rank = value ?? 0;
       if (!best || rank > best.sim || (rank === best.sim && p.r.u.id < best.p.r.u.id)) best = { p, sim: rank };
     }
