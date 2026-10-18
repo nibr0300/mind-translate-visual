@@ -6,6 +6,7 @@
 - [x] Uppladdning/import hoppar tillbaka till startläge på mobil — orsak: förhandsvisningen laddade om sidan när filväljaren tog appen i bakgrunden. Åtgärdat (återansluter utan omladdning, senaste fält sparas).
 
 ## Expansion (efter grunden)
+- [ ] Mekanismgraf, kausal DPO-sökning, tyst chosen och blandad trading-testkorpus för DPO/SFT
 - [x] Träningsdata: pokerfrågemallar, topologisk kontext, mänsklig granskning och JSONL-export för SFT/generisk DPO; 25 tester, SFT-nedladdning verifierad med riktig pokerbok (12 kandidater, 0 DPO-par med strikt urval)
 - [x] Domänprofiler (General, Poker, Research, Law & policy, Dialogue & therapy) med två egna axlar var
 - [x] A1 domänaxlar med corpus-vikt + A4 fält-API (ingest, field, tensions, project)
