@@ -70,28 +70,41 @@ async function createEmbeddings(chunks: ChunkPayload[], filename: string): Promi
   if (!apiKey) throw new Error("AI embedding service is not configured");
   const embeddings: number[][] = new Array(chunks.length);
 
-  for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH) {
+  const starts: number[] = [];
+  for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH) starts.push(i);
+  const deadline = Date.now() + 120_000; // stay under the 150 s platform idle limit
+  const embedBatch = async (i: number) => {
     const input = chunks.slice(i, i + EMBEDDING_BATCH).map((chunk) => augmentForEmbedding(chunk, filename));
-    // Retry transient upstream failures (429/5xx) with backoff instead of failing the whole save.
     let response: Response | null = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
-      });
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const left = deadline - Date.now();
+      if (left < 3000) throw new Error("Embedding timed out");
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), Math.min(45_000, left));
+      try {
+        response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+          method: "POST", signal: ctrl.signal,
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
+        });
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") { response = null; continue; }
+        throw e;
+      } finally { clearTimeout(t); }
       if (response.ok || !(response.status === 429 || response.status >= 500)) break;
       await response.text();
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     }
-    if (!response!.ok) throw new Error(`Embedding failed (${response!.status}): ${await response!.text()}`);
+    if (!response) throw new Error("Embedding timed out");
+    if (!response.ok) throw new Error(`Embedding failed (${response.status}): ${await response.text()}`);
     const body = await response.json();
     const vectors = (body.data ?? []) as { embedding: number[]; index: number }[];
     for (const vector of vectors) embeddings[i + vector.index] = vector.embedding;
-  }
+  };
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(4, starts.length) }, async () => {
+    while (next < starts.length) await embedBatch(starts[next++]);
+  }));
 
   if (embeddings.some((embedding) => !Array.isArray(embedding))) {
     throw new Error("Embedding response was incomplete");
