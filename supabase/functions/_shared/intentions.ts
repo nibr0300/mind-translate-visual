@@ -46,7 +46,14 @@ export async function analyzeUnits(textUnits: string[], domain?: DomainInput | n
     const batch = textUnits.slice(i, i + BATCH_SIZE);
     const numberedUnits = batch.map((t: string, idx: number) => `[${i + idx}] ${t}`).join("\n");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Hard cap per model call so the function always answers well before the
+    // 150 s platform idle limit; the client falls back to lexical signals.
+    const ctrl = new AbortController();
+    const abortTimer = setTimeout(() => ctrl.abort(), 55_000);
+    let response: Response;
+    try {
+    response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      signal: ctrl.signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -117,6 +124,14 @@ Lyrics, prose, and dialogue can score high on moral/narrative tension even when 
         tool_choice: { type: "function", function: { name: "return_analysis" } },
       }),
     });
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        throw new IntentionError(504, "AI analysis timed out for this batch.");
+      }
+      throw e;
+    } finally {
+      clearTimeout(abortTimer);
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
