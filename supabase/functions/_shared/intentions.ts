@@ -38,18 +38,20 @@ export async function analyzeUnits(textUnits: string[], domain?: DomainInput | n
     throw new Error("LOVABLE_API_KEY is not configured");
   }
 
-  // Batch text units into chunks of 20 to stay within token limits
-  const BATCH_SIZE = 20;
+  // Small sub-batches run in parallel so one slow model call cannot stall the
+  // whole request; a timed-out sub-batch is skipped (client falls back to lexical).
+  const BATCH_SIZE = 5;
+  const CONCURRENCY = 4;
   const allResults: any[] = [];
 
-  for (let i = 0; i < textUnits.length; i += BATCH_SIZE) {
+  const runBatch = async (i: number) => {
     const batch = textUnits.slice(i, i + BATCH_SIZE);
     const numberedUnits = batch.map((t: string, idx: number) => `[${i + idx}] ${t}`).join("\n");
 
     // Hard cap per model call so the function always answers well before the
     // 150 s platform idle limit; the client falls back to lexical signals.
     const ctrl = new AbortController();
-    const abortTimer = setTimeout(() => ctrl.abort(), 55_000);
+    const abortTimer = setTimeout(() => ctrl.abort(), 33_000);
     let response: Response;
     try {
     response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -126,7 +128,8 @@ Lyrics, prose, and dialogue can score high on moral/narrative tension even when 
     });
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
-        throw new IntentionError(504, "AI analysis timed out for this batch.");
+        console.warn(`analyze: sub-batch at ${i} timed out — skipped`);
+        return;
       }
       throw e;
     } finally {
@@ -151,7 +154,14 @@ Lyrics, prose, and dialogue can score high on moral/narrative tension even when 
       const parsed = JSON.parse(toolCall.function.arguments);
       allResults.push(...(parsed.analyses || []));
     }
-  }
+  };
+
+  const starts: number[] = [];
+  for (let i = 0; i < textUnits.length; i += BATCH_SIZE) starts.push(i);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, starts.length) }, async () => {
+    while (next < starts.length) await runBatch(starts[next++]);
+  }));
 
   // Drop "not applicable" (-1) axis scores so they never count as real values.
   for (const r of allResults) {
