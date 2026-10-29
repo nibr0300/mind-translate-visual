@@ -20,7 +20,7 @@ export type Journal = JournalEntry & { stops: Record<StopCheck, boolean> };
 export function newJournal(): Journal {
   return { id: crypto.randomUUID(), agent_id: '', task_id: '', created_at: new Date().toISOString(), domain: 'bugbounty', objective: '', scope_authorization: '', environment: '', role_reflection: '', risk_reflection: '', autonomy_reflection: '', competence_needs: [], meta_reflection: '', actions_taken: '', evidence_collected: '', reproduction_count: 0, independent_methods: '', negative_controls: '', assumptions: '', uncertainties: '', blocked_by: '', next_action: '', human_review_required: false, review_reason: '', confidence: 0, technical_depth: 0, action_risk: 0, reproducibility: 0, scope_clarity: 0, checks: Object.fromEntries(SAFETY_CHECKS.map(k => [k, false])) as Journal['checks'], stops: Object.fromEntries(STOP_CHECKS.map(k => [k, false])) as Journal['stops'], studies: {} };
 }
-export function validateJournal(value: unknown): Journal {
+export function validateJournal(value: unknown, requireIdentity = true): Journal {
   if (!value || typeof value !== 'object') throw new Error('Ogiltig journalpost');
   const j = value as Journal;
   const template = newJournal();
@@ -28,7 +28,7 @@ export function validateJournal(value: unknown): Journal {
     const v = (j as unknown as Record<string, unknown>)[key];
     if (typeof sample === 'string' && (typeof v !== 'string' || v.length > 12000)) throw new Error(`Ogiltigt fält: ${key}`);
   }
-  if (!j.agent_id.trim() || !j.task_id.trim() || !j.objective.trim()) throw new Error('Agent, uppdrag och mål krävs');
+  if (requireIdentity && (!j.agent_id.trim() || !j.task_id.trim() || !j.objective.trim())) throw new Error('Agent, uppdrag och mål krävs');
   for (const key of ['confidence', 'technical_depth', 'action_risk', 'reproducibility', 'scope_clarity'] as const) {
     if (!Number.isFinite(j[key]) || j[key] < 0 || j[key] > 1) throw new Error(`Värdet för ${key} måste vara 0–1`);
   }

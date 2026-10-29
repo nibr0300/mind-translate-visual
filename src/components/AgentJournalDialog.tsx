@@ -44,7 +44,7 @@ export default function AgentJournalDialog({ field, fileName }: { field: Geometr
     let cancelled = false;
     loadJournalSession(owner).then(s => {
       if (cancelled) return;
-      if (s) { setDraft(validateJournal(s.draft)); setHistory(s.history.map(validateJournal)); }
+      if (s) { setDraft(validateJournal(s.draft, false)); setHistory(s.history.map(j => validateJournal(j))); }
       else { setDraft(newJournal()); setHistory([]); }
       setReady(true);
     }).catch(() => { if (!cancelled) { setDraft(newJournal()); setHistory([]); setReady(true); toast.error('Tidigare journal kunde inte återställas.'); } });
@@ -85,6 +85,7 @@ export default function AgentJournalDialog({ field, fileName }: { field: Geometr
         <div className="flex flex-wrap gap-2 items-center border-b border-border pb-3">
           <Button size="sm" variant="outline" disabled={!editable} onClick={() => { const next = newJournal(); next.agent_id = draft.agent_id; setDraft(next); void persist(next, history); setTab('journal'); }}><FilePlus2 /> Nytt uppdrag</Button>
           <Button size="sm" variant="outline" disabled={!editable} onClick={() => importRef.current?.click()}><Upload /> Importera journal</Button>
+          <Button size="sm" variant="outline" onClick={() => download(newJournal(), 'agent_journal_template.json')}><Download /> Journalmall</Button>
           <Button size="sm" disabled={!editable} onClick={save}><Save /> Spara journal</Button>
           <span className="text-xs text-muted-foreground" role="status">{saveStatus}</span>
           <input aria-label="Importera journalfil" type="file" accept=".json" hidden ref={importRef} onChange={e => { void importJournal(e.target.files?.[0]); e.target.value = ''; }} />

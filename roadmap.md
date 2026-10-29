@@ -1,9 +1,10 @@
 # Roadmap
 
 ## Journal-loop för Bug Bounty
-- [ ] Journalmall, beständig agenthistorik och läs/sammanfatta/integrera/ompröva-flöde
-- [ ] Prioriterat kompetensspår från fältet och agent_mandate_export.json med stoppvillkor
-- [ ] Versionerad journal-ingång via field-api och verifierade regeltester/hela användarflödet
+- [x] Journalmall, privat enhetssparad agenthistorik och läs/sammanfatta/integrera/ompröva-flöde
+- [x] Lexikalt prioriterat kompetensspår från fältet och agent_mandate_export.json med stoppvillkor; inga fabricerade förkunskapskrav
+- [x] Versionerad journal-ingång via field-api deployad; 49 regeltester, inloggat flöde med deklarerade testdata, återställning och nedladdning verifierade; okänt fält ger 404
+- [ ] Verifiering med kamratens verkliga agent och Bug Bounty-bibliotek — väntar på hans journal och ett tillgängligt Bug Bounty-fält; ingen automatisk verktygskörning eller schemaläggning sker i denna app
 
 ## Grunden (först)
 - [x] JSON-import av pokerboken: begränsad kartgrafik, 35 tester godkända; riktig 600-nodersbok importerad, zoom och Cross-Corpus DPO med akademiskt fält verifierade i mobilstorlek (0 par vid starttrösklar). Fysisk mobil återstår att bekräfta.
