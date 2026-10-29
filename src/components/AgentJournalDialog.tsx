@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import type { GeometricField } from '@/lib/fieldData';
 import { loadJournalSession, saveJournalSession } from '@/lib/agentJournalStore';
 import CompetenceDevelopment from '@/components/CompetenceDevelopment';
-import { buildJournalExport, calculateMandate, journalLearningPath, newJournal, validateJournal, SAFETY_CHECKS, STOP_CHECKS, type Journal } from '../../supabase/functions/_shared/agentJournal';
+import { buildJournalExport, calculateMandate, journalLearningPath, newJournal, newCompetenceAssessment, validateJournal, SAFETY_CHECKS, STOP_CHECKS, type Journal } from '../../supabase/functions/_shared/agentJournal';
 
 const textFields = [
   ['objective', 'Uppdragets mål'], ['scope_authorization', 'Scope och uttryckligt tillstånd'], ['environment', 'Godkänd testmiljö'],
@@ -86,7 +86,7 @@ export default function AgentJournalDialog({ field, fileName }: { field: Geometr
         <div className="flex flex-wrap gap-2 items-center border-b border-border pb-3">
           <Button size="sm" variant="outline" disabled={!editable} onClick={() => { const next = newJournal(); next.agent_id = draft.agent_id; setDraft(next); void persist(next, history); setTab('journal'); }}><FilePlus2 /> Nytt uppdrag</Button>
           <Button size="sm" variant="outline" disabled={!editable} onClick={() => importRef.current?.click()}><Upload /> Importera journal</Button>
-          <Button size="sm" variant="outline" onClick={() => download(newJournal(), 'agent_journal_template.json')}><Download /> Journalmall</Button>
+          <Button size="sm" variant="outline" onClick={() => download({ ...newJournal(), competence: newCompetenceAssessment() }, 'agent_journal_template.json')}><Download /> Journalmall</Button>
           <Button asChild size="sm" variant="outline"><a href="/agent-journal-contract.md" target="_blank" rel="noreferrer">Agentanslutning</a></Button>
           <Button size="sm" disabled={!editable} onClick={save}><Save /> Spara journal</Button>
           <span className="text-xs text-muted-foreground" role="status">{saveStatus}</span>
