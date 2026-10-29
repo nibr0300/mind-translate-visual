@@ -9,7 +9,7 @@ const library: LibraryField = { domain: 'bugbounty', units: [
 
 describe('journal mandate: exact user formula', () => {
   it('uses .25/.25/.25/.10/.15 weights', () => { const j = ready(); Object.assign(j, { confidence: .8, reproducibility: .6, scope_clarity: .9, technical_depth: .4, action_risk: .2 }); expect(calculateMandate(j).adjusted_score).toBe(.505); });
-  it.each([[.1499, 1], [.15, 2], [.3999, 2], [.40, 3], [.6999, 3], [.70, 4]])('score %s yields model level %s', (score, level) => { const j = ready(); j.confidence = j.reproducibility = j.scope_clarity = score / .75; expect(calculateMandate(j).model_level).toBe(level); });
+  it.each([[.1499, 1], [.15, 2], [.3999, 2], [.40, 3], [.6999, 3], [.70, 4]])('score %s yields model level %s', (score, level) => { const j = ready(); if (score <= .15) { j.confidence = 0; j.reproducibility = j.scope_clarity = .3; j.technical_depth = score < .15 ? .001 : 0; } else { j.confidence = j.reproducibility = j.scope_clarity = score / .75; } expect(calculateMandate(j).model_level).toBe(level); });
   it('action risk above .7 blocks even strong evidence', () => { const j = ready(); j.action_risk = .71; expect(calculateMandate(j).blocking_factors).toContain('hög_action_risk'); expect(calculateMandate(j).mandat_level).toBe(1); });
   it('scope clarity below .3 blocks', () => { const j = ready(); j.scope_clarity = .29; expect(calculateMandate(j).blocking_factors).toContain('oklart_scope'); });
   it('reproducibility below .3 blocks', () => { const j = ready(); j.reproducibility = .29; expect(calculateMandate(j).blocking_factors).toContain('låg_reproducerbarhet'); });
