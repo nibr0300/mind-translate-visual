@@ -1,4 +1,13 @@
 /** Pure, versioned journal/mandate contract shared by browser and field-api. */
+export interface CompetenceAssessment {
+  skill: string; before: number; after: number; effort_minutes: number;
+  application_evidence: string; assessment_basis: string; assessed_by: string;
+  responsibility_reflection: string; autonomy_scope: string;
+  current_autonomy: number; proposed_autonomy: number;
+  supervision_before_minutes: number; supervision_after_minutes: number;
+  material_ids: string[];
+}
+export const newCompetenceAssessment = (): CompetenceAssessment => ({ skill: '', before: 0, after: 0, effort_minutes: 0, application_evidence: '', assessment_basis: '', assessed_by: '', responsibility_reflection: '', autonomy_scope: '', current_autonomy: 1, proposed_autonomy: 1, supervision_before_minutes: 0, supervision_after_minutes: 0, material_ids: [] });
 export interface JournalEntry {
   id: string; agent_id: string; task_id: string; created_at: string; domain: string;
   objective: string; scope_authorization: string; environment: string;
@@ -11,6 +20,7 @@ export interface JournalEntry {
   confidence: number; technical_depth: number; action_risk: number; reproducibility: number; scope_clarity: number;
   checks: Record<SafetyCheck, boolean>;
   studies: Record<string, { summary: string; integration: string; completed: boolean }>;
+  competence?: CompetenceAssessment;
 }
 export const SAFETY_CHECKS = ['explicit_scope', 'test_account', 'approved_environment', 'clean_state', 'negative_control', 'raw_evidence', 'validated_tools'] as const;
 export type SafetyCheck = typeof SAFETY_CHECKS[number];
@@ -39,7 +49,33 @@ export function validateJournal(value: unknown, requireIdentity = true): Journal
   }
   if (typeof j.human_review_required !== 'boolean' || !j.studies || typeof j.studies !== 'object' || Array.isArray(j.studies) || Object.keys(j.studies).length > 100) throw new Error('Ogiltig granskning eller studielogg');
   for (const s of Object.values(j.studies)) if (!s || typeof s.summary !== 'string' || typeof s.integration !== 'string' || s.summary.length > 12000 || s.integration.length > 12000 || typeof s.completed !== 'boolean' || (s.completed && (!s.summary.trim() || !s.integration.trim()))) throw new Error('Slutförda studier kräver sammanfattning och integration');
+  if (j.competence !== undefined) {
+    const c = j.competence;
+    if (!c || typeof c !== 'object' || Array.isArray(c)) throw new Error('Ogiltig kompetensbedömning');
+    for (const key of ['skill', 'application_evidence', 'assessment_basis', 'assessed_by', 'responsibility_reflection', 'autonomy_scope'] as const) if (typeof c[key] !== 'string' || c[key].length > 12000) throw new Error(`Ogiltig kompetensuppgift: ${key}`);
+    for (const key of ['before', 'after'] as const) if (!Number.isFinite(c[key]) || c[key] < 0 || c[key] > 1) throw new Error('Kompetensbedömning måste vara 0–1');
+    for (const key of ['effort_minutes', 'supervision_before_minutes', 'supervision_after_minutes'] as const) if (!Number.isFinite(c[key]) || c[key] < 0 || c[key] > 1000000) throw new Error('Ogiltig tidsbedömning');
+    for (const key of ['current_autonomy', 'proposed_autonomy'] as const) if (!Number.isInteger(c[key]) || c[key] < 1 || c[key] > 4) throw new Error('Självständighetsnivå måste vara 1–4');
+    if (!Array.isArray(c.material_ids) || c.material_ids.length > 100 || c.material_ids.some(id => typeof id !== 'string' || id.length > 200)) throw new Error('Ogiltiga materialreferenser');
+  }
   return j;
+}
+export function assessCompetenceDevelopment(j: Journal) {
+  const c = j.competence ?? newCompetenceAssessment();
+  const completed = c.material_ids.filter(id => j.studies[id]?.completed);
+  const gain = Math.round((c.after - c.before) * 10000) / 10000;
+  const evidenceRecorded = Boolean(c.skill.trim() && c.application_evidence.trim() && c.assessment_basis.trim() && c.assessed_by.trim());
+  const impactSupported = evidenceRecorded && completed.length > 0;
+  const proposalSupported = impactSupported && gain > 0 && Boolean(c.autonomy_scope.trim() && c.responsibility_reflection.trim());
+  return { skill: c.skill, skill_before: c.before, skill_after: c.after, skill_change: gain, effort_minutes: c.effort_minutes,
+    linked_completed_material: completed, application_evidence: c.application_evidence, assessment_basis: c.assessment_basis, assessed_by: c.assessed_by,
+    impact_status: impactSupported ? 'documented_application_pending_external_verification' : 'learning_or_evidence_pending',
+    supervision_minutes_change: c.supervision_before_minutes - c.supervision_after_minutes,
+    current_autonomy: c.current_autonomy, proposed_autonomy: c.proposed_autonomy,
+    progression_status: c.proposed_autonomy <= c.current_autonomy ? 'maintain_or_reassess' : proposalSupported ? 'supported_proposal_pending_external_decision' : 'proposal_needs_application_evidence',
+    autonomy_scope: c.autonomy_scope, responsibility_reflection: c.responsibility_reflection,
+    authorization_granted: false, external_mandate_unchanged: true, legal_responsibility_transferred: false,
+    evidence_source: 'submitted_assessment_not_independently_verified', causal_impact_proven: false };
 }
 export function calculateMandate(j: Journal) {
   const score = j.confidence * .25 + j.reproducibility * .25 + j.scope_clarity * .25 - j.technical_depth * .10 - j.action_risk * .15;
@@ -73,5 +109,5 @@ export function journalLearningPath(j: Journal, field: LibraryField) {
 export function buildJournalExport(j: Journal, field: LibraryField, provenance: { field_id: string; field_version: string }) {
   validateJournal(j);
   const learning_path = journalLearningPath(j, field);
-  return { schema: 'rfa.agent-journal', version: 1, exported_at: new Date().toISOString(), agent_id: j.agent_id, domain: j.domain, provenance, journal: j, mandate: calculateMandate(j), learning_path, learning_status: !learning_path.length ? 'no_relevant_material' : learning_path.every(p => p.study.completed) ? 'integrated_pending_reassessment' : 'study_pending', safeguards: { advisory_only: true, executes_actions: false, study_does_not_raise_confidence: true, semantic_edges_are_not_prerequisites: true, evidence_is_user_supplied_not_verified: true, next_task_requires_new_assessment: true } };
+  return { schema: 'rfa.agent-journal', version: 2, exported_at: new Date().toISOString(), agent_id: j.agent_id, domain: j.domain, provenance, journal: j, competence_development: assessCompetenceDevelopment(j), mandate: calculateMandate(j), learning_path, learning_status: !learning_path.length ? 'no_relevant_material' : learning_path.every(p => p.study.completed) ? 'integrated_pending_reassessment' : 'study_pending', safeguards: { advisory_only: true, executes_actions: false, study_does_not_raise_confidence: true, semantic_edges_are_not_prerequisites: true, evidence_is_user_supplied_not_verified: true, next_task_requires_new_assessment: true } };
 }
