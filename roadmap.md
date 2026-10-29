@@ -1,5 +1,10 @@
 # Roadmap
 
+## Journal-loop för Bug Bounty
+- [ ] Journalmall, beständig agenthistorik och läs/sammanfatta/integrera/ompröva-flöde
+- [ ] Prioriterat kompetensspår från fältet och agent_mandate_export.json med stoppvillkor
+- [ ] Versionerad journal-ingång via field-api och verifierade regeltester/hela användarflödet
+
 ## Grunden (först)
 - [x] JSON-import av pokerboken: begränsad kartgrafik, 35 tester godkända; riktig 600-nodersbok importerad, zoom och Cross-Corpus DPO med akademiskt fält verifierade i mobilstorlek (0 par vid starttrösklar). Fysisk mobil återstår att bekräfta.
 - [x] Djup AI-spänning (llmTension/CTI) blev alltid 0 — analysen avbröts innan den hann klart. Åtgärdat + synlig varning vid låg täckning.
