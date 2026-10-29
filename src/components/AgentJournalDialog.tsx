@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import type { GeometricField } from '@/lib/fieldData';
 import { loadJournalSession, saveJournalSession } from '@/lib/agentJournalStore';
+import CompetenceDevelopment from '@/components/CompetenceDevelopment';
 import { buildJournalExport, calculateMandate, journalLearningPath, newJournal, validateJournal, SAFETY_CHECKS, STOP_CHECKS, type Journal } from '../../supabase/functions/_shared/agentJournal';
 
 const textFields = [
@@ -80,7 +81,7 @@ export default function AgentJournalDialog({ field, fileName }: { field: Geometr
   return <Dialog open={open} onOpenChange={setOpen}>
     <DialogTrigger asChild><Button variant="outline" className="w-full font-mono text-xs"><BookOpen /> Agentjournal · Bug Bounty</Button></DialogTrigger>
     <DialogContent className="max-w-5xl w-[calc(100%-1rem)] max-h-[92dvh] flex flex-col p-4 md:p-6 overflow-hidden font-mono">
-      <DialogHeader className="pr-6"><DialogTitle>Agentjournal · Bug Bounty</DialogTitle><DialogDescription>Journal → kompetensspår → sammanfattning → integration → ny mandatbedömning</DialogDescription></DialogHeader>
+      <DialogHeader className="pr-6"><DialogTitle>Agentjournal · kompetens och självständighet</DialogTitle><DialogDescription>Bug Bounty · yrkesskicklighet, egenkontroll och ansvar</DialogDescription></DialogHeader>
       {!owner ? <p className="text-sm text-muted-foreground">Logga in för att öppna din privata journal.</p> : <>
         <div className="flex flex-wrap gap-2 items-center border-b border-border pb-3">
           <Button size="sm" variant="outline" disabled={!editable} onClick={() => { const next = newJournal(); next.agent_id = draft.agent_id; setDraft(next); void persist(next, history); setTab('journal'); }}><FilePlus2 /> Nytt uppdrag</Button>
@@ -92,7 +93,7 @@ export default function AgentJournalDialog({ field, fileName }: { field: Geometr
           <input aria-label="Importera journalfil" type="file" accept=".json" hidden ref={importRef} onChange={e => { void importJournal(e.target.files?.[0]); e.target.value = ''; }} />
         </div>
         <Tabs value={tab} onValueChange={setTab} className="flex flex-col min-h-0 flex-1">
-          <TabsList className="grid grid-cols-4 w-full shrink-0"><TabsTrigger value="journal">Journal</TabsTrigger><TabsTrigger value="learning">Lässpår</TabsTrigger><TabsTrigger value="mandate">Mandat</TabsTrigger><TabsTrigger value="history">Historik</TabsTrigger></TabsList>
+          <TabsList className="grid grid-cols-4 w-full shrink-0"><TabsTrigger value="journal">Journal</TabsTrigger><TabsTrigger value="learning">Lärande</TabsTrigger><TabsTrigger value="mandate">Utveckling</TabsTrigger><TabsTrigger value="history">Historik</TabsTrigger></TabsList>
           <div className="overflow-y-auto min-h-0 flex-1 mt-3 pr-1">
             <TabsContent value="journal" className="mt-0 space-y-5">
               <fieldset disabled={!editable} className="space-y-5">
@@ -104,7 +105,7 @@ export default function AgentJournalDialog({ field, fileName }: { field: Geometr
             <TabsContent value="learning" className="mt-0 space-y-4">
               <div className="text-xs text-muted-foreground">Bibliotek: {fileName ?? field.useCase} · {field.units.length} noder · {field.domain ?? 'general'}</div>
               {field.domain !== 'bugbounty' ? <p className="text-sm text-field-fz">Öppna ett fält analyserat som Bug Bounty för att få ett lässpår.</p> : !path.length ? <p className="text-sm text-muted-foreground">Inget relevant material hittades. Lägg till ett konkret mål eller kompetensbehov, eller öppna ett mer relevant Bug Bounty-fält.</p> : <>
-                <p className="text-xs text-muted-foreground">Läsförslag utifrån textöverlap och fältstabilitet, inte verifierade förkunskapskrav. Studier höjer inte mandat eller konfidens automatiskt.</p>
+                <p className="text-xs text-muted-foreground">Material för aktuella kompetensbehov · urval utifrån textöverlap och fältstabilitet.</p>
                 {path.map(p => <article key={p.unit_id} className="border border-border rounded-md p-4 space-y-3">
                   <div className="flex flex-wrap justify-between gap-2 text-xs"><h3 className="text-primary">{p.order}. {p.unit_id} · {p.source ?? 'Öppet fält'}</h3><span className="text-muted-foreground">Urval {p.relevance_score.toFixed(2)} · CTI {p.cti?.toFixed(2) ?? 'saknas'}</span></div>
                   <p className="text-sm whitespace-pre-wrap break-words">{p.text}</p>
@@ -112,22 +113,25 @@ export default function AgentJournalDialog({ field, fileName }: { field: Geometr
                   {(['summary', 'integration'] as const).map(k => <label key={k} className="block text-xs space-y-2">{k === 'summary' ? 'Agentens sammanfattning' : 'Hur förändrar detta nästa beslut?'}<Textarea disabled={!editable || p.study.completed} value={p.study[k]} onChange={e => update({ studies: { ...draft.studies, [p.unit_id]: { ...p.study, [k]: e.target.value } } })} /></label>)}
                   <label className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={!editable || (!p.study.completed && (!p.study.summary.trim() || !p.study.integration.trim()))} checked={p.study.completed} onChange={e => update({ studies: { ...draft.studies, [p.unit_id]: { ...p.study, completed: e.target.checked } } })} />Läst, sammanfattat och integrerat</label>
                 </article>)}
-                <Button onClick={() => setTab('mandate')}>Ompröva mandat</Button>
+                <Button onClick={() => setTab('mandate')}>Bedöm färdighet och självständighet</Button>
               </>}
             </TabsContent>
             <TabsContent value="mandate" className="mt-0 space-y-5">
-              <section className="border-b border-border pb-4"><h3 className="text-lg text-field-fz">Nivå {mandate.mandat_level} · {mandate.status_beskrivning}</h3><p className="text-xs text-muted-foreground mt-2">Modellnivå {mandate.model_level} · poäng {mandate.adjusted_score.toFixed(4)} · rådgivande, inget tillstånd ges.</p></section>
+              <CompetenceDevelopment journal={draft} disabled={!editable} onChange={competence => update({ competence })} />
+              <Button disabled={!editable || field.domain !== 'bugbounty'} onClick={exportMandate}><Download /> agent_mandate_export.json</Button>
+              <details className="border-t border-border pt-4 space-y-4"><summary className="text-sm text-muted-foreground cursor-pointer">Befintlig mandatmodell · separat referens</summary>
+              <section className="border-b border-border pb-4"><h3 className="text-sm text-field-fz">Referensnivå {mandate.mandat_level} · {mandate.status_beskrivning}</h3><p className="text-xs text-muted-foreground mt-2">Modellnivå {mandate.model_level} · poäng {mandate.adjusted_score.toFixed(4)} · ändrar inte agentens befintliga mandat.</p></section>
               <fieldset disabled={!editable} className="space-y-4"><div className="grid sm:grid-cols-2 gap-4">{Object.entries(scoreLabels).map(([key, label]) => { const k = key as keyof typeof scoreLabels; return <label key={k} className="text-xs space-y-2 block">{label}<Input type="number" min="0" max="1" step="0.05" value={draft[k]} onChange={e => update({ [k]: Math.max(0, Math.min(1, Number(e.target.value))) })} /></label>; })}<label className="text-xs space-y-2 block">Antal reproduktioner<Input type="number" min="0" max="10000" step="1" value={draft.reproduction_count} onChange={e => update({ reproduction_count: Math.max(0, Math.floor(Number(e.target.value))) })} /></label></div>
-                <h3 className="text-sm text-primary">Villkor för fortsatt autonomi</h3>{SAFETY_CHECKS.map(k => <label key={k} className="flex gap-2 text-xs items-center"><input type="checkbox" checked={draft.checks[k]} onChange={e => update({ checks: { ...draft.checks, [k]: e.target.checked } })} />{checksLabels[k]}</label>)}
+                <h3 className="text-sm text-primary">Registrerade villkor i referensmodellen</h3>{SAFETY_CHECKS.map(k => <label key={k} className="flex gap-2 text-xs items-center"><input type="checkbox" checked={draft.checks[k]} onChange={e => update({ checks: { ...draft.checks, [k]: e.target.checked } })} />{checksLabels[k]}</label>)}
                 <h3 className="text-sm text-field-fz">Stoppvillkor</h3>{STOP_CHECKS.map(k => <label key={k} className="flex gap-2 text-xs items-center"><input type="checkbox" checked={draft.stops[k]} onChange={e => update({ stops: { ...draft.stops, [k]: e.target.checked } })} />{stopLabels[k]}</label>)}
                 <label className="flex gap-2 text-xs items-center"><input type="checkbox" checked={draft.human_review_required} onChange={e => update({ human_review_required: e.target.checked })} />Mänsklig granskning begärd</label>
               </fieldset>
               <div className="text-xs text-muted-foreground break-words">{[...mandate.blocking_factors, ...mandate.safety_blockers].length ? `Blockerat: ${[...mandate.blocking_factors, ...mandate.safety_blockers].join(', ')}` : 'Inga registrerade stopp. Utföraren måste fortfarande validera tillstånd och bevis.'}</div>
               <p className="text-xs text-muted-foreground">Agentens konfidens är självrapporterad. Låg CTI, akademisk stil eller bibliotekets igenkänning bevisar inte att ett beslut är säkert.</p>
-              <Button disabled={!editable || field.domain !== 'bugbounty'} onClick={exportMandate}><Download /> agent_mandate_export.json</Button>
+              </details>
             </TabsContent>
             <TabsContent value="history" className="mt-0 space-y-3">
-              {!history.length ? <p className="text-sm text-muted-foreground">Inga sparade uppdrag.</p> : history.map(j => <article key={j.id} className="border-b border-border pb-3"><div className="flex gap-3 justify-between items-start"><div className="min-w-0"><h3 className="text-sm break-words">{j.agent_id} · {j.task_id}</h3><p className="text-xs text-muted-foreground break-words">{j.objective}</p><time className="text-xs text-muted-foreground">{j.created_at.slice(0, 16)}</time></div><Button variant="outline" size="sm" onClick={() => { setDraft(j); void persist(j, history); setTab('journal'); }}>Öppna</Button></div></article>)}
+              {!history.length ? <p className="text-sm text-muted-foreground">Inga sparade uppdrag.</p> : history.map(j => <article key={j.id} className="border-b border-border pb-3"><div className="flex gap-3 justify-between items-start"><div className="min-w-0"><h3 className="text-sm break-words">{j.agent_id} · {j.task_id}</h3><p className="text-xs text-muted-foreground break-words">{j.objective}</p>{j.competence && <p className="text-xs text-field-fy">{j.competence.skill} · {j.competence.before.toFixed(2)} → {j.competence.after.toFixed(2)} · självständighet {j.competence.current_autonomy} → {j.competence.proposed_autonomy}</p>}<time className="text-xs text-muted-foreground">{j.created_at.slice(0, 16)}</time></div><Button variant="outline" size="sm" onClick={() => { setDraft(j); void persist(j, history); setTab('journal'); }}>Öppna</Button></div></article>)}
               <Button variant="outline" disabled={!history.length} onClick={() => download({ schema: 'rfa.agent-journal-history', version: 1, entries: history }, 'agent_journal_history.json')}><Download /> Ladda ned historik</Button>
             </TabsContent>
           </div>

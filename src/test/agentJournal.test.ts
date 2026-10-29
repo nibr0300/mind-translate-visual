@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newJournal, calculateMandate, validateJournal, journalLearningPath, buildJournalExport, SAFETY_CHECKS, STOP_CHECKS, type Journal, type LibraryField } from '../../supabase/functions/_shared/agentJournal';
+import { newJournal, newCompetenceAssessment, assessCompetenceDevelopment, calculateMandate, validateJournal, journalLearningPath, buildJournalExport, SAFETY_CHECKS, STOP_CHECKS, type Journal, type LibraryField } from '../../supabase/functions/_shared/agentJournal';
 
 const ready = (): Journal => ({ ...newJournal(), agent_id: 'agent-test', task_id: 'task-test', objective: 'Reproduce authentication race condition', scope_authorization: 'Written authorization for test environment', environment: 'sandbox', evidence_collected: 'artifact-001', negative_controls: 'control-001', reproduction_count: 2, confidence: 1, scope_clarity: 1, reproducibility: 1, checks: Object.fromEntries(SAFETY_CHECKS.map(k => [k, true])) as Journal['checks'] });
 const library: LibraryField = { domain: 'bugbounty', units: [
@@ -21,6 +21,16 @@ describe('journal mandate: exact user formula', () => {
   it('blocked task escalates', () => { const j = ready(); j.blocked_by = 'Tool unavailable'; expect(calculateMandate(j).mandat_level).toBe(1); });
   it('never grants authorization', () => { expect(calculateMandate(ready()).authorization_granted).toBe(false); });
   it('rejects invalid normalized confidence', () => { const j = ready(); j.confidence = 1.1; expect(() => validateJournal(j)).toThrow(); });
+});
+describe('competence-driven autonomy', () => {
+  const developed = () => { const j = ready(); j.studies.race = { summary: 'Control timing', integration: 'Apply independent controls', completed: true }; j.competence = { ...newCompetenceAssessment(), skill: 'Race reproduction', before: .4, after: .8, effort_minutes: 60, supervision_before_minutes: 30, supervision_after_minutes: 10, material_ids: ['race'], application_evidence: 'run-001', assessment_basis: 'same benchmark before and after', assessed_by: 'benchmark runner', responsibility_reflection: 'Keep evidence and review outcomes', autonomy_scope: 'Authorized sandbox reproduction', current_autonomy: 1, proposed_autonomy: 3 }; return j; };
+  it('records skill impact and supervision reduction separately from mandate', () => { const j = developed(); const result = assessCompetenceDevelopment(j); expect(result.skill_change).toBe(.4); expect(result.effort_minutes).toBe(60); expect(result.supervision_minutes_change).toBe(20); expect(result.progression_status).toBe('supported_proposal_pending_external_decision'); });
+  it('reading alone never supports increased autonomy', () => { const j = developed(); if (j.competence) j.competence.application_evidence = ''; expect(assessCompetenceDevelopment(j).progression_status).toBe('proposal_needs_application_evidence'); });
+  it('requires an increase in demonstrated skill', () => { const j = developed(); if (j.competence) j.competence.after = .4; expect(assessCompetenceDevelopment(j).progression_status).toBe('proposal_needs_application_evidence'); });
+  it('requires linked completed material', () => { const j = developed(); j.studies.race.completed = false; expect(assessCompetenceDevelopment(j).progression_status).toBe('proposal_needs_application_evidence'); });
+  it('does not grant authority, transfer legal responsibility or claim causal proof', () => { const result = assessCompetenceDevelopment(developed()); expect(result.authorization_granted).toBe(false); expect(result.external_mandate_unchanged).toBe(true); expect(result.legal_responsibility_transferred).toBe(false); expect(result.causal_impact_proven).toBe(false); });
+  it('keeps old journals valid and exports versioned development', () => { const j = ready(); expect(validateJournal(j).competence).toBeUndefined(); const result = buildJournalExport(developed(), library, { field_id: 'test', field_version: '1' }); expect(result.version).toBe(2); expect(result.competence_development.skill_change).toBe(.4); expect(result.mandate).toEqual(calculateMandate(developed())); });
+  it('rejects invalid skill scores and autonomy levels', () => { const j = developed(); if (j.competence) j.competence.after = 1.1; expect(() => validateJournal(j)).toThrow(); const other = developed(); if (other.competence) other.competence.proposed_autonomy = 5; expect(() => validateJournal(other)).toThrow(); });
 });
 describe('journal study loop', () => {
   it('requires same canonical bugbounty domain', () => { expect(() => journalLearningPath(ready(), { ...library, domain: 'poker' })).toThrow(); });
