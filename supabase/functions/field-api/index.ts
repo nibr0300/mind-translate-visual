@@ -9,6 +9,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
 import { axisFrictions, axisWeights, type AxisUnit } from "../_shared/axisMath.ts";
 import { analyzeUnits, IntentionError } from "../_shared/intentions.ts";
+import { buildJournalExport, validateJournal, type LibraryField } from "../_shared/agentJournal.ts";
 
 const CONTRACT_VERSION = 1;
 const EMBEDDING_MODEL = "google/gemini-embedding-001";
@@ -222,6 +223,28 @@ const ProjectSchema = z.object({
   domain: z.string().max(40).optional(),
 });
 
+// Stateless journal loop: private history belongs to the calling agent/device.
+// Only owner-scoped, canonical-domain library data is read; no actions execute.
+async function journalLoop(userId: string, req: Request) {
+  const raw = await req.text();
+  if (new TextEncoder().encode(raw).length > 2 * 1024 * 1024) return json({ error: "Journal request exceeds 2 MB" }, 413);
+  let body: { field_id?: string; journal?: unknown };
+  try { body = JSON.parse(raw); } catch { return json({ error: "Invalid JSON" }, 400); }
+  if (!body || !z.string().uuid().safeParse(body.field_id).success) return json({ error: "A valid field_id is required" }, 400);
+  let journal;
+  try { journal = validateJournal(body.journal); } catch (e) { return json({ error: e instanceof Error ? e.message : "Invalid journal" }, 400); }
+  if (journal.domain !== "bugbounty") return json({ error: "Journal domain must be bugbounty" }, 400);
+  const sb = admin();
+  const { data: doc, error: docError } = await sb.from("documents").select("id, domain, uploaded_at").eq("id", body.field_id).eq("user_id", userId).eq("domain", "bugbounty").maybeSingle();
+  if (docError) throw docError;
+  if (!doc) return json({ error: "Field not found" }, 404);
+  const { data: chunks, error } = await sb.from("chunks").select("id, text, cluster_id, cti, fz, intention").eq("document_id", doc.id).order("chunk_index").limit(2001);
+  if (error) throw error;
+  if ((chunks?.length ?? 0) > 2000) return json({ error: "Library exceeds 2000 units; select a smaller field" }, 413);
+  const field: LibraryField = { domain: doc.domain, units: (chunks ?? []).map(c => ({ id: c.id, text: c.text, clusterId: c.cluster_id ?? 0, cti: c.cti ?? undefined, fz: c.fz ?? 0, intention: c.intention, domainAxes: c.intention?.domainAxes })) };
+  return json(buildJournalExport(journal, field, { field_id: doc.id, field_version: doc.uploaded_at }));
+}
+
 async function project(userId: string, body: unknown) {
   const p = ProjectSchema.safeParse(body);
   if (!p.success) return json({ error: p.error.flatten().fieldErrors }, 400);
@@ -279,6 +302,7 @@ Deno.serve(async (req) => {
     const [route, id] = parts.slice(i + 1);
     const uuid = z.string().uuid();
 
+    if (req.method === "POST" && route === "journal") return await journalLoop(userId, req);
     if (req.method === "POST" && route === "ingest") return await ingest(userId, await req.json());
     if (req.method === "POST" && route === "calibrate") return await calibrate(userId);
     if (req.method === "POST" && route === "project") return await project(userId, await req.json());
@@ -293,7 +317,7 @@ Deno.serve(async (req) => {
       return json({ version: CONTRACT_VERSION, field_id: id, axes: f.weights, tensions: f.tensions(n) });
     }
     if (req.method === "GET" && !route) {
-      return json({ version: CONTRACT_VERSION, routes: ["POST /calibrate", "POST /ingest", "GET /field/{id}", "GET /tensions/{id}", "POST /project"] });
+      return json({ version: CONTRACT_VERSION, routes: ["POST /journal", "POST /calibrate", "POST /ingest", "GET /field/{id}", "GET /tensions/{id}", "POST /project"] });
     }
     return json({ error: "Not found" }, 404);
   } catch (e) {

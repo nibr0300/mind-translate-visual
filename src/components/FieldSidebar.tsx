@@ -9,6 +9,7 @@ import SearchPanel from "./SearchPanel";
 import AccountPanel from "./AccountPanel";
 import FieldGuide from "./FieldGuide";
 import DatasetExportDialog from "./DatasetExportDialog";
+import AgentJournalDialog from "./AgentJournalDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -202,6 +203,10 @@ export default function FieldSidebar({
 
       {/* PDF Upload */}
       <PdfUploader onFieldGenerated={onUploadField} />
+
+      <div className="p-4 border-b border-border shrink-0">
+        <AgentJournalDialog field={field} fileName={uploadedFileName} />
+      </div>
 
 
       {/* Use Case Selector */}
