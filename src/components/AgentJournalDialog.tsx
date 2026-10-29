@@ -86,6 +86,7 @@ export default function AgentJournalDialog({ field, fileName }: { field: Geometr
           <Button size="sm" variant="outline" disabled={!editable} onClick={() => { const next = newJournal(); next.agent_id = draft.agent_id; setDraft(next); void persist(next, history); setTab('journal'); }}><FilePlus2 /> Nytt uppdrag</Button>
           <Button size="sm" variant="outline" disabled={!editable} onClick={() => importRef.current?.click()}><Upload /> Importera journal</Button>
           <Button size="sm" variant="outline" onClick={() => download(newJournal(), 'agent_journal_template.json')}><Download /> Journalmall</Button>
+          <Button asChild size="sm" variant="outline"><a href="/agent-journal-contract.md" target="_blank" rel="noreferrer">Agentanslutning</a></Button>
           <Button size="sm" disabled={!editable} onClick={save}><Save /> Spara journal</Button>
           <span className="text-xs text-muted-foreground" role="status">{saveStatus}</span>
           <input aria-label="Importera journalfil" type="file" accept=".json" hidden ref={importRef} onChange={e => { void importJournal(e.target.files?.[0]); e.target.value = ''; }} />
