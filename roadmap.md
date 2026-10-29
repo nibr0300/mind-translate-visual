@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Journal-loop för Bug Bounty
+- [ ] Skifta till kompetensutveckling: insats, före/efter-bedömning, tillämpningsbevis, självständighetsförslag och export; behåll befintliga mandat som separat referens
 - [x] Journalmall, privat enhetssparad agenthistorik och läs/sammanfatta/integrera/ompröva-flöde
 - [x] Lexikalt prioriterat kompetensspår från fältet och agent_mandate_export.json med stoppvillkor; inga fabricerade förkunskapskrav
 - [x] Versionerad journal-ingång via field-api deployad; 49 regeltester, inloggat flöde med deklarerade testdata, återställning och nedladdning verifierade; okänt fält ger 404
