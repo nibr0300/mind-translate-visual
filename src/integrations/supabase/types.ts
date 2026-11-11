@@ -308,6 +308,27 @@ export type Database = {
           },
         ]
       }
+      narrator_provider_blocks: {
+        Row: {
+          blocked_at: string
+          message: string
+          model: string
+          status: number
+        }
+        Insert: {
+          blocked_at?: string
+          message: string
+          model: string
+          status: number
+        }
+        Update: {
+          blocked_at?: string
+          message?: string
+          model?: string
+          status?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
