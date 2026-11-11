@@ -8,7 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/useAuth';
 import { parseFieldImport } from '@/lib/fieldImport';
-import { DEFAULT_NARRATOR_THRESHOLDS, prepareNarrator, narratorJsonl, narratorProvenance, narratorBatch, downloadNarrator, type NarratorItem, type NarratorSource } from '@/lib/narrator';
+import { DEFAULT_NARRATOR_THRESHOLDS, narratorAutoLimit, prepareNarrator, narratorJsonl, narratorProvenance, narratorBatch, downloadNarrator, type NarratorItem, type NarratorSource } from '@/lib/narrator';
 import { loadNarrator, saveNarrator, type NarratorSession } from '@/lib/narratorStore';
 import { generateNarration } from '@/lib/narratorClient';
 
@@ -20,6 +20,7 @@ export default function NarratorDialog() {
   const [items, setItems] = useState<NarratorItem[]>([]);
   const [thresholds, setThresholds] = useState(DEFAULT_NARRATOR_THRESHOLDS);
   const [limit, setLimit] = useState(10);
+  const [automaticLimit, setAutomaticLimit] = useState(true);
   const [baseline, setBaseline] = useState(false);
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -48,22 +49,23 @@ export default function NarratorDialog() {
 
   useEffect(() => {
     let active = true;
-    abortRef.current?.abort(); setReady(false); setSources([]); setItems([]); setIndex(0); setError('');
+    abortRef.current?.abort(); setReady(false); setSources([]); setItems([]); setIndex(0); setError(''); setAutomaticLimit(true); setLimit(10);
     loadNarrator(owner).then(s => {
       if (!active || !s) return;
       setItems(s.items); setThresholds(s.thresholds); setLimit(s.limit); setBaseline(s.baseline);
+      setAutomaticLimit(s.automaticLimit ?? s.limit === 10);
     }).catch(() => { if (active) setError('Sparad granskning kunde inte återställas.'); }).finally(() => { if (active) setReady(true); });
     return () => { active = false; abortRef.current?.abort(); };
   }, [owner]);
 
   useEffect(() => {
     if (!ready) return;
-    pendingSave.current = { owner, session: { items, thresholds, limit, baseline } };
+    pendingSave.current = { owner, session: { items, thresholds, limit, baseline, automaticLimit } };
     if (!saveStarted.current) saveStarted.current = Date.now();
     if (saveTimer.current !== null) clearTimeout(saveTimer.current);
     // Coalesce typing/deltas, but checkpoint continuous streams at least every two seconds.
     saveTimer.current = setTimeout(flushSave, Math.max(0, Math.min(400, 2000 - (Date.now() - saveStarted.current))));
-  }, [items, thresholds, limit, baseline, ready, owner, flushSave]);
+  }, [items, thresholds, limit, baseline, automaticLimit, ready, owner, flushSave]);
 
   useEffect(() => {
     const onHidden = () => { if (document.visibilityState === 'hidden') flushSave(); };
@@ -77,6 +79,7 @@ export default function NarratorDialog() {
   }, [owner, flushSave]);
 
   const prepared = useMemo(() => sources.length ? prepareNarrator(sources, thresholds) : null, [sources, thresholds]);
+  const effectiveLimit = automaticLimit ? narratorAutoLimit(prepared?.candidates.length ?? 0) : limit;
   const current = items[index];
   const approved = items.filter(i => !i.baseline && i.review === 'approved' && i.answer.trim());
   const approvedBaseline = items.filter(i => i.baseline && i.review === 'approved' && i.answer.trim());
@@ -107,7 +110,7 @@ export default function NarratorDialog() {
   }
   function buildQueue() {
     if (!prepared) return;
-    const next = [...prepared.candidates.slice(0, limit), ...(baseline ? prepared.baseline.map(i => ({ ...i, answer: i.score.target.text })) : [])];
+    const next = [...prepared.candidates.slice(0, effectiveLimit), ...(baseline ? prepared.baseline.map(i => ({ ...i, answer: i.score.target.text })) : [])];
     const existing = new Map(itemsRef.current.map(i => [`${i.score.source}:${i.score.id}:${i.score.target.text}`, i]));
     const merged = next.map(i => existing.get(`${i.score.source}:${i.score.id}:${i.score.target.text}`) ?? i);
     itemsRef.current = merged; setItems(merged); setIndex(0); setError(''); setProgress('');
@@ -158,7 +161,9 @@ export default function NarratorDialog() {
           </div>
           {prepared && <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">{[[prepared.candidates.length, 'Friktion'], [prepared.junk, 'Skräp'], [prepared.duplicates, 'Dubbletter'], [prepared.baseline.length, 'Tysta'], [prepared.quiet, 'Övriga bortvalda']].map(([n, label]) => <div key={label} className="border-l-2 border-border pl-3 py-1"><strong className="block text-lg text-primary">{n}</strong><span className="text-muted-foreground">{label}</span></div>)}</div>}
           <div className="flex flex-wrap gap-3 items-center">
-            <label className="text-xs flex items-center gap-2">AI-tak<Input aria-label="AI-tak" type="number" min={1} max={500} value={limit} disabled={busy} className="w-20" onChange={e => setLimit(Math.max(1, Math.min(500, Number(e.target.value) || 1)))} /></label>
+            <label className="text-xs flex items-center gap-2"><Checkbox checked={automaticLimit} disabled={busy} onCheckedChange={v => { setAutomaticLimit(v === true); if (v !== true && prepared) setLimit(Math.max(1, effectiveLimit)); }} />Automatiskt antal</label>
+            <label className="text-xs flex items-center gap-2">AI-tak<Input aria-label="AI-tak" type="number" min={automaticLimit ? 0 : 1} max={500} value={effectiveLimit} disabled={busy || automaticLimit} className="w-20" onChange={e => setLimit(Math.max(1, Math.min(500, Number(e.target.value) || 1)))} /></label>
+            {prepared && <span className="text-xs text-muted-foreground">{Math.min(effectiveLimit, prepared.candidates.length)} / {prepared.candidates.length} friktionskandidater</span>}
             <label className="text-xs flex items-center gap-2"><Checkbox checked={baseline} disabled={busy} onCheckedChange={v => setBaseline(v === true)} />Separat baslinje · utan AI</label>
             <Button variant="secondary" onClick={buildQueue} disabled={!prepared || busy}>Förbered urval</Button>
             <span className="text-xs text-muted-foreground">Lovable AI · debiteras per svar och snabbkorrigering</span>

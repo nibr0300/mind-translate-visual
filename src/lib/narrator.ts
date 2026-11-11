@@ -7,6 +7,10 @@ Pröva idén inifrån dess premisser. Fånga vad metaforen synliggör innan du f
 Att erkänna avsikten är inte att bekräfta varje sakpåstående: behåll saklig omsorg, markera relevanta osäkerheter varsamt och gör nödvändiga korrigeringar som en del av vår gemensamma utforskning. Hitta inte på fakta eller förvandla metaforer till bokstavlig evidens.`;
 export interface NarratorThresholds { fz: number; truth: number; cti: number }
 export const DEFAULT_NARRATOR_THRESHOLDS: NarratorThresholds = { fz: 0.35, truth: 0.5, cti: 0.25 };
+// Scale only with eligible, deduplicated material; never dilute quality to fill a quota.
+export function narratorAutoLimit(candidateCount: number): number {
+  return Math.min(candidateCount, 500, Math.max(10, Math.ceil(candidateCount * 0.2)));
+}
 export interface NarratorScore {
   id: string; source: string; domain: string; cluster: string;
   target: { text: string; fz: number; fy: number; cti: number | null; truthTension: number | null; speechAct: string | null };

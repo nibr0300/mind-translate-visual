@@ -1,11 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { cleanNarratorText, isFrictionNode, isSilentNode, narratorScore, prepareNarrator, narratorJsonl, narratorBatch, NARRATOR_SYSTEM, type NarratorItem } from '@/lib/narrator';
+import { cleanNarratorText, isFrictionNode, isSilentNode, narratorScore, prepareNarrator, narratorAutoLimit, narratorJsonl, narratorBatch, NARRATOR_SYSTEM, type NarratorItem } from '@/lib/narrator';
 import { type FieldUnit, type GeometricField } from '@/lib/fieldData';
 
 const node = (id: string, patch: Partial<FieldUnit> = {}): FieldUnit => ({ id, text: `Konkreta beslut om varians och motståndarens dolda möjligheter ${id}.`, pos: { x: 0, y: 0 }, vector2d: [0, 0], clusterId: 0, type: 'paragraph', fz: 0.1, fy: 0.1, cti: 0.1, ...patch });
 const field = (units: FieldUnit[], edges?: GeometricField['edges']): GeometricField => ({ units, edges, clusters: [], stats: { totalUnits: units.length, boundaryUnits: 0, avgFZ: 0, avgFY: 0 }, useCase: 'uploaded' });
 
 describe('Narrator selection and export rules', () => {
+  it('scales example count beyond ten for larger eligible material', () => {
+    expect(narratorAutoLimit(50)).toBe(10);
+    expect(narratorAutoLimit(600)).toBe(120);
+    expect(narratorAutoLimit(1200)).toBe(240);
+  });
+  it('never exceeds eligible material or the 500-answer cost ceiling', () => {
+    expect(narratorAutoLimit(0)).toBe(0);
+    expect(narratorAutoLimit(7)).toBe(7);
+    expect(narratorAutoLimit(3000)).toBe(500);
+  });
   it('rejects null/binary remnants', () => expect(cleanNarratorText('En lång text med tydlig betydelse\u0000 bland rester')).toBeNull());
   it('rejects fragments below 25 characters', () => expect(cleanNarratorText('a'.repeat(24))).toBeNull());
   it('retains readable multilingual text and code', () => {

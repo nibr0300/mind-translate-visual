@@ -57,6 +57,7 @@ describe('Narrator repeated-update performance', () => {
       }
       return 'Completed grounded answer';
     });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Automatiskt antal' }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'AI-tak' }), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Förbered urval' }));
     fireEvent.click(screen.getByRole('button', { name: /Generera/ }));
