@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpenText, Upload, Play, Square, Download, Check, X, Target, HelpCircle, Blocks, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/useAuth';
 import { parseFieldImport } from '@/lib/fieldImport';
 import { DEFAULT_NARRATOR_THRESHOLDS, prepareNarrator, narratorJsonl, narratorProvenance, narratorBatch, downloadNarrator, type NarratorItem, type NarratorSource } from '@/lib/narrator';
-import { loadNarrator, saveNarrator } from '@/lib/narratorStore';
+import { loadNarrator, saveNarrator, type NarratorSession } from '@/lib/narratorStore';
 import { generateNarration } from '@/lib/narratorClient';
 
 export default function NarratorDialog() {
@@ -32,6 +32,19 @@ export default function NarratorDialog() {
   const itemsRef = useRef(items); itemsRef.current = items;
   const ownerRef = useRef(owner); ownerRef.current = owner;
   const saveQueue = useRef(Promise.resolve());
+  const pendingSave = useRef<{ owner: string; session: NarratorSession } | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveStarted = useRef(0);
+  const flushSave = useCallback(() => {
+    if (saveTimer.current !== null) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    const pending = pendingSave.current;
+    pendingSave.current = null; saveStarted.current = 0;
+    if (!pending) return;
+    saveQueue.current = saveQueue.current.catch(() => {}).then(() => saveNarrator(pending.owner, pending.session)).catch(() => {
+      if (ownerRef.current === pending.owner) setError('Granskningen kunde inte sparas på denna enhet. Exportera innan du stänger.');
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -45,11 +58,25 @@ export default function NarratorDialog() {
 
   useEffect(() => {
     if (!ready) return;
-    const s = { items, thresholds, limit, baseline };
-    saveQueue.current = saveQueue.current.catch(() => {}).then(() => saveNarrator(owner, s)).catch(() => setError('Granskningen kunde inte sparas på denna enhet. Exportera innan du stänger.'));
-  }, [items, thresholds, limit, baseline, ready, owner]);
+    pendingSave.current = { owner, session: { items, thresholds, limit, baseline } };
+    if (!saveStarted.current) saveStarted.current = Date.now();
+    if (saveTimer.current !== null) clearTimeout(saveTimer.current);
+    // Coalesce typing/deltas, but checkpoint continuous streams at least every two seconds.
+    saveTimer.current = setTimeout(flushSave, Math.max(0, Math.min(400, 2000 - (Date.now() - saveStarted.current))));
+  }, [items, thresholds, limit, baseline, ready, owner, flushSave]);
 
-  const prepared = sources.length ? prepareNarrator(sources, thresholds) : null;
+  useEffect(() => {
+    const onHidden = () => { if (document.visibilityState === 'hidden') flushSave(); };
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pagehide', flushSave);
+    return () => {
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('pagehide', flushSave);
+      flushSave();
+    };
+  }, [owner, flushSave]);
+
+  const prepared = useMemo(() => sources.length ? prepareNarrator(sources, thresholds) : null, [sources, thresholds]);
   const current = items[index];
   const approved = items.filter(i => !i.baseline && i.review === 'approved' && i.answer.trim());
   const approvedBaseline = items.filter(i => i.baseline && i.review === 'approved' && i.answer.trim());
@@ -112,7 +139,7 @@ export default function NarratorDialog() {
     } finally { abortRef.current = null; setBusy(false); }
   }
 
-  return <Dialog open={open} onOpenChange={value => { if (!value) abortRef.current?.abort(); setOpen(value); }}>
+  return <Dialog open={open} onOpenChange={value => { if (!value) { abortRef.current?.abort(); flushSave(); } setOpen(value); }}>
     <Button variant="outline" className="w-full mt-2 font-mono text-xs" onClick={() => setOpen(true)}><BookOpenText /> Re-ingest & Narratör</Button>
     <DialogContent aria-describedby={undefined} className="max-w-6xl w-[calc(100%-1rem)] h-[92dvh] flex flex-col gap-0 p-0 overflow-hidden font-mono">
       <header className="border-b border-border px-5 py-4 pr-12 shrink-0">
