@@ -1,5 +1,11 @@
 # Roadmap
 
+## Partitur-Narratören
+- [x] Återinläsning av flera sparade fält, skräp-/friktionsfilter och tre kontextankare utan ny fältanalys
+- [x] Sekventiell strömmande AI-generering med nodtak, stopp, snabbkorrigering och lokal batch-export; persistent server-spärr vid provideråtkomstnekande
+- [x] Redigerbar mänsklig granskning, godkänd ChatML-export och separat proveniens/baslinje; granskning återställs per användare på enheten
+- [x] 58 riktade tester godkända; inloggat 600-noders poker/trav-fält, AI-svar, snabbkorrigering, godkännande, nedladdning och omladdning verifierade; mobilstorlek 390×844 utan horisontell överströmning. Modellträning och fysisk telefon ingår inte i verifieringen.
+
 ## Journal-loop för Bug Bounty
 - [x] Skiftat till kompetensutveckling: insats, före/efter-bedömning, tillämpningsbevis, självständighetsförslag och v2-export; befintliga mandat separat referens. 41 regeltester godkända; inloggat flöde med deklarerade syntetiska data, export och återställning verifierade; field-api deployad, okänt fält ger 404. Verklig kompetens-/API-bedömning väntar på tillgängligt Bug Bounty-fält och kamratens agentjournal.
 - [x] Journalmall, privat enhetssparad agenthistorik och läs/sammanfatta/integrera/ompröva-flöde

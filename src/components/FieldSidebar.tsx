@@ -10,6 +10,7 @@ import AccountPanel from "./AccountPanel";
 import FieldGuide from "./FieldGuide";
 import DatasetExportDialog from "./DatasetExportDialog";
 import AgentJournalDialog from "./AgentJournalDialog";
+import NarratorDialog from "./NarratorDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -206,6 +207,7 @@ export default function FieldSidebar({
 
       <div className="p-4 border-b border-border shrink-0">
         <AgentJournalDialog field={field} fileName={uploadedFileName} />
+        <NarratorDialog />
       </div>
 
 

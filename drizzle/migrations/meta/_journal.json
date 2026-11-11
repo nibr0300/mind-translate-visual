@@ -15,6 +15,13 @@
       "when": 1791738340371,
       "tag": "0001_noise_ratio_misassigned",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794431349136,
+      "tag": "0002_narrator_provider_blocks",
+      "breakpoints": true
     }
   ]
 }
