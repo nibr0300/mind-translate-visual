@@ -15,6 +15,8 @@ vi.mock('@/lib/narrator', async importOriginal => {
 });
 import NarratorDialog from '@/components/NarratorDialog';
 
+vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 async function openManyFields() {
