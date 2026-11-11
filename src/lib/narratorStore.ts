@@ -1,5 +1,5 @@
 import type { NarratorItem, NarratorThresholds } from './narrator';
-export interface NarratorSession { items: NarratorItem[]; thresholds: NarratorThresholds; limit: number; baseline: boolean }
+export interface NarratorSession { items: NarratorItem[]; thresholds: NarratorThresholds; limit: number; baseline: boolean; automaticLimit?: boolean }
 function openStore() {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const r = indexedDB.open('rfa-narrator', 1);
