@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { cleanNarratorText, isFrictionNode, isSilentNode, narratorScore, prepareNarrator, narratorJsonl, narratorBatch, NARRATOR_SYSTEM, type NarratorItem } from '@/lib/narrator';
-import { generateDemoField, type FieldUnit, type GeometricField } from '@/lib/fieldData';
+import { type FieldUnit, type GeometricField } from '@/lib/fieldData';
 
 const node = (id: string, patch: Partial<FieldUnit> = {}): FieldUnit => ({ id, text: `Konkreta beslut om varians och motståndarens dolda möjligheter ${id}.`, pos: { x: 0, y: 0 }, vector2d: [0, 0], clusterId: 0, type: 'paragraph', fz: 0.1, fy: 0.1, cti: 0.1, ...patch });
 const field = (units: FieldUnit[], edges?: GeometricField['edges']): GeometricField => ({ units, edges, clusters: [], stats: { totalUnits: units.length, boundaryUnits: 0, avgFZ: 0, avgFY: 0 }, useCase: 'uploaded' });

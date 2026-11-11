@@ -73,7 +73,10 @@ ${body.correction ? correctionRules[body.correction] : ''}`;
       providerOptions: { openai: { forceReasoning: true, reasoningEffort: 'low', reasoningSummary: 'auto', store: false, include: ['reasoning.encrypted_content'] } },
     });
     const iterator = result.fullStream[Symbol.asyncIterator]();
-    const first = await iterator.next();
+    let first = await iterator.next();
+    // SDK start events precede the upstream HTTP response. Wait for real
+    // upstream content/error before committing browser response headers.
+    while (!first.done && ['start', 'start-step'].includes(first.value.type)) first = await iterator.next();
     if (failure) { const f = failure as { status: number; message: string }; return json(f.message, f.status); }
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
