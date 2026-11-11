@@ -1,5 +1,11 @@
 # Roadmap
 
+## Partitur-Narratören
+- [ ] Återinläsning av flera sparade fält, skräp-/friktionsfilter och kontextankare utan ny fältanalys
+- [ ] AI-generering med kostnadstak, stopp, snabbkorrigering och lokal batch-export
+- [ ] Redigerbar mänsklig granskning, godkänd ChatML-export och separat proveniens/baslinje
+- [ ] Regeltester och inloggat flöde på dator och mobilstorlek
+
 ## Journal-loop för Bug Bounty
 - [x] Skiftat till kompetensutveckling: insats, före/efter-bedömning, tillämpningsbevis, självständighetsförslag och v2-export; befintliga mandat separat referens. 41 regeltester godkända; inloggat flöde med deklarerade syntetiska data, export och återställning verifierade; field-api deployad, okänt fält ger 404. Verklig kompetens-/API-bedömning väntar på tillgängligt Bug Bounty-fält och kamratens agentjournal.
 - [x] Journalmall, privat enhetssparad agenthistorik och läs/sammanfatta/integrera/ompröva-flöde
