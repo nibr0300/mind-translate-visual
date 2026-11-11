@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Partitur-Narratören
+- [ ] Verifiera och åtgärda upprepat urval och täta sparningar vid många fält i Narratören
 - [x] Återinläsning av flera sparade fält, skräp-/friktionsfilter och tre kontextankare utan ny fältanalys
 - [x] Sekventiell strömmande AI-generering med nodtak, stopp, snabbkorrigering och lokal batch-export; persistent server-spärr vid provideråtkomstnekande
 - [x] Redigerbar mänsklig granskning, godkänd ChatML-export och separat proveniens/baslinje; granskning återställs per användare på enheten
