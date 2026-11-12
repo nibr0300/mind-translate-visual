@@ -5,7 +5,7 @@ import type { GeometricField } from '@/lib/fieldData';
 const mocks = vi.hoisted(() => ({ save: vi.fn().mockResolvedValue(undefined), prepare: vi.fn(), generate: vi.fn() }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'performance-test-owner' } }) }));
 vi.mock('@/lib/narratorStore', () => ({ loadNarrator: vi.fn().mockResolvedValue(null), saveNarrator: mocks.save }));
-vi.mock('@/lib/fieldImport', () => ({ parseFieldImport: JSON.parse }));
+vi.mock('@/lib/fieldImport', () => ({ parseFieldImport: (text: string) => JSON.parse(text), fieldImportSummary: vi.fn() }));
 vi.mock('@/lib/narratorClient', () => ({ generateNarration: mocks.generate }));
 vi.mock('@/lib/narrator', async importOriginal => {
   const original = await importOriginal<typeof import('@/lib/narrator')>();

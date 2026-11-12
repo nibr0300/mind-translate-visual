@@ -1,5 +1,8 @@
 # Roadmap
 
+## Självläkande import
+- [x] Gemensam självläkande import i karta, fält B och Narratör: säkra strukturreparationer, inga uppskattade analysvärden, överhoppade noder och rensade förbindelser redovisas i gränssnitt och exportanteckningar. 33 riktade tester godkända; inloggad import av ett 437-nodersfält med avsiktliga fel, granskning och ChatML-export verifierade utan sidfel, även vid mobilbredd. Tre äldre kausalparningstester fallerar separat; det kompletta Trading-fältet verifieras oförändrat av importen.
+
 ## Field saving credit-limit error
 - [x] Deployed safe gateway errors with original status, stopped blocked batches, and moved embeddings before saved-content changes; 3 error tests passed, preview build OK.
 - [x] Signed-in upload with simulated credit-limit 403 verified: safe warning appears, 42-node map remains visible, and field restores after reload with no page errors; no live AI credits spent.
