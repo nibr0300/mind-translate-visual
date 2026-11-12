@@ -192,7 +192,7 @@ export async function generateFieldFromFile(
 
   // Background: embed + persist. Don't block UI on it.
   void persistFieldInBackground(field, chunks, file, sourceType).catch((err) => {
-    if (isCreditError(err)) notifyCreditsExhausted();
+    if (isCreditError(err)) notifyCreditsExhausted(err.message);
     else console.warn("[persist] failed:", err);
   });
 
@@ -440,7 +440,14 @@ async function persistFieldInBackground(
       share_to_global: shareToGlobal,
     },
   });
-  if (persistErr) throw persistErr;
+  if (persistErr) {
+    const response = persistErr.context;
+    if (response instanceof Response) {
+      const detail = await response.clone().json().catch(() => null);
+      if (typeof detail?.error === "string") throw new Error(detail.error);
+    }
+    throw persistErr;
+  }
 
   const info = persistData as { reused?: boolean; persisted_chunks?: number };
   if (info?.reused) {

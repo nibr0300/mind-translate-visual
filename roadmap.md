@@ -1,5 +1,8 @@
 # Roadmap
 
+## Field saving credit-limit error
+- [ ] Preserve gateway status and safe reason, stop blocked batches, protect previous saved content, and verify handling; live AI saving waits on owner adjustment of the reached spending cap.
+
 ## Partitur-Narratören
 - [x] Åtgärdat upprepat urval och täta sparningar: 16 tester godkända, inklusive 12 fält med simulerad strömning; inloggad granskning/export/återställning med 9 verkliga sparade fält (3155 noder) verifierad. Fysisk telefon ej testad.
 - [x] Återinläsning av flera sparade fält, skräp-/friktionsfilter och tre kontextankare utan ny fältanalys
