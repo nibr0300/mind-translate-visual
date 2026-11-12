@@ -1,5 +1,8 @@
 # Roadmap
 
+## Självläkande import
+- [ ] Reparera säkra strukturfel, hoppa över oanvändbara noder utan att hitta på analysvärden, och visa ändringarna vid import; verifiera Narratörens inläsning och export.
+
 ## Field saving credit-limit error
 - [x] Deployed safe gateway errors with original status, stopped blocked batches, and moved embeddings before saved-content changes; 3 error tests passed, preview build OK.
 - [x] Signed-in upload with simulated credit-limit 403 verified: safe warning appears, 42-node map remains visible, and field restores after reload with no page errors; no live AI credits spent.
