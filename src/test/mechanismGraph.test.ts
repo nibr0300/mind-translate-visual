@@ -74,8 +74,10 @@ describe("mechanism graph and transfer rules", () => {
     expect(Object.keys(JSON.parse(serializeDataset([c], "system")))).toEqual(["prompt", "chosen", "rejected"]);
     expect(containsMechanismJargon(c.answer)).toBe(false);
   });
-  it("rejects malformed mechanism arrays in saved fields", () => {
+  it("removes invalid mechanism tags without discarding the source node", () => {
     const bad = { ...trading, units: [{ ...trading.units[0], mechanisms: [42] }] };
-    expect(() => parseFieldImport(JSON.stringify(bad))).toThrow("Ogiltiga mekanismer");
+    const restored = parseFieldImport(JSON.stringify(bad));
+    expect(restored.units[0].mechanisms).toEqual([]);
+    expect(restored.units[0].text).toBe(trading.units[0].text);
   });
 });

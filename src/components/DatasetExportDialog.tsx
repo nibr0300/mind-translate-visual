@@ -11,7 +11,7 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { parseFieldImport } from "@/lib/fieldImport";
+import { parseFieldImport, fieldImportSummary } from "@/lib/fieldImport";
 import { useMeaningScores } from "@/hooks/useMeaningScores";
 
 function download(content: string, name: string, type: string) {
@@ -56,7 +56,7 @@ function ExportWorkspace({ field, fileName, initial, onPersist }: { field: Geome
     if (!file) return;
     file.text().then(t => {
       // Field B only contributes its nodes; its saved links are never used here.
-      const parsed = { ...parseFieldImport(t), edges: [] };
+      const parsed = { ...parseFieldImport(t, report => toast.warning(fieldImportSummary(report), { description: report.details.slice(0, 3).join("; "), duration: 10000 })), edges: [] };
       const next = { field: parsed, name: file.name };
       onPersist({ fieldB: next, cross: true, open: true });
       setFieldB(next); setEdits({}); setIndex(0);

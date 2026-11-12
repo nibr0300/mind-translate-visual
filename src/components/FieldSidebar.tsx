@@ -14,7 +14,7 @@ import NarratorDialog from "./NarratorDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Upload, Map as MapIcon } from "lucide-react";
 import { toast } from "sonner";
-import { parseFieldImport } from "@/lib/fieldImport";
+import { parseFieldImport, fieldImportSummary } from "@/lib/fieldImport";
 
 const CLUSTER_COLORS = [
   "hsl(180, 70%, 50%)",
@@ -95,7 +95,7 @@ export default function FieldSidebar({
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const parsed = parseFieldImport(String(reader.result));
+        const parsed = parseFieldImport(String(reader.result), report => toast.warning(fieldImportSummary(report), { description: report.details.slice(0, 3).join("; "), duration: 10000 }));
         onUploadField(parsed, file.name.replace(/\.json$/, ""));
       } catch {
         toast.error("Filen är inte ett giltigt sparat fält (.json). Det öppna fältet behålls.");

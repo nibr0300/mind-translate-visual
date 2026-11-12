@@ -8,17 +8,25 @@ describe("saved field import", () => {
     const field = generateDemoField("didactics");
     expect(parseFieldImport(JSON.stringify(field))).toEqual(field);
   });
-  it("rejects missing vectors before rendering", () => {
+  it("restores missing vectors from saved positions without changing scores", () => {
     const field = generateDemoField("didactics");
     const raw = JSON.parse(JSON.stringify(field));
     delete raw.units[0].vector2d;
-    expect(() => parseFieldImport(JSON.stringify(raw))).toThrow("Ogiltig nod");
+    const restored = parseFieldImport(JSON.stringify(raw));
+    expect(restored.units[0].vector2d).toEqual([raw.units[0].pos.x, raw.units[0].pos.y]);
+    expect(restored.units[0].degenerate).toBe(true);
+    expect(restored.units[0].fz).toBe(raw.units[0].fz);
+    expect(restored.units[0].fy).toBe(raw.units[0].fy);
   });
-  it("rejects invalid metrics before rendering", () => {
+  it("skips missing required metrics instead of manufacturing tension values", () => {
     const field = generateDemoField("didactics");
     const raw = JSON.parse(JSON.stringify(field));
     raw.units[0].fz = null;
-    expect(() => parseFieldImport(JSON.stringify(raw))).toThrow("Ogiltig nod");
+    const restored = parseFieldImport(JSON.stringify(raw));
+    expect(restored.units).toHaveLength(field.units.length - 1);
+    expect(restored.units.some(u => u.id === raw.units[0].id)).toBe(false);
+    expect(restored.stats.totalUnits).toBe(field.units.length - 1);
+    expect(restored.stats.boundaryUnits).toBe(restored.units.filter(u => u.fz > 0.65).length);
   });
   it("bounds the display graph while retaining all saved edges", () => {
     const field = generateDemoField("didactics");

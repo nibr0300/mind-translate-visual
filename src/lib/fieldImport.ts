@@ -107,15 +107,17 @@ export function parseFieldImport(text: string, onRepair?: (report: FieldImportRe
     members.push(unit); grouped.set(unit.clusterId, members);
   }
   const average = (members: FieldUnit[], key: "fz" | "fy") => members.reduce((sum, u) => sum + u[key] / members.length, 0);
-  const restoredClusters = [...grouped].map(([id, members]) => {
+  const restoredClusters = [...new Set([...clusters.keys(), ...grouped.keys()])].flatMap(id => {
+    const members = grouped.get(id) ?? [];
     const original = clusters.get(id);
     const valid = original && vector(original.center) && typeof original.label === "string" && [original.unitCount, original.avgFZ, original.avgFY].every(finite);
-    if (valid && !report.skippedNodes) return original;
+    if (valid && !report.skippedNodes) return [original];
+    if (!members.length) return [];
     detail(`Kluster ${id}: sammanställning återställd från kvarvarande noder`);
-    return { ...original, id, label: typeof original?.label === "string" ? original.label : `Kluster ${id}`,
+    return [{ ...original, id, label: typeof original?.label === "string" ? original.label : `Kluster ${id}`,
       description: typeof original?.description === "string" ? original.description : "",
       center: vector(original?.center) ? original?.center : [0, 1].map(axis => members.reduce((sum, u) => sum + u.vector2d[axis] / members.length, 0)),
-      unitCount: members.length, avgFZ: average(members, "fz"), avgFY: average(members, "fy") };
+      unitCount: members.length, avgFZ: average(members, "fz"), avgFY: average(members, "fy") }];
   });
   let edges = field.edges;
   if (edges != null) {
@@ -127,7 +129,7 @@ export function parseFieldImport(text: string, onRepair?: (report: FieldImportRe
   }
   const stats = { ...field.stats };
   if (report.skippedNodes || ![stats.totalUnits, stats.boundaryUnits, stats.avgFZ, stats.avgFY].every(finite)) {
-    Object.assign(stats, { totalUnits: units.length, boundaryUnits: units.filter(u => u.fz > 0.6).length, avgFZ: average(units, "fz"), avgFY: average(units, "fy") });
+    Object.assign(stats, { totalUnits: units.length, boundaryUnits: units.filter(u => u.fz > 0.65).length, avgFZ: average(units, "fz"), avgFY: average(units, "fy") });
     // Original source coverage remains provenance, not a claim about retained nodes.
     if (record(stats.analyzedOf)) stats.analyzedOf = { ...stats.analyzedOf, analyzed: units.length };
     detail("Fältstatistik uppdaterad för kvarvarande noder");

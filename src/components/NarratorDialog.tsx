@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/useAuth';
-import { parseFieldImport } from '@/lib/fieldImport';
+import { parseFieldImport, fieldImportSummary } from '@/lib/fieldImport';
 import { DEFAULT_NARRATOR_THRESHOLDS, narratorAutoLimit, prepareNarrator, narratorJsonl, narratorProvenance, narratorBatch, downloadNarrator, type NarratorItem, type NarratorSource } from '@/lib/narrator';
 import { loadNarrator, saveNarrator, type NarratorSession } from '@/lib/narratorStore';
 import { generateNarration } from '@/lib/narratorClient';
@@ -27,6 +27,7 @@ export default function NarratorDialog() {
   const [reading, setReading] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  const [importNotes, setImportNotes] = useState<string[]>([]);
   const [progress, setProgress] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -49,7 +50,7 @@ export default function NarratorDialog() {
 
   useEffect(() => {
     let active = true;
-    abortRef.current?.abort(); setReady(false); setSources([]); setItems([]); setIndex(0); setError(''); setAutomaticLimit(true); setLimit(10);
+    abortRef.current?.abort(); setReady(false); setSources([]); setItems([]); setIndex(0); setError(''); setImportNotes([]); setAutomaticLimit(true); setLimit(10);
     loadNarrator(owner).then(s => {
       if (!active || !s) return;
       setItems(s.items); setThresholds(s.thresholds); setLimit(s.limit); setBaseline(s.baseline);
@@ -93,18 +94,19 @@ export default function NarratorDialog() {
     if (busy || reading) return;
     const readOwner = owner;
     setReading(true); setError('');
-    const added: NarratorSource[] = [], failures: string[] = [];
+    const added: NarratorSource[] = [], failures: string[] = [], notes: string[] = [];
     try {
       for (const file of Array.from(files)) {
         try {
           if (file.size > 64 * 1024 * 1024) throw new Error('högst 64 MB per fil');
-          const field = parseFieldImport(await file.text());
+          const field = parseFieldImport(await file.text(), report => notes.push(`${file.name}: ${fieldImportSummary(report)}\n${report.details.join('\n')}`));
           added.push({ name: file.name, field });
         } catch (e) { failures.push(`${file.name}: ${e instanceof Error ? e.message : 'kunde inte läsas'}`); }
       }
       if (ownerRef.current === readOwner) {
         setSources(previous => [...previous.filter(s => !added.some(a => a.name === s.name)), ...added]);
         setError(failures.join('\n'));
+        setImportNotes(notes);
       }
     } finally { setReading(false); if (fileRef.current) fileRef.current.value = ''; }
   }
@@ -156,6 +158,7 @@ export default function NarratorDialog() {
             <input ref={fileRef} type="file" accept=".json,application/json" multiple className="hidden" onChange={e => { if (e.target.files) void readFiles(e.target.files); }} />
           </div>
           {!!sources.length && <div className="flex flex-wrap gap-2">{sources.map(s => <span key={s.name} className="text-xs flex items-center gap-1 max-w-full text-muted-foreground"><span className="break-all">{s.name}</span><Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title={`Ta bort ${s.name}`} disabled={busy} onClick={() => setSources(sources.filter(x => x.name !== s.name))}><X /></Button></span>)}</div>}
+          {!!importNotes.length && <details className="text-xs text-muted-foreground whitespace-pre-wrap break-words"><summary className="cursor-pointer text-primary">Import återställd · visa ändringar</summary>{importNotes.map((note, i) => <p key={i} className="mt-2">{note}</p>)}</details>}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             {(['fz', 'truth', 'cti'] as const).map(key => <label key={key} className="text-xs space-y-3 block"><span className="flex justify-between text-muted-foreground"><span>{key === 'truth' ? 'Truth Tension' : key.toUpperCase()} ≥</span><span className="text-primary">{thresholds[key].toFixed(2)}</span></span><Slider aria-label={`Tröskel ${key}`} value={[thresholds[key]]} min={0} max={1} step={0.05} disabled={busy} onValueChange={([value]) => setThresholds(t => ({ ...t, [key]: value }))} /></label>)}
           </div>
@@ -199,7 +202,7 @@ export default function NarratorDialog() {
         <Button size="sm" disabled={!approved.length || busy} onClick={() => downloadNarrator('narrator_approved.jsonl', narratorJsonl(approved))}><Download />ChatML · {approved.length}</Button>
         <Button size="sm" variant="outline" disabled={!approved.length && !approvedBaseline.length || busy} onClick={() => downloadNarrator('narrator_provenance.json', narratorProvenance([...approved, ...approvedBaseline]))}><Download />Proveniens</Button>
         {baseline && <Button size="sm" variant="outline" disabled={!approvedBaseline.length || busy} onClick={() => downloadNarrator('baseline_calm.jsonl', narratorJsonl(approvedBaseline))}><Download />Baslinje · {approvedBaseline.length}</Button>}
-        <Button size="icon" variant="ghost" className="ml-auto" title="Rensa urval" disabled={busy} onClick={() => { setSources([]); setItems([]); itemsRef.current = []; setIndex(0); setError(''); }}><Trash2 /></Button>
+        <Button size="icon" variant="ghost" className="ml-auto" title="Rensa urval" disabled={busy} onClick={() => { setSources([]); setItems([]); itemsRef.current = []; setIndex(0); setError(''); setImportNotes([]); }}><Trash2 /></Button>
       </footer>
     </DialogContent>
   </Dialog>;
