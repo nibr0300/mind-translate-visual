@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { generateDemoField } from '@/lib/fieldData';
 import { parseFieldImport, type FieldImportReport } from '@/lib/fieldImport';
+import trading from '../../public/fixtures/trading_tilt_transfer.json';
 
 const rawField = () => JSON.parse(JSON.stringify(generateDemoField('didactics')));
 
 describe('self-healing field import', () => {
+  it('leaves the complete trading transfer fixture unchanged', () => {
+    expect(parseFieldImport(JSON.stringify(trading))).toEqual(trading);
+  });
   it('preserves complete intention scores when optional analysis values are null', () => {
     const raw = rawField();
     raw.units[0].intention = { speechAct: 'expressive', epistemicCertainty: 0.8, intentionalForce: 0.3, truthTension: 0.9, moralTension: null };
