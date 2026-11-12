@@ -5,6 +5,7 @@
 // - Fires async LLM relabel + ranking refresh
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { EmbeddingError, embeddingError } from "../_shared/embeddingError.ts";
 
 interface ChunkPayload {
   chunk_index: number;
@@ -73,10 +74,12 @@ async function createEmbeddings(chunks: ChunkPayload[], filename: string): Promi
   const starts: number[] = [];
   for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH) starts.push(i);
   const deadline = Date.now() + 120_000; // stay under the 150 s platform idle limit
+  let stopped = false;
   const embedBatch = async (i: number) => {
     const input = chunks.slice(i, i + EMBEDDING_BATCH).map((chunk) => augmentForEmbedding(chunk, filename));
     let response: Response | null = null;
     for (let attempt = 0; attempt < 4; attempt++) {
+      if (stopped) return;
       const left = deadline - Date.now();
       if (left < 3000) throw new Error("Embedding timed out");
       const ctrl = new AbortController();
@@ -88,22 +91,32 @@ async function createEmbeddings(chunks: ChunkPayload[], filename: string): Promi
           body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
         });
       } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") { response = null; continue; }
+        if (e instanceof DOMException && e.name === "AbortError") throw new EmbeddingError(504, "Embedding timed out");
         throw e;
       } finally { clearTimeout(t); }
-      if (response.ok || !(response.status === 429 || response.status >= 500)) break;
-      await response.text();
-      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+      if (response.ok) break;
+      const failure = embeddingError(response.status, await response.text());
+      if (!(response.status === 429 || response.status >= 500) || attempt === 3) {
+        stopped = true;
+        throw failure;
+      }
+      const retryAfter = response.headers.get("Retry-After");
+      const seconds = retryAfter ? Number(retryAfter) : NaN;
+      const wait = Number.isFinite(seconds) ? seconds * 1000 : retryAfter ? Date.parse(retryAfter) - Date.now() : 1000 * 2 ** attempt + Math.random() * 500;
+      if (wait >= deadline - Date.now()) throw failure;
+      await new Promise((r) => setTimeout(r, Math.max(1000, wait)));
     }
     if (!response) throw new Error("Embedding timed out");
-    if (!response.ok) throw new Error(`Embedding failed (${response.status}): ${await response.text()}`);
     const body = await response.json();
     const vectors = (body.data ?? []) as { embedding: number[]; index: number }[];
     for (const vector of vectors) embeddings[i + vector.index] = vector.embedding;
   };
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(4, starts.length) }, async () => {
-    while (next < starts.length) await embedBatch(starts[next++]);
+    while (!stopped && next < starts.length) {
+      try { await embedBatch(starts[next++]); }
+      catch (error) { stopped = true; throw error; }
+    }
   }));
 
   if (embeddings.some((embedding) => !Array.isArray(embedding))) {
@@ -120,10 +133,9 @@ Deno.serve(async (req) => {
     if (!payload.filename) throw new Error("filename required");
     if (!Array.isArray(payload.chunks)) throw new Error("chunks[] required");
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const url = Deno.env.get("SUPABASE_URL"), serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !serviceKey) throw new Error("Saving service is not configured");
+    const supabase = createClient(url, serviceKey);
 
     // Identify the calling user from the Authorization bearer token.
     const authHeader = req.headers.get("Authorization");
@@ -159,6 +171,16 @@ Deno.serve(async (req) => {
         reused = true;
       }
     }
+
+    if (reused) {
+      return new Response(JSON.stringify({ document_id: documentId, persisted_chunks: 0, reused: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Finish AI work before inserting a document or wiping an older version.
+    // A credit/access block must leave previously saved content untouched.
+    const embeddings = await createEmbeddings(payload.chunks, payload.filename);
 
     if (!documentId) {
       let q = supabase
@@ -218,21 +240,6 @@ Deno.serve(async (req) => {
       if (docErr) throw docErr;
       documentId = doc.id;
     }
-
-    if (reused) {
-      // Skip re-writing chunks/clusters — content already persisted under this doc
-      return new Response(JSON.stringify({
-        document_id: documentId,
-        persisted_chunks: 0,
-        reused: true,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Generate embeddings server-side. Returning them through the browser used
-    // tens of megabytes of parsed JSON and caused mobile tabs to reload white.
-    const embeddings = await createEmbeddings(payload.chunks, payload.filename);
 
     // Postgres text/jsonb cannot store \u0000. Strip null bytes everywhere.
     const stripNulls = (s: unknown): unknown => {
@@ -352,7 +359,7 @@ Deno.serve(async (req) => {
     });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+      status: err instanceof EmbeddingError ? err.status : 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -1,5 +1,10 @@
 # Roadmap
 
+## Field saving credit-limit error
+- [x] Deployed safe gateway errors with original status, stopped blocked batches, and moved embeddings before saved-content changes; 3 error tests passed, preview build OK.
+- [x] Signed-in upload with simulated credit-limit 403 verified: safe warning appears, 42-node map remains visible, and field restores after reload with no page errors; no live AI credits spent.
+- [ ] Verify live AI saving after recovery — blocked by the reached workspace AI spending cap (60 credits/month); no further AI probes until an owner adjusts it.
+
 ## Partitur-Narratören
 - [x] Åtgärdat upprepat urval och täta sparningar: 16 tester godkända, inklusive 12 fält med simulerad strömning; inloggad granskning/export/återställning med 9 verkliga sparade fält (3155 noder) verifierad. Fysisk telefon ej testad.
 - [x] Återinläsning av flera sparade fält, skräp-/friktionsfilter och tre kontextankare utan ny fältanalys
