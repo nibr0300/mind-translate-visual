@@ -67,7 +67,7 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
   const docs = sentences.map(tokenize);
   const N = docs.length;
 
-  const df: Record<string, number> = {};
+  const df: Record<string, number> = Object.create(null);
   docs.forEach((doc) => {
     const seen = new Set<string>();
     doc.forEach((w) => {
@@ -99,7 +99,7 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
   const vocabIndex = new Map(vocab.map((w, i) => [w, i]));
 
   const vectors = docs.map((doc) => {
-    const tf: Record<string, number> = {};
+    const tf: Record<string, number> = Object.create(null);
     doc.forEach((w) => (tf[w] = (tf[w] || 0) + 1));
     const maxTf = Math.max(...Object.values(tf), 1);
 
@@ -237,7 +237,7 @@ export function generateClusterLabels(
     const clusterSentences = sentences.filter((_, i) => assignments[i] === c);
     const allTokens = clusterSentences.flatMap(tokenize).filter((w) => !STOPWORDS.has(w));
 
-    const tf: Record<string, number> = {};
+    const tf: Record<string, number> = Object.create(null);
     allTokens.forEach((w) => (tf[w] = (tf[w] || 0) + 1));
 
     const topTerms = Object.entries(tf)

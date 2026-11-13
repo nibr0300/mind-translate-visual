@@ -1,7 +1,7 @@
 # Roadmap
 
 ## skills3 F-värden
-- [x] Rättat hashindex i TF-IDF och uppdaterat FZ-sammanfattningen efter domänkalibrering.
+- [x] Rättat ordtabeller som krockade med kodordet constructor, hashindex i TF-IDF och FZ-sammanfattningen efter domänkalibrering.
 - [ ] Verifiera skills3-uppladdning och regressionstester utan nya AI-kostnader.
 
 ## Narratör v2

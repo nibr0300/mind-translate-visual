@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeTFIDF, kMeans, projectTo2D } from "@/lib/textAnalyzer";
+import { computeTFIDF, kMeans, projectTo2D, generateClusterLabels } from "@/lib/textAnalyzer";
 
 describe("bounded TF-IDF vocabulary", () => {
   it("keeps rare buckets finite when actual vocabulary is shorter than its budget", () => {
@@ -20,5 +20,16 @@ describe("bounded TF-IDF vocabulary", () => {
     const { vectors, vocab } = computeTFIDF(texts);
     expect(vocab.length).toBeLessThanOrEqual(608);
     expect(vectors.every(v => v.length === vocab.length && v.every(Number.isFinite))).toBe(true);
+  });
+
+  it("counts constructor as code text rather than an inherited object property", () => {
+    const texts = ["constructor(secretKey) {", "constructor() {", "prototype relation", "__proto__ state"];
+    const { vectors, vocab } = computeTFIDF(texts);
+    expect(vocab).toContain("constructor");
+    expect(vectors.every(v => v.every(Number.isFinite))).toBe(true);
+    expect(projectTo2D(vectors).every(c => c.every(Number.isFinite))).toBe(true);
+    const constructorIndex = vocab.indexOf("constructor");
+    expect(vectors[0][constructorIndex]).toBeCloseTo(1 + Math.log(2));
+    expect(generateClusterLabels(texts, [0, 0, 0, 0], 1)[0].label).toContain("Constructor");
   });
 });
