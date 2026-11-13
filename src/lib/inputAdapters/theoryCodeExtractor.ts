@@ -68,6 +68,10 @@ const EXTERNAL_CALL =
 const CODE_CALL =
   /[\w.]+\s*\([^)]*[=",][^)]*\)|=>\s*[\w.]+\(|\b(?:read|write|send|post|get|exec|execute)_?\w*\s*\(/;
 
+/** Assignment / state change: the operational heart of a program. */
+const CODE_MUTATION =
+  /^\s*(?:[A-Za-z_$][\w.$\[\]'"]*|self\.[\w.]+|state\[[^\]]+\])\s*(?:=|\+=|-=|\*=|\/=)(?!=)|\beffects\s*=|\.append\(|\.update\(|\.extend\(|\bset_\w+\(/;
+
 /** The act of naming something. */
 const DEFINITION =
   /\b(?:definition|definiera|definierar|definierad|definieras|denotes|beteckna|betecknar|is defined as|defined as|kallas|där X är|vi skriver|vi kallar|låt oss kalla)\b|:=|\\triangleq|^\s*(?:def\.?|definition)\s*\d/i;
