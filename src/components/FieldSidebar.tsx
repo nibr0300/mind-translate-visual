@@ -452,7 +452,7 @@ export default function FieldSidebar({
             <ul className="flex flex-col gap-1">
               {ranked.map((r) => (
                 <li key={r.path} className="flex items-center gap-2 text-[11px] font-mono">
-                  <div className="flex-1 truncate text-foreground" title={r.path}>{r.path}</div>
+                  <div className="flex-1 truncate text-foreground" title={r.path}>{labelOf(r.path)}</div>
                   <div className="w-16 h-1.5 rounded bg-secondary overflow-hidden">
                     <div
                       className="h-full bg-[hsl(320,80%,55%)]"
