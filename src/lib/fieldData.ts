@@ -59,12 +59,22 @@ export interface FieldCluster {
   description: string;
 }
 
+/** Counts from a structural extractor (bug bounty, formal theory & code). */
+export interface StructuralStats {
+  byType: Record<string, number>;
+  noiseDropped: number;
+  droppedSample: { text: string; reason: string }[];
+  nearDuplicates: number;
+  corpusHash: string;
+}
+
 export interface GeometricField {
   units: FieldUnit[];
   clusters: FieldCluster[];
   /** kNN graph in the original vector space — enables real network analysis on export. */
   edges?: FieldEdge[];
   stats: {
+    totalUnits: number;
     boundaryUnits: number;
     avgFZ: number;
     avgFY: number;
