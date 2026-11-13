@@ -1,5 +1,8 @@
 # Roadmap
 
+## Missing corpus metric crash
+- [ ] Preserve unavailable search scores as missing and protect ranking, cluster and chunk displays; verify regression tests and signed-in rendering.
+
 ## skills3 F-värden
 - [x] Rättat ordtabeller som krockade med kodordet constructor, hashindex i TF-IDF och FZ-sammanfattningen efter domänkalibrering.
 - [x] 31 regressionstester godkända; inloggad skills3-uppladdning med AI-anrop avstängda gav 386 noder, FY 0.634, FZ 0.030 och inga ogiltiga koordinater/värden. Karta och sammanfattning visuellt verifierade; äldre sparad analys har inte ändrats och djup AI-omanalys ingick inte.
