@@ -212,7 +212,7 @@ export function extractTheoryUnits(raw: string): TheoryExtraction {
       return;
     }
     // A structural act is kept at any length; plain prose needs substance.
-    if (kind !== "text" && kind !== "prose") {
+    if (kind !== "text" && kind !== "prose" && kind !== "blank") {
       units.push({ text: trimmed, unitType: kind, start, end });
       return;
     }

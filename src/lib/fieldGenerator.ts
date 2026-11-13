@@ -124,7 +124,9 @@ export async function generateFieldFromFile(
       // own nodes; they are never chunked into prose.
       const raw = rawUnits.map((u) => u.text).join("\n\n");
       const extraction = structural === "security" ? extractSecurityUnits(raw) : extractTheoryUnits(raw);
-      const deduped = dedupeNearDuplicates(extraction.units);
+      const deduped = dedupeNearDuplicates<
+        { text: string; unitType: string; start: number; end: number }
+      >(extraction.units);
       chunks = deduped.map((u, i) => ({
         index: i,
         text: u.text,
