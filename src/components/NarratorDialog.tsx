@@ -8,7 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/useAuth';
 import { parseFieldImport, fieldImportSummary } from '@/lib/fieldImport';
-import { DEFAULT_NARRATOR_THRESHOLDS, narratorAutoLimit, prepareNarrator, narratorJsonl, narratorProvenance, narratorBatch, downloadNarrator, type NarratorItem, type NarratorSource } from '@/lib/narrator';
+import { NARRATOR_VERSION, DEFAULT_NARRATOR_THRESHOLDS, narratorAutoLimit, prepareNarrator, narratorJsonl, narratorProvenance, narratorBatch, downloadNarrator, type NarratorItem, type NarratorSource } from '@/lib/narrator';
 import { loadNarrator, saveNarrator, type NarratorSession } from '@/lib/narratorStore';
 import { generateNarration } from '@/lib/narratorClient';
 
@@ -117,9 +117,9 @@ export default function NarratorDialog() {
     const merged = next.map(i => existing.get(`${i.score.source}:${i.score.id}:${i.score.target.text}`) ?? i);
     itemsRef.current = merged; setItems(merged); setIndex(0); setError(''); setProgress('');
   }
-  async function run(correction?: string) {
+  async function run(correction?: string, regenerate = false) {
     if (busy) return;
-    const targets = correction ? current && !current.baseline ? [{ item: current, i: index }] : [] : pending;
+    const targets = correction || regenerate ? current && !current.baseline ? [{ item: current, i: index }] : [] : pending;
     if (!targets.length) return;
     const controller = new AbortController(); abortRef.current = controller;
     setBusy(true); setError('');
@@ -130,7 +130,7 @@ export default function NarratorDialog() {
         updateItem(i, { review: 'pending' });
         try {
           const answer = await generateNarration(item.score, controller.signal, text => updateItem(i, { answer: text, review: 'pending' }), correction, item.answer);
-          updateItem(i, { answer, review: 'pending' });
+          updateItem(i, { answer, review: 'pending', voiceVersion: NARRATOR_VERSION });
         } catch (e) {
           // Incomplete output must never become an approvable training record.
           updateItem(i, { answer: item.answer, review: 'pending' });
@@ -148,7 +148,7 @@ export default function NarratorDialog() {
     <Button variant="outline" className="w-full mt-2 font-mono text-xs" onClick={() => setOpen(true)}><BookOpenText /> Re-ingest & Narratör</Button>
     <DialogContent aria-describedby={undefined} className="max-w-6xl w-[calc(100%-1rem)] h-[92dvh] flex flex-col gap-0 p-0 overflow-hidden font-mono">
       <header className="border-b border-border px-5 py-4 pr-12 shrink-0">
-        <DialogTitle className="flex items-center gap-2 text-primary"><BookOpenText className="h-5 w-5" /> Partitur-Narratören</DialogTitle>
+        <DialogTitle className="flex items-center gap-2 text-primary"><BookOpenText className="h-5 w-5" /> Partitur-Narratören · v2</DialogTitle>
       </header>
       <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
         <section className="p-4 md:p-5 border-b border-border space-y-4">
@@ -191,6 +191,7 @@ export default function NarratorDialog() {
             </div>
             <div className="space-y-3 min-w-0">
               <h3 className="text-xs text-primary">{current.baseline ? 'Baslinje · källtext som svar' : 'Dispositionellt svar'}</h3>
+              {!current.baseline && current.answer && <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{current.voiceVersion === NARRATOR_VERSION ? 'Narratör v2' : 'Äldre svar · v1'}</span><Button variant="outline" size="sm" disabled={busy || !user} onClick={() => void run(undefined, true)}><Play />Generera om · v2</Button></div>}
               <Textarea aria-label="Dispositionellt svar" className="min-h-56 text-sm" value={current.answer} disabled={busy} onChange={e => updateItem(index, { answer: e.target.value, review: 'pending' })} />
               {!current.baseline && <div className="flex flex-wrap gap-2">{[['specific', 'Gör mer specifik', Target], ['hesitation', 'Öka tvekan', HelpCircle], ['concrete', 'Minska abstraktion', Blocks]].map(([key, label, Icon]) => { const Symbol = Icon as typeof Target; return <Button key={key as string} variant="outline" size="sm" title={`${label} · nytt AI-anrop`} disabled={busy || !current.answer || !user} onClick={() => void run(key as string)}><Symbol />{label as string}</Button>; })}</div>}
               <div className="flex flex-wrap gap-2 items-center"><Button disabled={busy || !current.answer.trim()} variant={current.review === 'approved' ? 'secondary' : 'default'} onClick={() => updateItem(index, { review: 'approved' })}><Check />{current.review === 'approved' ? 'Godkänd' : 'Godkänn'}</Button><Button variant="outline" disabled={busy} onClick={() => updateItem(index, { review: 'rejected' })}><X />Avvisa</Button><span className="text-xs text-muted-foreground">{current.review === 'rejected' ? 'Avvisad' : current.review === 'pending' ? 'Ej godkänd' : ''}</span></div>

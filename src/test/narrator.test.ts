@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cleanNarratorText, isFrictionNode, isSilentNode, narratorScore, prepareNarrator, narratorAutoLimit, narratorJsonl, narratorBatch, NARRATOR_SYSTEM, type NarratorItem } from '@/lib/narrator';
+import { cleanNarratorText, isFrictionNode, isSilentNode, narratorScore, prepareNarrator, narratorAutoLimit, narratorJsonl, narratorBatch, narratorProvenance, NARRATOR_SYSTEM, NARRATOR_VERSION, LEGACY_NARRATOR_SYSTEM, type NarratorItem } from '@/lib/narrator';
 import { type FieldUnit, type GeometricField } from '@/lib/fieldData';
 
 const node = (id: string, patch: Partial<FieldUnit> = {}): FieldUnit => ({ id, text: `Konkreta beslut om varians och motståndarens dolda möjligheter ${id}.`, pos: { x: 0, y: 0 }, vector2d: [0, 0], clusterId: 0, type: 'paragraph', fz: 0.1, fy: 0.1, cti: 0.1, ...patch });
@@ -50,8 +50,22 @@ describe('Narrator selection and export rules', () => {
   });
   it('exports only nonempty human-approved answers with exactly three messages and no provenance', () => {
     const f = field([node('a')]); const score = narratorScore(f, f.units[0], 'private-source');
-    const items: NarratorItem[] = [{ score, answer: ' Godkänt svar ', review: 'approved' }, { score, answer: 'utkast', review: 'pending' }, { score, answer: 'nej', review: 'rejected' }, { score, answer: '', review: 'approved' }];
+    const items: NarratorItem[] = [{ score, answer: ' Godkänt svar ', review: 'approved', voiceVersion: NARRATOR_VERSION }, { score, answer: 'utkast', review: 'pending' }, { score, answer: 'nej', review: 'rejected' }, { score, answer: '', review: 'approved' }];
     expect(narratorJsonl(items)).toBe(JSON.stringify({ messages: [{ role: 'system', content: NARRATOR_SYSTEM }, { role: 'user', content: f.units[0].text }, { role: 'assistant', content: 'Godkänt svar' }] }));
     expect(JSON.parse(narratorBatch(items).split('\n')[0]).score.source).toBe('private-source');
+  });
+  it('preserves the original voice of unversioned saved answers instead of relabeling them v2', () => {
+    const f = field([node('legacy')]);
+    const item: NarratorItem = { score: narratorScore(f, f.units[0], 'saved'), answer: 'Tidigare godkänt svar', review: 'approved' };
+    expect(JSON.parse(narratorJsonl([item])).messages[0].content).toBe(LEGACY_NARRATOR_SYSTEM);
+    expect(JSON.parse(narratorProvenance([item])).records[0].voiceVersion).toBe('rfa-narrator-v1');
+  });
+  it('marks new offline requests v2 while leaving source scores unchanged', () => {
+    const f = field([node('new', { fz: 0.739, fy: 0.97, cti: 0.4 })]);
+    const item: NarratorItem = { score: narratorScore(f, f.units[0], 'saved'), answer: '', review: 'pending' };
+    const request = JSON.parse(narratorBatch([item]));
+    expect(request.version).toBe('rfa-narrator-v2');
+    expect(request.score.target).toEqual(item.score.target);
+    expect(item.voiceVersion).toBeUndefined();
   });
 });
