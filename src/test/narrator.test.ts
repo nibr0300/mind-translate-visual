@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { cleanNarratorText, isFrictionNode, isSilentNode, narratorScore, prepareNarrator, narratorAutoLimit, narratorJsonl, narratorBatch, narratorProvenance, NARRATOR_SYSTEM, NARRATOR_VERSION, LEGACY_NARRATOR_SYSTEM, type NarratorItem } from '@/lib/narrator';
 import { type FieldUnit, type GeometricField } from '@/lib/fieldData';
+import { isNarratorCorrection } from '../../supabase/functions/_shared/narratorVoice';
+
+describe('Narrator voice correction requests', () => {
+  it('accepts proactive action', () => expect(isNarratorCorrection('proactive_action')).toBe(true));
+  it('accepts proactive defense', () => expect(isNarratorCorrection('proactive_defense')).toBe(true));
+  it('accepts curiosity', () => expect(isNarratorCorrection('curiosity')).toBe(true));
+  it('preserves the existing corrections', () => {
+    for (const key of ['specific', 'hesitation', 'concrete']) expect(isNarratorCorrection(key)).toBe(true);
+  });
+  it('rejects unknown and inherited keys rather than using them as instructions', () => {
+    for (const value of ['constructor', 'toString', '__proto__', 'unknown', '', null, 1, {}]) expect(isNarratorCorrection(value)).toBe(false);
+  });
+});
 
 const node = (id: string, patch: Partial<FieldUnit> = {}): FieldUnit => ({ id, text: `Konkreta beslut om varians och motståndarens dolda möjligheter ${id}.`, pos: { x: 0, y: 0 }, vector2d: [0, 0], clusterId: 0, type: 'paragraph', fz: 0.1, fy: 0.1, cti: 0.1, ...patch });
 const field = (units: FieldUnit[], edges?: GeometricField['edges']): GeometricField => ({ units, edges, clusters: [], stats: { totalUnits: units.length, boundaryUnits: 0, avgFZ: 0, avgFY: 0 }, useCase: 'uploaded' });

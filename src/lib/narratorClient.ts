@@ -1,7 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { NarratorScore } from './narrator';
+import type { NarratorCorrection } from '../../supabase/functions/_shared/narratorVoice';
 
-export async function generateNarration(score: NarratorScore, signal: AbortSignal, onText: (text: string) => void, correction?: string, previous?: string) {
+export async function generateNarration(score: NarratorScore, signal: AbortSignal, onText: (text: string) => void, correction?: NarratorCorrection, previous?: string) {
   const { data } = await supabase.auth.getSession();
   if (!data.session) throw new Error('Logga in för att använda Lovable AI. Lokal batch-export är tillgänglig utan inloggning.');
   const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/narrate-field`, {
