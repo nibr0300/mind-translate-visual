@@ -253,6 +253,12 @@ export function extractTheoryUnits(raw: string): TheoryExtraction {
       flushPara(lineStart);
       continue;
     }
+    // A short line repeated through the document is page furniture, not content.
+    if (kind === "text" && trimmed.length < 60 && repeated.has(trimmed.toLowerCase())) {
+      flushPara(lineStart);
+      dropped.push({ text: trimmed.slice(0, 120), reason: "running header" });
+      continue;
+    }
     if (kind === "text") {
       if (!para) paraStart = lineStart;
       para += (para ? " " : "") + trimmed;
