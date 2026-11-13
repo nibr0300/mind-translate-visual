@@ -1,14 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
+import { finiteMetric } from "./metricDisplay";
 
 export interface CorpusDocument {
   id: string;
   filename: string;
   source_type: string;
   uploaded_at: string;
-  avg_cti: number;
-  max_cti: number;
-  avg_fz: number;
-  avg_fy: number;
+  avg_cti: number | null;
+  max_cti: number | null;
+  avg_fz: number | null;
+  avg_fy: number | null;
   chunk_count: number;
   cluster_count: number;
 }
@@ -20,13 +21,13 @@ export interface ClusterMatch {
   filename: string;
   label: string;
   custom_label: string | null;
-  similarity: number;
-  fz_delta: number;
-  fy_delta: number;
-  hybrid_score: number;
-  avg_fz: number;
-  avg_fy: number;
-  avg_cti: number;
+  similarity: number | null;
+  fz_delta: number | null;
+  fy_delta: number | null;
+  hybrid_score: number | null;
+  avg_fz: number | null;
+  avg_fy: number | null;
+  avg_cti: number | null;
   unit_count: number;
   description: string;
 }
@@ -39,7 +40,7 @@ export interface ChunkMatch {
   cluster_label: string | null;
   fz: number | null;
   cti: number | null;
-  similarity: number;
+  similarity: number | null;
   filename: string | null;
 }
 
@@ -66,7 +67,10 @@ export async function fetchCorpusRanking(force = false): Promise<CorpusDocument[
     console.warn("[searchClient] corpus ranking failed:", error.message);
     return [];
   }
-  const rows = (data ?? []) as unknown as CorpusDocument[];
+  const rows = ((data ?? []) as unknown as CorpusDocument[]).map(row => ({
+    ...row, avg_cti: finiteMetric(row.avg_cti), max_cti: finiteMetric(row.max_cti),
+    avg_fz: finiteMetric(row.avg_fz), avg_fy: finiteMetric(row.avg_fy),
+  }));
   setCache("corpus-ranking", rows);
   return rows;
 }
@@ -80,7 +84,7 @@ export interface SearchClustersOpts {
 }
 
 export async function searchSimilarClusters(opts: SearchClustersOpts): Promise<{
-  source: { label: string; avg_fz: number; avg_fy: number } | null;
+  source: { label: string; avg_fz: number | null; avg_fy: number } | null;
   matches: ClusterMatch[];
 }> {
   const { data, error } = await supabase.functions.invoke("search-clusters", {
@@ -93,7 +97,12 @@ export async function searchSimilarClusters(opts: SearchClustersOpts): Promise<{
     },
   });
   if (error) throw error;
-  return data as { source: any; matches: ClusterMatch[] };
+  const result = data as { source: any; matches?: ClusterMatch[] };
+  return { ...result, matches: (result.matches ?? []).map(row => ({
+    ...row, similarity: finiteMetric(row.similarity), hybrid_score: finiteMetric(row.hybrid_score),
+    fz_delta: finiteMetric(row.fz_delta), fy_delta: finiteMetric(row.fy_delta),
+    avg_fz: finiteMetric(row.avg_fz), avg_fy: finiteMetric(row.avg_fy), avg_cti: finiteMetric(row.avg_cti),
+  })) };
 }
 
 export async function searchChunks(
@@ -109,7 +118,9 @@ export async function searchChunks(
     },
   });
   if (error) throw error;
-  return ((data as any)?.matches ?? []) as ChunkMatch[];
+  return (((data as any)?.matches ?? []) as ChunkMatch[]).map(row => ({
+    ...row, similarity: finiteMetric(row.similarity), fz: finiteMetric(row.fz), cti: finiteMetric(row.cti),
+  }));
 }
 
 export async function updateClusterLabel(

@@ -13,6 +13,7 @@ import { ChevronDown, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DOMAIN_PROFILES } from "@/lib/domainProfiles";
 import CalibrationPanel from "./CalibrationPanel";
+import { formatMetric, metricBarWidth } from "@/lib/metricDisplay";
 
 interface Props {
   field: GeometricField;
@@ -163,9 +164,9 @@ export default function SearchPanel({ field, fileName, activeClusterId, onSelect
                 <span className="text-muted-foreground/60 w-4 text-right">{i + 1}</span>
                 <span className="flex-1 truncate text-foreground" title={d.filename}>{d.filename}</span>
                 <div className="w-14 h-1.5 rounded bg-secondary overflow-hidden">
-                  <div className="h-full bg-[hsl(320,80%,55%)]" style={{ width: `${Math.min(100, d.avg_cti * 200)}%` }} />
+                  <div className="h-full bg-[hsl(320,80%,55%)]" style={{ width: metricBarWidth(d.avg_cti) }} />
                 </div>
-                <span className="w-9 text-right text-muted-foreground">{d.avg_cti.toFixed(2)}</span>
+                <span className="w-9 text-right text-muted-foreground">{formatMetric(d.avg_cti)}</span>
                 <span className="w-10 text-right text-muted-foreground/60">k={d.cluster_count}</span>
                 <select
                   aria-label={`Domain for ${d.filename}`}
@@ -210,8 +211,8 @@ export default function SearchPanel({ field, fileName, activeClusterId, onSelect
                   <div className="text-[10px] font-mono text-muted-foreground mb-1">Selected cluster</div>
                   <div className="text-xs font-mono font-medium text-foreground mb-1">{activeCluster.label}</div>
                   <div className="flex gap-3 text-[10px] font-mono mb-2">
-                    <span><span className="text-field-fz">FZ</span> {activeCluster.avgFZ.toFixed(2)}</span>
-                    <span><span className="text-field-fy">FY</span> {activeCluster.avgFY.toFixed(2)}</span>
+                    <span><span className="text-field-fz">FZ</span> {formatMetric(activeCluster.avgFZ)}</span>
+                    <span><span className="text-field-fy">FY</span> {formatMetric(activeCluster.avgFY)}</span>
                     <span className="text-muted-foreground">n={activeCluster.unitCount}</span>
                   </div>
                   <div className="flex gap-1">
@@ -244,17 +245,17 @@ export default function SearchPanel({ field, fileName, activeClusterId, onSelect
                         <span className="font-mono text-xs font-medium text-foreground flex-1 truncate">
                           {m.custom_label ?? m.label}
                         </span>
-                        <span className="font-mono text-[10px] text-primary">{m.hybrid_score.toFixed(2)}</span>
+                        <span className="font-mono text-[10px] text-primary">{formatMetric(m.hybrid_score)}</span>
                       </div>
                       <div className="text-[10px] font-mono text-muted-foreground truncate pl-6 mb-1">
                         {m.filename}
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-mono pl-6">
-                        <span><span className="text-muted-foreground">sim</span> {m.similarity.toFixed(2)}</span>
-                        <span><span className="text-field-fz">Δfz</span> {m.fz_delta.toFixed(2)}</span>
-                        <span><span className="text-field-fy">Δfy</span> {m.fy_delta.toFixed(2)}</span>
-                        <span><span className="text-muted-foreground">FZ</span> {m.avg_fz.toFixed(2)}</span>
-                        <span><span className="text-muted-foreground">FY</span> {m.avg_fy.toFixed(2)}</span>
+                        <span><span className="text-muted-foreground">sim</span> {formatMetric(m.similarity)}</span>
+                        <span><span className="text-field-fz">Δfz</span> {formatMetric(m.fz_delta)}</span>
+                        <span><span className="text-field-fy">Δfy</span> {formatMetric(m.fy_delta)}</span>
+                        <span><span className="text-muted-foreground">FZ</span> {formatMetric(m.avg_fz)}</span>
+                        <span><span className="text-muted-foreground">FY</span> {formatMetric(m.avg_fy)}</span>
                       </div>
                       {m.description && (
                         <p className="text-[11px] text-muted-foreground leading-snug pl-6 mt-1 line-clamp-2">
@@ -304,12 +305,12 @@ export default function SearchPanel({ field, fileName, activeClusterId, onSelect
                     <span className="font-mono text-[10px] text-muted-foreground truncate flex-1">
                       {c.filename ?? "(unknown)"} · {c.cluster_label ?? "—"}
                     </span>
-                    <span className="font-mono text-[10px] text-primary">{c.similarity.toFixed(2)}</span>
+                    <span className="font-mono text-[10px] text-primary">{formatMetric(c.similarity)}</span>
                   </div>
                   <p className="text-[11px] text-foreground leading-snug pl-6 line-clamp-3">{c.text}</p>
                   <div className="flex gap-3 text-[10px] font-mono pl-6 mt-1 text-muted-foreground">
-                    {c.fz !== null && <span><span className="text-field-fz">FZ</span> {c.fz.toFixed(2)}</span>}
-                    {c.cti !== null && <span>CTI {c.cti.toFixed(2)}</span>}
+                    {c.fz != null && <span><span className="text-field-fz">FZ</span> {formatMetric(c.fz)}</span>}
+                    {c.cti != null && <span>CTI {formatMetric(c.cti)}</span>}
                   </div>
                 </li>
               ))}
@@ -328,7 +329,7 @@ function SliderRow({
     <div>
       <div className="flex justify-between text-[10px] font-mono text-muted-foreground mb-1">
         <span>{label}</span>
-        <span>{value.toFixed(2)}</span>
+        <span>{formatMetric(value)}</span>
       </div>
       <input
         type="range"
