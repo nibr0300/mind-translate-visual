@@ -38,7 +38,15 @@ describe("mechanism graph and transfer rules", () => {
     expect(f.units.some(u => u.text.includes("Diversifiering är ett matematiskt skydd, inte en tro"))).toBe(true);
   });
   it("finds causal cross-domain hypotheses in both directions without requiring poker axes or lexical similarity", () => {
-    const rows = buildCrossCorpusDpoCandidates(poker(), fixture(), settings, new Map());
+    const a = poker(), b = fixture();
+    // The real path scores meaning in both directions; word overlap alone cannot
+    // cross two vocabularies, so the scores are what carry the pair.
+    const meaning = new Map<string, number>();
+    for (const x of a.units) for (const y of b.units) {
+      meaning.set(pairKey(x.text, y.text), 0.8);
+      meaning.set(pairKey(y.text, x.text), 0.8);
+    }
+    const rows = buildCrossCorpusDpoCandidates(a, b, settings, meaning);
     expect(rows.some(c => c.metadata.anchor_domain === "poker" && c.metadata.rejected_domain === "trading")).toBe(true);
     expect(rows.some(c => c.metadata.anchor_domain === "trading" && c.metadata.rejected_domain === "poker")).toBe(true);
     expect(rows.every(c => c.answer === "" && !c.approved && c.prompt.includes(c.rejected ?? ""))).toBe(true);
@@ -46,11 +54,12 @@ describe("mechanism graph and transfer rules", () => {
   it("retains chosen CTI <=0.20, certainty >=0.85, rejected CTI >=0.35 and gap >=0.25", () => {
     const a = poker(), b = fixture();
     a.units = [a.units[10]]; b.units = [b.units[6]];
-    expect(buildCrossCorpusDpoCandidates(a, b, settings)).toHaveLength(1);
+    const scores = () => new Map([[pairKey(a.units[0].text, b.units[0].text), 0.9]]);
+    expect(buildCrossCorpusDpoCandidates(a, b, settings, scores())).toHaveLength(1);
     a.units[0].cti = 0.21;
-    expect(buildCrossCorpusDpoCandidates(a, b, settings)).toHaveLength(0);
+    expect(buildCrossCorpusDpoCandidates(a, b, settings, scores())).toHaveLength(0);
     a.units[0].cti = 0.2; b.units[0].cti = 0.4;
-    expect(buildCrossCorpusDpoCandidates(a, b, settings)).toHaveLength(0);
+    expect(buildCrossCorpusDpoCandidates(a, b, settings, scores())).toHaveLength(0);
   });
   it("allows rational assertive trading examples in mechanism SFT without changing Strict SFT", () => {
     expect(buildDatasetCandidates(fixture(), DATASET_PRESETS["Strict SFT"])).toHaveLength(0);
