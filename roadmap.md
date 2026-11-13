@@ -1,7 +1,7 @@
 # Roadmap
 
 ## Missing corpus metric crash
-- [ ] Preserve unavailable search scores as missing and protect ranking, cluster and chunk displays; verify regression tests and signed-in rendering.
+- [x] Unavailable corpus and search metrics remain null and display as “—”, never invented zero. Four regression tests passed; signed-in null-CTI ranking reproduced the original crash before the fix, then ranking, null-score semantic results and domain filtering worked without page errors at desktop and 737×1383. Preview build OK; existing saved analyses and database untouched.
 
 ## skills3 F-värden
 - [x] Rättat ordtabeller som krockade med kodordet constructor, hashindex i TF-IDF och FZ-sammanfattningen efter domänkalibrering.
