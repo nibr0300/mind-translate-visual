@@ -52,16 +52,21 @@ export { corpusHash, dedupeNearDuplicates, simHash, simHashSimilarity };
 const CODE_DEF =
   /^\s*(?:export\s+|public\s+|private\s+|static\s+|async\s+)*(?:def|class|function|interface|struct|enum|type|trait|impl)\s+[A-Za-z_$][\w$]*|^\s*(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*(?:async\s*)?(?:\(|function\b|new\s)/;
 
-/** Evidence that a line is executable code rather than mathematics. */
-const CODE_EVIDENCE = /[{}();]|=>|\bself\.|\bdef\b|\breturn\b|state\[|effects\s*=|\bprint\(|\bawait\b/;
-
-/** Assignment / state change: the operational heart of a program. */
-const CODE_MUTATION =
-  /^\s*(?:[A-Za-z_$][\w.$\[\]'"]*|self\.[\w.]+|state\[[^\]]+\])\s*(?:=|\+=|-=|\*=|\/=)(?!=)|\beffects\s*=|\.append\(|\.update\(|\.extend\(|\bset_\w+\(/;
+/**
+ * Evidence that a line is executable code rather than mathematics or prose.
+ * A bare parenthesis is deliberately NOT evidence: "(ACS)" in a heading is not
+ * a function call.
+ */
+const CODE_EVIDENCE =
+  /[{};]|=>|\bself\.|\bdef\b|\breturn\b|\bimport\b|\bawait\b|state\[|effects\s*=|\|\||\b(?:True|False|None)\b|#\s|^\s*(?:for|if|while|elif|else|try|except|with|raise|yield|pass|print)\b/;
 
 /** A call that reaches outside the text: a tool, a file, a process, a network. */
+const EXTERNAL_CALL =
+  /\b(?:execute_\w+|run_\w+|invoke_\w+|tool_call|requests\.\w+|urllib\.\w+|httpx\.\w+|subprocess\.\w+|os\.system|shutil\.\w+|socket\.\w+|openai\.\w+|axios\.\w+|client\.\w+|fs\.\w+|fetch)\s*\(/;
+
+/** A call with the argument list only code writes: keyword args, several args, or a payload. */
 const CODE_CALL =
-  /\b(?:await|subprocess|requests|urllib|httpx|client|openai|os\.system|shutil|socket|fetch|axios)\b|\b[\w.]+\s*\(\s*(?:["'`][^"'`]{1,60}["'`]|\)|[A-Za-z_$][\w$=]*\s*[,)=])|=>\s*[\w.]+\(|\bexec\w*\(|\bexecute_\w+\(|\btool_call\b|\bread_\w+\(|\bwrite_\w+\(|\bsend_\w+\(|\bpost\w*\(|\bget_\w+\(/;
+  /[\w.]+\s*\([^)]*[=",][^)]*\)|=>\s*[\w.]+\(|\b(?:read|write|send|post|get|exec|execute)_?\w*\s*\(/;
 
 /** The act of naming something. */
 const DEFINITION =
@@ -139,11 +144,12 @@ function classifyLine(line: string): LineKind {
   // Numbered section titles: "2.3 Axiomatisk belastning"
   if (/^\d{1,2}(?:\.\d{1,2}){1,3}\s+[A-ZÅÄÖa-z]/.test(t) && t.length < 90 && !/[.!?]$/.test(t)) return "heading";
   if (CODE_DEF.test(t)) return "code_def";
-  if (CODE_EVIDENCE.test(t) && CODE_MUTATION.test(t)) return "code_mutation";
+  const isCode = CODE_EVIDENCE.test(t) || EXTERNAL_CALL.test(t);
+  if (isCode && CODE_MUTATION.test(t)) return "code_mutation";
   if (DEFINITION.test(t)) return "definition";
   if (AXIOM.test(t)) return "axiom";
   if (CLAIM.test(t)) return "claim";
-  if (CODE_EVIDENCE.test(t) && CODE_CALL.test(t)) return "code_call";
+  if (isCode && (EXTERNAL_CALL.test(t) || CODE_CALL.test(t))) return "code_call";
   if (DERIVATION.test(t)) return "derivation";
   if (isFormulaLine(t)) return "formula";
   return "text";
