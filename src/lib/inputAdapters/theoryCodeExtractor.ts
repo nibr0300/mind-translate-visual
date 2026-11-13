@@ -77,7 +77,7 @@ const CLAIM =
 
 /** The act of moving from one line to the next — with or without showing work. */
 const DERIVATION =
-  /\b(?:trivialt|trivially|lätt inses|lättvisat|easily|uppenbart|obvious|obviously|it is obvious|tydligen|utan vidare|hoppar över|därmed|hence|therefore|alltså|därför|följaktligen|följer|substituera|sätter vi in|steg för steg|mellanliggande|härledning|vi får|det ger|vilket ger|enligt ovan|se ekvation|analogt|av symmetri|by symmetry|one can show|easily seen|som framgår|omedelbart|detsamma gäller|utveckla|expandera|integrera|derivera)\b|⇒|⟹/i;
+  /(?<![a-z0-9])(?:trivialt|trivially|lätt inses|lättvisat|easily|uppenbart|obvious|obviously|it is obvious|tydligen|utan vidare|hoppar över|därmed|hence|therefore|alltså|därför|följaktligen|följer|substituera|sätter vi in|steg för steg|mellanliggande|härledning|vi får|det ger|vilket ger|enligt ovan|se ekvation|analogt|av symmetri|by symmetry|one can show|easily seen|som framgår|omedelbart|detsamma gäller|utveckla|expandera|integrera|derivera)(?![a-z0-9])|⇒|⟹/i;
 
 /** Standalone mathematics: display math or a line that is mostly symbols. */
 const FORMULA_BLOCK =
@@ -117,11 +117,11 @@ const NOISE_PATTERNS: { re: RegExp; reason: string }[] = [
 
 function isNoise(text: string): string | null {
   const t = text.trim();
-  if (t.length < 3) return "too short";
   for (const { re, reason } of NOISE_PATTERNS) if (re.test(t)) return reason;
-  if (!/[a-z0-9αβγδεζηθικλμνξοπρστυφχψω]/i.test(t)) return "no content";
+  if (t.length < 3) return "too short";
+  if (!/[\p{L}\p{N}]/u.test(t)) return "no content";
   // A line that is almost entirely punctuation is an artefact of PDF extraction.
-  const alnum = (t.match(/[a-z0-9]/gi) ?? []).length;
+  const alnum = (t.match(/[\p{L}\p{N}]/gu) ?? []).length;
   if (alnum / t.length < 0.35) return "no content";
   return null;
 }
