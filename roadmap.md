@@ -1,5 +1,9 @@
 # Roadmap
 
+## Narratör v2
+- [ ] Gemensam relationell v2-hållning för generering och export, tydlig versionering av nya/äldre svar och möjlighet att generera om.
+- [ ] Verifiera gransknings/exportflödet och bedöm behovet av databasrensning utan radering.
+
 ## Självläkande import
 - [x] Gemensam självläkande import i karta, fält B och Narratör: säkra strukturreparationer, inga uppskattade analysvärden, överhoppade noder och rensade förbindelser redovisas i gränssnitt och exportanteckningar. 33 riktade tester godkända; inloggad import av ett 437-nodersfält med avsiktliga fel, granskning och ChatML-export verifierade utan sidfel, även vid mobilbredd. Tre äldre kausalparningstester fallerar separat; det kompletta Trading-fältet verifieras oförändrat av importen.
 
