@@ -14,9 +14,13 @@ import { chunkUnits, type Chunk } from "./chunker";
 import { sha256Hex } from "./contentHash";
 import { getActiveDomainId, getDomainProfile, getActiveSourceClass } from "./domainProfiles";
 import { extractSecurityUnits, dedupeNearDuplicates, corpusHash, type NoiseDrop } from "./inputAdapters/securityExtractor";
+import { extractTheoryUnits } from "./inputAdapters/theoryCodeExtractor";
 import { applyLexicalAxes, applySourceWeight, recalibrateFz, axisClusterLabels } from "./domainLayer";
+import type { StructuralStats } from "./fieldData";
 
 interface SecurityMeta {
+  /** Which structural extractor produced the units — decides the stats key. */
+  kind: "security" | "theory";
   dropped: NoiseDrop[];
   byType: Record<string, number>;
   nearDuplicates: number;
