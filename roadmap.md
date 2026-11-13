@@ -1,5 +1,9 @@
 # Roadmap
 
+## skills3 F-värden
+- [x] Rättat hashindex i TF-IDF och uppdaterat FZ-sammanfattningen efter domänkalibrering.
+- [ ] Verifiera skills3-uppladdning och regressionstester utan nya AI-kostnader.
+
 ## Narratör v2
 - [x] Gemensam relationell v2-hållning för generering och export, tydlig versionering av nya/äldre svar och möjlighet att generera om; narrate-field deployad.
 - [x] 20 riktade tester godkända; inloggad import av verkligt 600-nodersfält, granskning, ChatML och v2-batch-export verifierade utan sidfel. Ingen radering: den nya rösten kräver inte nya fältmått. Identisk innehållshash återanvänder däremot databasfält vid faktisk omanalys, så riktad hantering kräver valda dokument. Live-generering med v2 väntar på redan noterad AI-budgetåterhämtning.

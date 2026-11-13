@@ -91,8 +91,9 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
     // Rank by informativeness (tf-idf mass), not raw frequency.
     .sort((a, b) => df[b] * Math.log(N / df[b]) - df[a] * Math.log(N / df[a]));
 
+  const lexicalVocab = globalRanked.slice(0, lexicalBudget);
   const vocab = [
-    ...globalRanked.slice(0, lexicalBudget),
+    ...lexicalVocab,
     ...Array.from({ length: HASH_BUCKETS }, (_, i) => `__rare_${i}`),
   ];
   const vocabIndex = new Map(vocab.map((w, i) => [w, i]));
@@ -114,7 +115,7 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
     // dimensions. Thus short system axioms never become zero vectors.
     for (const w of new Set(doc.filter(isEligible))) {
       if (vocabIndex.has(w)) continue;
-      const bucket = lexicalBudget + Math.floor(seedHash(w) * HASH_BUCKETS);
+      const bucket = lexicalVocab.length + Math.floor(seedHash(w) * HASH_BUCKETS);
       vec[bucket] += (tf[w] / maxTf) * (1 + Math.log(N / (df[w] || 1)));
     }
     return vec;
