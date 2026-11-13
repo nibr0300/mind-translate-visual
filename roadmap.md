@@ -1,5 +1,9 @@
 # Roadmap
 
+## Narratörens röstjusteringar
+- [x] Proaktiv åtgärd, proaktivt försvar och nyfikenhet tillagda som separata snabbkorrigeringar; befintlig röst och granskning behålls.
+- [x] 23 tester godkända; inloggad import av sparat pokerfält, tre simulerade korrigeringsanrop, granskning och ChatML-export verifierade utan sidfel på dator/mobil. narrate-field driftsatt; den verkliga AI-röstens kvalitet återstår att bedöma när AI-budgeten tillåter.
+
 ## Missing corpus metric crash
 - [x] Unavailable corpus and search metrics remain null and display as “—”, never invented zero. Four regression tests passed; signed-in null-CTI ranking reproduced the original crash before the fix, then ranking, null-score semantic results and domain filtering worked without page errors at desktop and 737×1383. Preview build OK; existing saved analyses and database untouched.
 

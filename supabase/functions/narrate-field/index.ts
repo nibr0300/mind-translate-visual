@@ -3,16 +3,11 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { createOpenAI } from 'npm:@ai-sdk/openai@3';
 import { streamText } from 'npm:ai@6';
 import { requireUser } from '../_shared/auth.ts';
-import { NARRATOR_GENERATION_SYSTEM } from '../_shared/narratorVoice.ts';
+import { NARRATOR_GENERATION_SYSTEM, NARRATOR_CORRECTIONS, isNarratorCorrection } from '../_shared/narratorVoice.ts';
 import { createLovableAiGatewayRunIdFetch, getLovableAiGatewayResponseHeaders } from '../_shared/run-id.ts';
 
 const MODEL = 'openai/gpt-6-astra';
 const json = (error: string, status: number) => new Response(JSON.stringify({ error }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-const correctionRules: Record<string, string> = {
-  specific: 'Gör svaret mer specifikt och förankra det i grannarnas konkreta begrepp utan att hitta på fakta.',
-  hesitation: 'Öka den aktiva prövningen av antaganden och alternativa förklaringar, inte ursäkter eller passiv tvekan. Behåll ett konkret nästa steg. Ändra inte källans mätvärden.',
-  concrete: 'Minska abstraktionsnivån: använd konkreta operationer och termer från källtexten.',
-};
 
 Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -27,7 +22,7 @@ Deno.serve(async req => {
       !['cti', 'truthTension'].every(k => score.target[k] == null || (typeof score.target[k] === 'number' && score.target[k] >= 0 && score.target[k] <= 1)) ||
       !Array.isArray(score.neighbors) || score.neighbors.length > 3 || score.neighbors.some((n: { text?: unknown }) => typeof n.text !== 'string' || n.text.length > 20000) ||
       typeof score.cluster !== 'string' || score.cluster.length > 1000 || typeof score.domain !== 'string' || score.domain.length > 100 ||
-      (body.correction && !correctionRules[body.correction]) || (body.previous != null && (typeof body.previous !== 'string' || body.previous.length > 20000))) return json('Ogiltigt partitur eller för stor text. Granska noden eller exportera den för lokal bearbetning.', 400);
+      (body.correction != null && !isNarratorCorrection(body.correction)) || (body.previous != null && (typeof body.previous !== 'string' || body.previous.length > 20000))) return json('Ogiltigt partitur eller för stor text. Granska noden eller exportera den för lokal bearbetning.', 400);
     const apiKey = Deno.env.get('LOVABLE_API_KEY');
     const url = Deno.env.get('SUPABASE_URL'), serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!apiKey || !url || !serviceKey) return json('Narratörens AI-tjänst är inte konfigurerad.', 401);
@@ -60,7 +55,7 @@ Deno.serve(async req => {
       },
     });
     const system = `${NARRATOR_GENERATION_SYSTEM}
-${body.correction ? correctionRules[body.correction] : ''}`;
+${isNarratorCorrection(body.correction) ? NARRATOR_CORRECTIONS[body.correction] : ''}`;
     const result = streamText({ model: provider.responses(MODEL), system,
       messages: [{ role: 'user', content: JSON.stringify({ cluster: score.cluster, domain: score.domain, target: score.target, semanticNeighbors: score.neighbors, previousDraft: body.previous ?? null }) }],
       maxRetries: 0, abortSignal: req.signal,

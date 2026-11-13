@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpenText, Upload, Play, Square, Download, Check, X, Target, HelpCircle, Blocks, Trash2 } from 'lucide-react';
+import { BookOpenText, Upload, Play, Square, Download, Check, X, Target, HelpCircle, Blocks, Trash2, ArrowRight, Shield, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,16 @@ import { parseFieldImport, fieldImportSummary } from '@/lib/fieldImport';
 import { NARRATOR_VERSION, DEFAULT_NARRATOR_THRESHOLDS, narratorAutoLimit, prepareNarrator, narratorJsonl, narratorProvenance, narratorBatch, downloadNarrator, type NarratorItem, type NarratorSource } from '@/lib/narrator';
 import { loadNarrator, saveNarrator, type NarratorSession } from '@/lib/narratorStore';
 import { generateNarration } from '@/lib/narratorClient';
+import type { NarratorCorrection } from '../../supabase/functions/_shared/narratorVoice';
+
+const voiceCorrections: { key: NarratorCorrection; label: string; Icon: typeof Target }[] = [
+  { key: 'specific', label: 'Gör mer specifik', Icon: Target },
+  { key: 'hesitation', label: 'Öka tvekan', Icon: HelpCircle },
+  { key: 'concrete', label: 'Minska abstraktion', Icon: Blocks },
+  { key: 'proactive_action', label: 'Proaktiv åtgärd', Icon: ArrowRight },
+  { key: 'proactive_defense', label: 'Proaktivt försvar', Icon: Shield },
+  { key: 'curiosity', label: 'Nyfikenhet', Icon: Search },
+];
 
 export default function NarratorDialog() {
   const { user } = useAuth();
@@ -117,7 +127,7 @@ export default function NarratorDialog() {
     const merged = next.map(i => existing.get(`${i.score.source}:${i.score.id}:${i.score.target.text}`) ?? i);
     itemsRef.current = merged; setItems(merged); setIndex(0); setError(''); setProgress('');
   }
-  async function run(correction?: string, regenerate = false) {
+  async function run(correction?: NarratorCorrection, regenerate = false) {
     if (busy) return;
     const targets = correction || regenerate ? current && !current.baseline ? [{ item: current, i: index }] : [] : pending;
     if (!targets.length) return;
@@ -193,7 +203,7 @@ export default function NarratorDialog() {
               <h3 className="text-xs text-primary">{current.baseline ? 'Baslinje · källtext som svar' : 'Dispositionellt svar'}</h3>
               {!current.baseline && current.answer && <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{current.voiceVersion === NARRATOR_VERSION ? 'Narratör v2' : 'Äldre svar · v1'}</span><Button variant="outline" size="sm" disabled={busy || !user} onClick={() => void run(undefined, true)}><Play />Generera om · v2</Button></div>}
               <Textarea aria-label="Dispositionellt svar" className="min-h-56 text-sm" value={current.answer} disabled={busy} onChange={e => updateItem(index, { answer: e.target.value, review: 'pending' })} />
-              {!current.baseline && <div className="flex flex-wrap gap-2">{[['specific', 'Gör mer specifik', Target], ['hesitation', 'Öka tvekan', HelpCircle], ['concrete', 'Minska abstraktion', Blocks]].map(([key, label, Icon]) => { const Symbol = Icon as typeof Target; return <Button key={key as string} variant="outline" size="sm" title={`${label} · nytt AI-anrop`} disabled={busy || !current.answer || !user} onClick={() => void run(key as string)}><Symbol />{label as string}</Button>; })}</div>}
+              {!current.baseline && <div className="flex flex-wrap gap-2">{voiceCorrections.map(({ key, label, Icon }) => <Button key={key} variant="outline" size="sm" title={`${label} · nytt AI-anrop`} disabled={busy || !current.answer || !user} onClick={() => void run(key)}><Icon />{label}</Button>)}</div>}
               <div className="flex flex-wrap gap-2 items-center"><Button disabled={busy || !current.answer.trim()} variant={current.review === 'approved' ? 'secondary' : 'default'} onClick={() => updateItem(index, { review: 'approved' })}><Check />{current.review === 'approved' ? 'Godkänd' : 'Godkänn'}</Button><Button variant="outline" disabled={busy} onClick={() => updateItem(index, { review: 'rejected' })}><X />Avvisa</Button><span className="text-xs text-muted-foreground">{current.review === 'rejected' ? 'Avvisad' : current.review === 'pending' ? 'Ej godkänd' : ''}</span></div>
             </div>
           </div>
