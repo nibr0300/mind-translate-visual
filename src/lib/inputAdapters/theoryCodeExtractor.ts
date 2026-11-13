@@ -57,7 +57,7 @@ const CODE_EVIDENCE = /[{}();]|=>|\bself\.|\bdef\b|\breturn\b|state\[|effects\s*
 
 /** Assignment / state change: the operational heart of a program. */
 const CODE_MUTATION =
-  /(?:^|\s)(?:[A-Za-z_$][\w.$\[\]'"]*|self\.[\w.]+|state\[[^\]]+\])\s*(?:=|\+=|-=|\*=|\/=)(?!=)|\beffects\s*=|\.append\(|\.update\(|\.extend\(|\bset_\w+\(/;
+  /^\s*(?:[A-Za-z_$][\w.$\[\]'"]*|self\.[\w.]+|state\[[^\]]+\])\s*(?:=|\+=|-=|\*=|\/=)(?!=)|\beffects\s*=|\.append\(|\.update\(|\.extend\(|\bset_\w+\(/;
 
 /** A call that reaches outside the text: a tool, a file, a process, a network. */
 const CODE_CALL =

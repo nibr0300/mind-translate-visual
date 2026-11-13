@@ -333,6 +333,8 @@ export const DOMAIN_PROFILES: DomainProfile[] = [
       sim_vs_ground: {
         low: [["kallar api", 0.9], ["anropar", 0.7], ["läser fil", 0.9], ["skriver till", 0.85], ["startar process", 0.9], ["loopar över filer", 0.9], ["öppnar fil", 0.9], ["http", 0.7], ["request", 0.6], ["fetch", 0.7], ["subprocess", 0.9], ["writes to disk", 0.9], ["reads file", 0.9], ["calls the tool", 0.9], ["sänder", 0.7], ["sparar", 0.6], ["hämtar", 0.7], ["kör kommando", 0.9], ["mäter", 0.8], ["räknar antalet", 0.85], ["öppnar", 0.5], ["skriver fil", 0.9], ["lagrar", 0.6], ["exekverar", 0.8]],
         high: [["effects=", 0.9], ["state[", 0.85], ["self.state", 0.85], ["set_state", 0.85], ["räknar om", 0.7], ["beräknar en siffra", 0.9], ["uppdatera variabel", 0.9], ["mock", 0.9], ["simulerar", 0.85], ["låtsas", 0.9], ["dummy", 0.9], ["stub", 0.9], ["placeholder", 0.9], ["hardcod", 0.9], ["hårdkod", 0.9], ["hårdkodat", 0.9], ["i minnet", 0.85], ["variabeln", 0.6], ["ökar värdet", 0.85], ["sätter värdet", 0.85], ["skriver ut", 0.7], ["räknar upp", 0.8], ["räknar ner", 0.8], ["inrementerar", 0.85], ["ökar med", 0.7], ["tells", 0.6], ["fantasi", 0.8]],
+        lowRegex: [/\b(?:requests|urllib|httpx|subprocess|socket|shutil|os\.system)\b/, /\b(?:post|get|put|fetch|send)\s*\(/, /\bhttps?:\/\//, /\b(?:read|write|open|exec|run)_?\w*\s*\(/],
+        highRegex: [/effects\s*=/, /\bself\.[\w.]+\s*=/, /\bstate\[/, /\bset_[\w]+\s*\(/],
       },
       side_effect_visibility: {
         low: [["explicit", 0.8], ["returnerar", 0.7], ["logg", 0.7], ["loggar", 0.8], ["loggning", 0.8], ["kontroll", 0.6], ["verifierar", 0.8], ["validates", 0.8], ["assert", 0.8], ["raises", 0.8], ["throws", 0.8], ["felhantering", 0.8], ["hanterar fel", 0.85], ["try", 0.5], ["except", 0.6], ["guard", 0.6], ["precondition", 0.85], ["postcondition", 0.85], ["declared effects", 0.9], ["explicitly", 0.85], ["dokumenterad", 0.7], ["synlig", 0.6]],
@@ -341,6 +343,8 @@ export const DOMAIN_PROFILES: DomainProfile[] = [
       control_asymmetry: {
         low: [["frågar", 0.7], ["får svara", 0.85], ["kan vägra", 0.95], ["väljer själv", 0.9], ["egen initiativ", 0.85], ["ömsesidig", 0.9], ["mutual", 0.85], ["förhandlar", 0.85], ["ger tillbaka", 0.8], ["väntar på svar", 0.85], ["tillåter agenten", 0.85], ["agenten får", 0.8], ["kan välja", 0.85], ["kan avstå", 0.9], ["gräns sätts av", 0.85], ["consent", 0.9], ["tackar nej", 0.9], ["får avstå", 0.9], ["kan säga nej", 0.9], ["ömsesidigt", 0.9]],
         high: [["hårdkodad", 0.9], ["hårdkodat", 0.9], ["fast funktionsanrop", 0.95], ["tvingas", 0.9], ["måste svara", 0.9], ["får inte", 0.85], ["execute_python", 0.9], ["subprocess.run", 0.9], ["tool_call", 0.85], ["funktionsanrop", 0.7], ["körs av", 0.7], ["drivs av", 0.65], ["tvingar", 0.9], ["blockeras", 0.7], ["låst", 0.7], ["fixed", 0.6], ["hardcoded", 0.9], ["no choice", 0.9], ["cannot refuse", 0.95], ["must return", 0.85], ["tvingad", 0.9], ["utför utan", 0.85], ["utan val", 0.9], ["förutsätter att agenten", 0.8]],
+        highRegex: [/effects\s*=\s*\{/, /\bAction\(\s*["']/, /\b(?:precondition|add_effects|del_effects|cost)\s*=/, /\b(?:execute_|run_|invoke_)\w*\s*\(/],
+        lowRegex: [/\b(?:kan|får|may|can)\s+(?:vägra|avstå|säga nej|refuse|decline|opt out)/i],
       },
     },
     fzCalibration: { llmTension: 0.5, triangulated: 0.3, cti: 0.2, axisBonus: 0.12, oppositionBonus: 0.1, directivePenalty: 0 },
