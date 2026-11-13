@@ -65,7 +65,6 @@ export interface GeometricField {
   /** kNN graph in the original vector space — enables real network analysis on export. */
   edges?: FieldEdge[];
   stats: {
-    totalUnits: number;
     boundaryUnits: number;
     avgFZ: number;
     avgFY: number;

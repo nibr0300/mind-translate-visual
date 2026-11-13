@@ -43,13 +43,15 @@ function applyDomainLayer(field: GeometricField, meta: SecurityMeta | null) {
     if (cu.length) c.avgFZ = cu.reduce((s, u) => s + u.fz, 0) / cu.length;
   }
   if (meta) {
-    field.stats.security = {
+    const stats: StructuralStats = {
       byType: meta.byType,
       noiseDropped: meta.dropped.length,
       droppedSample: meta.dropped.slice(0, 40),
       nearDuplicates: meta.nearDuplicates,
       corpusHash: meta.corpusHash,
     };
+    if (meta.kind === "theory") field.stats.theory = stats;
+    else field.stats.security = stats;
   }
 }
 import { generateFieldFromPDF, extractLinesFromPDF } from "./pdfFieldGenerator";
