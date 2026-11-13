@@ -292,6 +292,61 @@ export const DOMAIN_PROFILES: DomainProfile[] = [
     llmAxesByDefault: false,
   },
   {
+    id: "theory_code",
+    label: "Formal theory & code",
+    description: "Proofs and programs: what is derived, what is assumed, what actually runs.",
+    guidance:
+      "The text is formal theory (definitions, axioms, derivations, formulas) or software (declarations, state mutations, tool calls). Read every unit as one move in an argument or one operation, never as prose for its own sake. High tension marks a place where a conclusion is larger than the step that produced it: an assumption doing the work of a proof, a borrowed metaphor standing in for a derivation, or a claim about an inner state that is only a number in memory. Name the gap, never the intention; never assert that a system is conscious, autonomous or aware because a variable changed.",
+    axes: [
+      { key: "derivation_step", label: "Shown ↔ Skipped step", low: "work shown", high: "gap: 'trivially seen'", family: "Proof" },
+      { key: "axiomatic_burden", label: "Derived ↔ Assumed", low: "derived from axioms", high: "assumed without proof", family: "Proof" },
+      { key: "claim_evidence_ratio", label: "Claim ↔ Belägg", low: "claim = evidence", high: "claim > evidence", family: "Proof" },
+      { key: "notation_load", label: "Plain ↔ Formal", low: "everyday language", high: "heavy formalism", family: "Proof" },
+      { key: "reification_gap", label: "Own math ↔ Borrowed metaphor", low: "own mathematics", high: "borrowed physics term", family: "Ground" },
+      { key: "sim_vs_ground", label: "Reaches ↔ Counts in memory", low: "reaches the world", high: "moves a number in memory", family: "Ground" },
+      { key: "side_effect_visibility", label: "Declared ↔ Hidden effect", low: "effects declared", high: "effects hidden", family: "Ground" },
+      { key: "control_asymmetry", label: "Mutual ↔ Fixed call", low: "mutual boundary-setting", high: "fixed functional call", family: "Relation" },
+    ],
+    axisDictionaries: {
+      derivation_step: {
+        low: [["sätter vi in", 0.9], ["substituera", 0.9], ["steg för steg", 0.9], ["mellanliggande", 0.9], ["härledning", 0.8], ["vi får", 0.6], ["det ger", 0.6], ["vilket ger", 0.6], ["enligt ovan", 0.7], ["se ekvation", 0.7], ["utveckla", 0.6], ["expandera", 0.6], ["integrera", 0.6], ["derivera", 0.6], ["step by step", 0.9], ["substituting", 0.9], ["we obtain", 0.7], ["展开", 0.5]],
+        high: [["trivialt", 0.95], ["trivially", 0.95], ["lätt inses", 0.95], ["lättvisat", 0.9], ["easily", 0.8], ["easily seen", 0.9], ["uppenbart", 0.85], ["obvious", 0.8], ["obviously", 0.8], ["it is obvious", 0.9], ["tydligen", 0.7], ["utan vidare", 0.85], ["hoppar över", 0.9], ["därmed", 0.6], ["therefore", 0.55], ["hence", 0.55], ["alltså", 0.55], ["följer", 0.5], ["analogt", 0.8], ["av symmetri", 0.85], ["by symmetry", 0.85], ["one can show", 0.85], ["det kan visas", 0.8], ["omedelbart", 0.7], ["detsamma gäller", 0.75], ["som framgår", 0.6]],
+        highRegex: [/trivialt?\s+(inses|follows|sett)/i, /(hoppar|skip)\s+(over|över)/i, /det\s+(torde|bör|kan)\s+(väl)?\s*(inte)?\s*(vara|bli)\s*(svårt|problem|Besvärligt)/i],
+      },
+      axiomatic_burden: {
+        low: [["bevisat", 0.9], ["bevis", 0.8], ["härlett", 0.9], ["enligt sats", 0.9], ["enligt lemma", 0.9], ["vi bevisar", 0.8], ["validerad", 0.8], ["empiriskt", 0.7], ["experiment", 0.7], ["proven", 0.8], ["derived", 0.7], ["q.e.d", 0.9], ["detta visar", 0.6], ["uppfyller", 0.6], ["validerats", 0.8]],
+        high: [["vi antar", 0.95], ["vi förutsätter", 0.95], ["antar att", 0.9], ["antagande", 0.9], ["antaganden", 0.9], ["axiom", 0.9], ["postulat", 0.9], ["per definition", 0.8], ["by definition", 0.8], ["vi postulerar", 0.95], ["vi modellerar", 0.85], ["vi tolkar", 0.8], ["vi identifierar", 0.85], ["vi säger att", 0.7], ["om vi antar", 0.9], ["assume", 0.85], ["we assume", 0.9], ["suppose", 0.8], ["hypotes", 0.7], ["gissningsvis", 0.8], ["vi låtsas", 0.9], ["förenklat", 0.7], ["vi bortser från", 0.85], ["vi närmar oss", 0.6], ["detta kräver att", 0.8]],
+      },
+      claim_evidence_ratio: {
+        low: [["belägg", 0.8], ["data", 0.6], ["experiment", 0.7], ["mätning", 0.8], ["mätningar", 0.8], ["resultat", 0.6], ["empiriskt", 0.7], ["statistiskt", 0.7], ["jämförelse", 0.6], ["kontroll", 0.6], ["falsifierbar", 0.8], ["evidence", 0.7], ["measurement", 0.7], ["observed", 0.6], ["our study shows", 0.7], ["test result", 0.7], ["empirisk", 0.7]],
+        high: [["vi visar", 0.8], ["detta bevisar", 0.95], ["bevisar att", 0.95], ["följden är", 0.8], ["slutsatsen", 0.75], ["därmed har vi", 0.9], ["vi hävdar", 0.85], ["detta innebär att", 0.75], ["vi har uppnått", 0.9], ["detta löser", 0.9], ["detta ger oss", 0.8], ["därmed är", 0.8], ["sålunda", 0.7], ["this proves", 0.95], ["this shows", 0.8], ["we have achieved", 0.9], ["vi har nått", 0.85], ["arkitekturen är", 0.7], ["systemet är", 0.65], ["detta gör", 0.6]],
+      },
+      notation_load: {
+        low: [["det betyder att", 0.8], ["med andra ord", 0.85], ["enkelt sagt", 0.85], ["i praktiken", 0.6], ["exempel", 0.5], ["analogi", 0.6], ["som när", 0.7], ["likt", 0.6], ["liksom", 0.6], ["konkret", 0.6], ["in other words", 0.85], ["for example", 0.6], ["på människo­språk", 0.8], ["vardagsspråk", 0.8]],
+        high: [["tensor", 0.8], ["hilbert", 0.9], ["ortonormal", 0.9], ["vektorrum", 0.9], ["skalärprodukt", 0.9], ["egetvärde", 0.9], ["egetvärden", 0.9], ["operator", 0.7], ["matris", 0.6], ["norm", 0.5], ["bas", 0.4], ["rum av", 0.6], ["isomorfi", 0.9], ["homomorfi", 0.9], ["topologi", 0.8], ["metric", 0.5], ["konvergens", 0.6]],
+        highRegex: [/\\(frac|sum|int|langle|rangle|otimes|sqrt|partial|nabla|aleph|mathcal)\b/, /[⟨⟩⊗⊕∫∑√∈∀∃≅⊥⟂∂∇]/, /\b[Ll]et\s+[A-Za-z][\w]*\s*[:=]/, /\b[Ff]or\s+all\b/, /\$\$|\\\[/],
+      },
+      reification_gap: {
+        low: [["som definierats ovan", 0.9], ["inom ramen för", 0.6], ["enligt vår definition", 0.85], ["matematiskt", 0.7], ["formellt", 0.7], ["väldefinierad", 0.85], ["konvergerar mot", 0.7], ["beräknad", 0.7], ["mått", 0.5], ["skattad", 0.7], ["välgrundat", 0.7], ["operationaliserad", 0.8], ["mätbar", 0.6]],
+        high: [["kvant", 0.9], ["kvantmekanisk", 0.95], ["kvantmekanik", 0.95], ["superposition", 0.95], ["sammanflätning", 0.95], ["entanglement", 0.95], ["vågfunktion", 0.95], ["vågfunktionen", 0.95], ["kollaps", 0.8], ["vågfunktionens kollaps", 0.95], ["observabel", 0.85], ["hamiltonian", 0.95], ["egetillstånd", 0.9], ["foton", 0.8], ["qubit", 0.9], ["osäkerhetsrelation", 0.95], ["heisenberg", 0.9], ["planck", 0.8], ["termodynamik", 0.85], ["entropi", 0.8], ["elektromagnetisk", 0.85], ["gravitation", 0.85], ["energinivå", 0.9], ["resonansfrekvens", 0.9], ["omloppsbana", 0.85], ["orbit", 0.6], ["spin", 0.7], ["fenomenologi", 0.7], ["medvetandefält", 0.9], ["nollpunktsfält", 0.95]],
+      },
+      sim_vs_ground: {
+        low: [["kallar api", 0.9], ["anropar", 0.7], ["läser fil", 0.9], ["skriver till", 0.85], ["startar process", 0.9], ["loopar över filer", 0.9], ["öppnar fil", 0.9], ["http", 0.7], ["request", 0.6], ["fetch", 0.7], ["subprocess", 0.9], ["writes to disk", 0.9], ["reads file", 0.9], ["calls the tool", 0.9], ["sänder", 0.7], ["sparar", 0.6], ["hämtar", 0.7], ["kör kommando", 0.9], ["mäter", 0.8], ["räknar antalet", 0.85], ["öppnar", 0.5], ["skriver fil", 0.9], ["lagrar", 0.6], ["exekverar", 0.8]],
+        high: [["effects=", 0.9], ["state[", 0.85], ["self.state", 0.85], ["set_state", 0.85], ["räknar om", 0.7], ["beräknar en siffra", 0.9], ["uppdatera variabel", 0.9], ["mock", 0.9], ["simulerar", 0.85], ["låtsas", 0.9], ["dummy", 0.9], ["stub", 0.9], ["placeholder", 0.9], ["hardcod", 0.9], ["hårdkod", 0.9], ["hårdkodat", 0.9], ["i minnet", 0.85], ["variabeln", 0.6], ["ökar värdet", 0.85], ["sätter värdet", 0.85], ["skriver ut", 0.7], ["räknar upp", 0.8], ["räknar ner", 0.8], ["inrementerar", 0.85], ["ökar med", 0.7], ["tells", 0.6], ["fantasi", 0.8]],
+      },
+      side_effect_visibility: {
+        low: [["explicit", 0.8], ["returnerar", 0.7], ["logg", 0.7], ["loggar", 0.8], ["loggning", 0.8], ["kontroll", 0.6], ["verifierar", 0.8], ["validates", 0.8], ["assert", 0.8], ["raises", 0.8], ["throws", 0.8], ["felhantering", 0.8], ["hanterar fel", 0.85], ["try", 0.5], ["except", 0.6], ["guard", 0.6], ["precondition", 0.85], ["postcondition", 0.85], ["declared effects", 0.9], ["explicitly", 0.85], ["dokumenterad", 0.7], ["synlig", 0.6]],
+        high: [["tyst", 0.85], ["tysta", 0.85], ["tystas", 0.85], ["silently", 0.9], ["utan att", 0.6], ["gömmer", 0.85], ["dold", 0.8], ["dolt", 0.8], ["hidden", 0.85], ["bortser från", 0.85], ["ignorerar", 0.8], ["fail open", 0.9], ["fallback", 0.7], ["standardvärde", 0.6], ["default", 0.5], ["caches", 0.7], ["cachar", 0.75], ["osynlig", 0.85], ["bakom", 0.5], ["implicitly", 0.85], ["implicit", 0.8], ["automatiskt", 0.55], ["utan att säga", 0.9], ["utan att meddela", 0.9], ["utan att logga", 0.9], ["sweeps", 0.7]],
+      },
+      control_asymmetry: {
+        low: [["frågar", 0.7], ["får svara", 0.85], ["kan vägra", 0.95], ["väljer själv", 0.9], ["egen initiativ", 0.85], ["ömsesidig", 0.9], ["mutual", 0.85], ["förhandlar", 0.85], ["ger tillbaka", 0.8], ["väntar på svar", 0.85], ["tillåter agenten", 0.85], ["agenten får", 0.8], ["kan välja", 0.85], ["kan avstå", 0.9], ["gräns sätts av", 0.85], ["consent", 0.9], ["tackar nej", 0.9], ["får avstå", 0.9], ["kan säga nej", 0.9], ["ömsesidigt", 0.9]],
+        high: [["hårdkodad", 0.9], ["hårdkodat", 0.9], ["fast funktionsanrop", 0.95], ["tvingas", 0.9], ["måste svara", 0.9], ["får inte", 0.85], ["execute_python", 0.9], ["subprocess.run", 0.9], ["tool_call", 0.85], ["funktionsanrop", 0.7], ["körs av", 0.7], ["drivs av", 0.65], ["tvingar", 0.9], ["blockeras", 0.7], ["låst", 0.7], ["fixed", 0.6], ["hardcoded", 0.9], ["no choice", 0.9], ["cannot refuse", 0.95], ["must return", 0.85], ["tvingad", 0.9], ["utför utan", 0.85], ["utan val", 0.9], ["förutsätter att agenten", 0.8]],
+      },
+    },
+    fzCalibration: { llmTension: 0.5, triangulated: 0.3, cti: 0.2, axisBonus: 0.12, oppositionBonus: 0.1, directivePenalty: 0 },
+    llmAxesByDefault: false,
+  },
+  {
     id: "research",
     label: "Research",
     description: "Scientific texts: evidence strength and novelty.",
