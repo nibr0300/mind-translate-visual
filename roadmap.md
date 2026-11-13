@@ -1,8 +1,8 @@
 # Roadmap
 
 ## Narratör v2
-- [ ] Gemensam relationell v2-hållning för generering och export, tydlig versionering av nya/äldre svar och möjlighet att generera om.
-- [ ] Verifiera gransknings/exportflödet och bedöm behovet av databasrensning utan radering.
+- [x] Gemensam relationell v2-hållning för generering och export, tydlig versionering av nya/äldre svar och möjlighet att generera om; narrate-field deployad.
+- [x] 20 riktade tester godkända; inloggad import av verkligt 600-nodersfält, granskning, ChatML och v2-batch-export verifierade utan sidfel. Ingen radering: den nya rösten kräver inte nya fältmått. Identisk innehållshash återanvänder däremot databasfält vid faktisk omanalys, så riktad hantering kräver valda dokument. Live-generering med v2 väntar på redan noterad AI-budgetåterhämtning.
 
 ## Självläkande import
 - [x] Gemensam självläkande import i karta, fält B och Narratör: säkra strukturreparationer, inga uppskattade analysvärden, överhoppade noder och rensade förbindelser redovisas i gränssnitt och exportanteckningar. 33 riktade tester godkända; inloggad import av ett 437-nodersfält med avsiktliga fel, granskning och ChatML-export verifierade utan sidfel, även vid mobilbredd. Tre äldre kausalparningstester fallerar separat; det kompletta Trading-fältet verifieras oförändrat av importen.
