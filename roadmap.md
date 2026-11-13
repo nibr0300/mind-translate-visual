@@ -47,7 +47,7 @@
 - [ ] Agentloop: situation → projicera → mäta → resonera → handla → observera → deformera fältet
 
 ## Teori- och kodadaptern
-- [x] Strukturerad extraktion för formell teori och program: egna noder för definition, axiom, härledning, påstående, formel, deklARATION, tillståndsändring och extern anrop; bruslogg och fingeravtryck. 12 riktade tester godkända; inloggad uppladdning av RFA-formelsamlingen gav 501 noder med synlig strukturernas läsning och axelfamiljerna Proof/Ground/Relation utan sidfel.
+- [x] Strukturerad extraktion för formell teori och program: egna noder för definition, axiom, härledning, påstående, formel, deklaration, tillståndsändring och extern anrop; bruslogg och fingeravtryck. 12 riktade tester godkända; inloggad uppladdning av RFA-formelsamlingen gav 501 noder med synlig strukturernas läsning och axelfamiljerna Proof/Ground/Relation utan sidfel.
 - [x] Profilerna Formal theory & code med axlarna derivation_step, axiomatic_burden, claim_evidence_ratio, notation_load, reification_gap, sim_vs_ground, side_effect_visibility, control_asymmetry; lexikala/tröskelvärden styr före modellen.
 - [x] Äldre kausalparningstester rättade: meningspoäng tillhandahålls i båda riktningarna och ordlikhet gäller som frånval när ingen poäng finns (10/10 godkända).
 - [ ] Granskning av de tre kompendierna som fält: formelsamlingen (bevisbörda), skill_merged och skills3_merged (Aethels kontrollflöden) — kräver AI-budget för djupanalys utöver den struktur som redan visas.
