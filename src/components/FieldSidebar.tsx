@@ -475,7 +475,7 @@ export default function FieldSidebar({
         const label = (k: string) => profile.axes.find((a) => a.key === k)?.label ?? k;
         const familyOf = (k: string) => profile.axes.find((a) => a.key === k)?.family ?? "";
         const families = [...new Set(weights.map((w) => familyOf(w.key)))];
-        const sec = field.stats.security;
+        const sec = field.stats.security ?? field.stats.theory;
         return (
           <div className="p-4 border-b border-border">
             <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-2">
