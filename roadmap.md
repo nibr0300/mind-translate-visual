@@ -2,7 +2,7 @@
 
 ## skills3 F-värden
 - [x] Rättat ordtabeller som krockade med kodordet constructor, hashindex i TF-IDF och FZ-sammanfattningen efter domänkalibrering.
-- [ ] Verifiera skills3-uppladdning och regressionstester utan nya AI-kostnader.
+- [x] 31 regressionstester godkända; inloggad skills3-uppladdning med AI-anrop avstängda gav 386 noder, FY 0.634, FZ 0.030 och inga ogiltiga koordinater/värden. Karta och sammanfattning visuellt verifierade; äldre sparad analys har inte ändrats och djup AI-omanalys ingick inte.
 
 ## Narratör v2
 - [x] Gemensam relationell v2-hållning för generering och export, tydlig versionering av nya/äldre svar och möjlighet att generera om; narrate-field deployad.
