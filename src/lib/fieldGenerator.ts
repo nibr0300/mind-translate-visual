@@ -14,9 +14,13 @@ import { chunkUnits, type Chunk } from "./chunker";
 import { sha256Hex } from "./contentHash";
 import { getActiveDomainId, getDomainProfile, getActiveSourceClass } from "./domainProfiles";
 import { extractSecurityUnits, dedupeNearDuplicates, corpusHash, type NoiseDrop } from "./inputAdapters/securityExtractor";
+import { extractTheoryUnits } from "./inputAdapters/theoryCodeExtractor";
 import { applyLexicalAxes, applySourceWeight, recalibrateFz, axisClusterLabels } from "./domainLayer";
+import type { StructuralStats } from "./fieldData";
 
 interface SecurityMeta {
+  /** Which structural extractor produced the units — decides the stats key. */
+  kind: "security" | "theory";
   dropped: NoiseDrop[];
   byType: Record<string, number>;
   nearDuplicates: number;
@@ -39,13 +43,15 @@ function applyDomainLayer(field: GeometricField, meta: SecurityMeta | null) {
     if (cu.length) c.avgFZ = cu.reduce((s, u) => s + u.fz, 0) / cu.length;
   }
   if (meta) {
-    field.stats.security = {
+    const stats: StructuralStats = {
       byType: meta.byType,
       noiseDropped: meta.dropped.length,
       droppedSample: meta.dropped.slice(0, 40),
       nearDuplicates: meta.nearDuplicates,
       corpusHash: meta.corpusHash,
     };
+    if (meta.kind === "theory") field.stats.theory = stats;
+    else field.stats.security = stats;
   }
 }
 import { generateFieldFromPDF, extractLinesFromPDF } from "./pdfFieldGenerator";
@@ -86,8 +92,12 @@ export async function generateFieldFromFile(
   let totalFound = 0;
   let securityMeta: SecurityMeta | null = null;
 
-  const isBugBounty = getDomainProfile(getActiveDomainId()).id === "bugbounty";
-  if (sourceType === "pdf" && !isBugBounty) {
+  // Structural profiles bypass the prose chunker: their units are acts
+  // (endpoints, definitions, state mutations), not sentences.
+  const activeProfile = getDomainProfile(getActiveDomainId());
+  const structural: "security" | "theory" | null =
+    activeProfile.id === "bugbounty" ? "security" : activeProfile.id === "theory_code" ? "theory" : null;
+  if (sourceType === "pdf" && !structural) {
     field = await generateFieldFromPDF(file, onProgress);
     // Re-derive chunks from the field's units for persistence
     chunks = field.units.map((u, i) => ({
@@ -109,11 +119,14 @@ export async function generateFieldFromFile(
     }
 
     onProgress?.("Chunking content…", 0.2);
-    if (isBugBounty) {
-      // Structural units (endpoints, hosts, params…) become their own nodes;
-      // they are never chunked into prose.
-      const extraction = extractSecurityUnits(rawUnits.map((u) => u.text).join("\n\n"));
-      const deduped = dedupeNearDuplicates(extraction.units);
+    if (structural) {
+      // Structural units (endpoints, definitions, state mutations…) become their
+      // own nodes; they are never chunked into prose.
+      const raw = rawUnits.map((u) => u.text).join("\n\n");
+      const extraction = structural === "security" ? extractSecurityUnits(raw) : extractTheoryUnits(raw);
+      const deduped = dedupeNearDuplicates<
+        { text: string; unitType: string; start: number; end: number }
+      >(extraction.units);
       chunks = deduped.map((u, i) => ({
         index: i,
         text: u.text,
@@ -121,11 +134,21 @@ export async function generateFieldFromFile(
         startPosition: u.start,
       }));
       securityMeta = {
+        kind: structural,
         dropped: extraction.dropped,
         byType: deduped.reduce<Record<string, number>>((acc, u) => ((acc[u.unitType] = (acc[u.unitType] ?? 0) + 1), acc), {}),
         nearDuplicates: extraction.units.length - deduped.length,
         corpusHash: corpusHash(deduped),
       };
+      const acts = Object.entries(securityMeta.byType)
+        .filter(([k]) => k !== "prose")
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, n]) => `${n} ${k}`);
+      if (acts.length) {
+        notes.push(
+          `Structural reading: ${acts.join(", ")}. Each act is its own node — formulas and identifiers are never split.`
+        );
+      }
     } else {
       chunks = chunkUnits(rawUnits);
     }

@@ -292,10 +292,13 @@ export const pairKey = (chosen: string, rejected: string) => `${chosen.trim()}\u
 
 /** Similarity per pair: meaning scores when given (from pairKey), else word-overlap TF-IDF. */
 function pairSimilarity(pool: PairPool, meaning?: Map<string, number>): (c: Tagged, r: Tagged) => number | null {
-  if (meaning) return (c, r) => meaning.get(pairKey(c.u.text, r.u.text)) ?? null;
   const vecs = buildTfIdf(pool.all.map(x => x.u.text));
   const at = new Map(pool.all.map((x, i) => [x, i]));
-  return (c, r) => { const ci = at.get(c), ri = at.get(r); return ci === undefined || ri === undefined ? null : cosine(vecs[ci], vecs[ri]); };
+  const word = (c: Tagged, r: Tagged) => { const ci = at.get(c), ri = at.get(r); return ci === undefined || ri === undefined ? null : cosine(vecs[ci], vecs[ri]); };
+  // A recorded AI meaning score wins. A pair with no score falls back to word
+  // overlap — an empty or partial map must not silently mean "no candidates".
+  if (meaning) return (c, r) => meaning.get(pairKey(c.u.text, r.u.text)) ?? word(c, r);
+  return word;
 }
 
 /** Pairs that still need a meaning score for the current settings, as unique texts plus index pairs. */

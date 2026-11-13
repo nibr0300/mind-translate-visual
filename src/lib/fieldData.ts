@@ -59,6 +59,15 @@ export interface FieldCluster {
   description: string;
 }
 
+/** Counts from a structural extractor (bug bounty, formal theory & code). */
+export interface StructuralStats {
+  byType: Record<string, number>;
+  noiseDropped: number;
+  droppedSample: { text: string; reason: string }[];
+  nearDuplicates: number;
+  corpusHash: string;
+}
+
 export interface GeometricField {
   units: FieldUnit[];
   clusters: FieldCluster[];
@@ -80,13 +89,9 @@ export interface GeometricField {
     /** Source class chosen at upload and its weight (profiles with a source taxonomy). */
     sourceClass?: { id: string; weight: number };
     /** Structural extraction stats (bug bounty profile). */
-    security?: {
-      byType: Record<string, number>;
-      noiseDropped: number;
-      droppedSample: { text: string; reason: string }[];
-      nearDuplicates: number;
-      corpusHash: string;
-    };
+    security?: StructuralStats;
+    /** Structural extraction stats (formal theory & code profile). */
+    theory?: StructuralStats;
   };
   useCase: string;
   /** Domain profile id used for the analysis (see domainProfiles.ts). */

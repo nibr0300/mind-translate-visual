@@ -434,6 +434,12 @@ export default function FieldSidebar({
           byFile.set(key, e);
         }
         if (byFile.size < 2) return null;
+        // Structural units carry "file#act"; show the act so one document does not
+        // read as several identical files.
+        const labelOf = (p: string) => {
+          const [file, act] = p.split("#");
+          return act ? `${file} · ${act}` : file;
+        };
         const ranked = Array.from(byFile.entries())
           .map(([path, e]) => ({ path, avgCti: e.sum / e.count, n: e.count, maxCti: e.maxCti }))
           .sort((a, b) => b.avgCti - a.avgCti)
@@ -446,7 +452,7 @@ export default function FieldSidebar({
             <ul className="flex flex-col gap-1">
               {ranked.map((r) => (
                 <li key={r.path} className="flex items-center gap-2 text-[11px] font-mono">
-                  <div className="flex-1 truncate text-foreground" title={r.path}>{r.path}</div>
+                  <div className="flex-1 truncate text-foreground" title={r.path}>{labelOf(r.path)}</div>
                   <div className="w-16 h-1.5 rounded bg-secondary overflow-hidden">
                     <div
                       className="h-full bg-[hsl(320,80%,55%)]"
@@ -475,7 +481,7 @@ export default function FieldSidebar({
         const label = (k: string) => profile.axes.find((a) => a.key === k)?.label ?? k;
         const familyOf = (k: string) => profile.axes.find((a) => a.key === k)?.family ?? "";
         const families = [...new Set(weights.map((w) => familyOf(w.key)))];
-        const sec = field.stats.security;
+        const sec = field.stats.security ?? field.stats.theory;
         return (
           <div className="p-4 border-b border-border">
             <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground block mb-2">
