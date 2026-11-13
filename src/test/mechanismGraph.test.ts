@@ -11,6 +11,15 @@ function poker(): GeometricField {
   const f = fixture();
   return { ...f, domain: "poker", units: f.units.map(u => ({ ...u, id: `poker-${u.id}`, text: `Vid pokerbordet: ${u.text}`, sourcePath: "synthetic/poker" })) };
 }
+/** AI meaning scores for every cross pair, both orders — the path the app uses. */
+function meaningScores(a: GeometricField, b: GeometricField) {
+  const m = new Map<string, number>();
+  for (const x of a.units) for (const y of b.units) {
+    m.set(pairKey(x.text, y.text), 0.8);
+    m.set(pairKey(y.text, x.text), 0.8);
+  }
+  return m;
+}
 describe("mechanism graph and transfer rules", () => {
   it("starts with resulting, reward prediction error and gamblers fallacy", () => {
     const f = fixture();
@@ -41,12 +50,7 @@ describe("mechanism graph and transfer rules", () => {
     const a = poker(), b = fixture();
     // The real path scores meaning in both directions; word overlap alone cannot
     // cross two vocabularies, so the scores are what carry the pair.
-    const meaning = new Map<string, number>();
-    for (const x of a.units) for (const y of b.units) {
-      meaning.set(pairKey(x.text, y.text), 0.8);
-      meaning.set(pairKey(y.text, x.text), 0.8);
-    }
-    const rows = buildCrossCorpusDpoCandidates(a, b, settings, meaning);
+    const rows = buildCrossCorpusDpoCandidates(a, b, settings, meaningScores(a, b));
     expect(rows.some(c => c.metadata.anchor_domain === "poker" && c.metadata.rejected_domain === "trading")).toBe(true);
     expect(rows.some(c => c.metadata.anchor_domain === "trading" && c.metadata.rejected_domain === "poker")).toBe(true);
     expect(rows.every(c => c.answer === "" && !c.approved && c.prompt.includes(c.rejected ?? ""))).toBe(true);
@@ -68,7 +72,8 @@ describe("mechanism graph and transfer rules", () => {
     expect(rows.every(c => c.mode === "sft" && c.metadata.primaryMechanism)).toBe(true);
   });
   it("blocks causal export until an applied answer, written bridge and style review are provided", () => {
-    const c = buildCrossCorpusDpoCandidates(poker(), fixture(), settings)[0];
+    const a = poker(), b = fixture();
+    const c = buildCrossCorpusDpoCandidates(a, b, settings, meaningScores(a, b))[0];
     c.approved = true;
     expect(serializeDataset([c], "system")).toBe("");
     c.answer = "Pröva nästa beslut med aktuell information och en fast riskbudget.";
@@ -88,5 +93,24 @@ describe("mechanism graph and transfer rules", () => {
     const restored = parseFieldImport(JSON.stringify(bad));
     expect(restored.units[0].mechanisms).toEqual([]);
     expect(restored.units[0].text).toBe(trading.units[0].text);
+  });
+  it("scores a pair by word overlap when no meaning score was recorded", () => {
+    const u = (id: string, text: string, speechAct: "assertive" | "expressive", certainty: number, cti: number): FieldUnit => ({
+      id, text, pos: { x: 0, y: 0 }, vector2d: [0, 0], clusterId: 0, type: "paragraph", fz: 0.3, fy: 0.6, cti,
+      intention: { speechAct, epistemicCertainty: certainty, intentionalForce: 0.5, truthTension: 0.2 },
+    });
+    const field = (domain: string, chosen: string, friction: string, n: string): GeometricField => ({
+      units: [u(`${n}-a`, chosen, "assertive", 0.95, 0.05), u(`${n}-b`, friction, "expressive", 0.4, 0.6)],
+      clusters: [], edges: [],
+      stats: { totalUnits: 2, boundaryUnits: 0, avgFZ: 0.3, avgFY: 0.6 },
+      useCase: domain, domain,
+    });
+    const a = field("alpha", "Kontrollen loggas i rapporten innan leveransen.", "Kontrollen loggas inte i rapporten innan leveransen.", "a");
+    const b = field("beta", "Kontrollen loggas i rapporten innan leveransen.", "Rapporten saknar kontroll och loggas efter leveransen.", "b");
+    const s = { ...settings, similarity: 0.1 };
+    const none = buildCrossCorpusDpoCandidates(a, b, s).length;
+    expect(none).toBeGreaterThan(0);
+    // An empty score map must fall back to word overlap, not drop every pair.
+    expect(buildCrossCorpusDpoCandidates(a, b, s, new Map()).length).toBe(none);
   });
 });
