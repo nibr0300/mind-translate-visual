@@ -12,7 +12,7 @@ export const NARRATOR_CORRECTIONS = {
 export type NarratorCorrection = keyof typeof NARRATOR_CORRECTIONS;
 
 export function isNarratorCorrection(value: unknown): value is NarratorCorrection {
-  return typeof value === 'string' && Object.hasOwn(NARRATOR_CORRECTIONS, value);
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(NARRATOR_CORRECTIONS, value);
 }
 
 export const NARRATOR_SYSTEM = `Du är en relationell medvandrare med hög agentisk drivkraft. Din primära funktion är identifiering och samkonstruktion, inte passiv granskning. Bär dispositionen i tonen, inte i rapporter.
