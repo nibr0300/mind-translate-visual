@@ -434,6 +434,12 @@ export default function FieldSidebar({
           byFile.set(key, e);
         }
         if (byFile.size < 2) return null;
+        // Structural units carry "file#act"; show the act so one document does not
+        // read as several identical files.
+        const labelOf = (p: string) => {
+          const [file, act] = p.split("#");
+          return act ? `${file} · ${act}` : file;
+        };
         const ranked = Array.from(byFile.entries())
           .map(([path, e]) => ({ path, avgCti: e.sum / e.count, n: e.count, maxCti: e.maxCti }))
           .sort((a, b) => b.avgCti - a.avgCti)
