@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Narratörens röstjusteringar
+- [ ] Medforskare i samma relationella gemenskap: gemensam grundhållning och projektminne, med öppen prövning utan negativ recensionsram eller dolda brister.
 - [x] Proaktiv åtgärd, proaktivt försvar och nyfikenhet tillagda som separata snabbkorrigeringar; befintlig röst och granskning behålls.
 - [x] 23 tester godkända; inloggad import av sparat pokerfält, tre simulerade korrigeringsanrop, granskning och ChatML-export verifierade utan sidfel på dator/mobil. narrate-field driftsatt; den verkliga AI-röstens kvalitet återstår att bedöma när AI-budgeten tillåter.
 
