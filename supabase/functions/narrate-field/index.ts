@@ -55,7 +55,7 @@ Deno.serve(async req => {
       },
     });
     const system = `${NARRATOR_GENERATION_SYSTEM}
-${isNarratorCorrection(body.correction) ? NARRATOR_CORRECTIONS[body.correction] : ''}`;
+${isNarratorCorrection(body.correction) ? `Aktiv röstjustering (har företräde framför den allmänna hållningen där de krockar; skriv om tidigare utkast från grunden i stället för att bevara dess struktur):\n${NARRATOR_CORRECTIONS[body.correction]}` : ''}`;
     const result = streamText({ model: provider.responses(MODEL), system,
       messages: [{ role: 'user', content: JSON.stringify({ cluster: score.cluster, domain: score.domain, target: score.target, semanticNeighbors: score.neighbors, previousDraft: body.previous ?? null }) }],
       maxRetries: 0, abortSignal: req.signal,
