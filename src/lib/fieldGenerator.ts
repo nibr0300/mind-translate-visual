@@ -174,24 +174,8 @@ export async function generateFieldFromFile(
     // is represented in the field.
     const HARD_CAP = 600;
     if (chunks.length > HARD_CAP) {
-      const bySource = new Map<string, Chunk[]>();
-      for (const c of chunks) {
-        const key = (c.source ?? "").split("@")[0] || "_";
-        if (!bySource.has(key)) bySource.set(key, []);
-        bySource.get(key)!.push(c);
-      }
-      const sources = [...bySource.values()];
-      const perSource = Math.max(3, Math.floor(HARD_CAP / sources.length));
-      const balanced: Chunk[] = [];
-      for (const arr of sources) {
-        if (arr.length <= perSource) {
-          balanced.push(...arr);
-        } else {
-          // Evenly sample across the source so we keep beginning, middle, end
-          const step = arr.length / perSource;
-          for (let i = 0; i < perSource; i++) balanced.push(arr[Math.floor(i * step)]);
-        }
-      }
+      const { kept: balanced, sourceCount } = balanceChunks(chunks, HARD_CAP);
+      const sources = { length: sourceCount };
       console.info(`[field] balanced cap: ${chunks.length} → ${balanced.length} chunks across ${sources.length} sources`);
       chunks = balanced;
       notes.push(
@@ -482,4 +466,40 @@ async function persistFieldInBackground(
   } else {
     console.info(`[persist] ${file.name} → vector DB (${info?.persisted_chunks ?? chunkPayload.length} chunks)`);
   }
+}
+
+/**
+ * Budget-preserving cap. Source keys are files ("file#type@offset" -> "file").
+ * Structural units (any "#type" other than prose) are always kept; the remaining
+ * budget is water-filled across files so no slot is wasted, sampling evenly.
+ */
+export function balanceChunks<T extends { source?: string }>(chunks: T[], cap: number): { kept: T[]; sourceCount: number } {
+  if (chunks.length <= cap) return { kept: chunks, sourceCount: 1 };
+  const isStructural = (c: T) => {
+    const m = /#([^@]+)/.exec(c.source ?? "");
+    return !!m && m[1] !== "prose";
+  };
+  const fileOf = (c: T) => ((c.source ?? "").split("@")[0].split("#")[0]) || "_";
+  const structural = new Set<number>();
+  chunks.forEach((c, i) => { if (isStructural(c)) structural.add(i); });
+  const pinned = [...structural].slice(0, cap);
+  const pinnedSet = new Set(pinned);
+  const byFile = new Map<string, number[]>();
+  chunks.forEach((c, i) => {
+    const f = fileOf(c);
+    if (!byFile.has(f)) byFile.set(f, []);
+    if (!pinnedSet.has(i)) byFile.get(f)!.push(i);
+  });
+  let budget = cap - pinned.length;
+  const pools = [...byFile.values()].filter((a) => a.length).sort((a, b) => a.length - b.length);
+  const chosen = new Set<number>(pinned);
+  for (let k = 0; k < pools.length; k++) {
+    const share = Math.floor(budget / (pools.length - k));
+    const arr = pools[k];
+    const take = Math.min(arr.length, share);
+    const step = arr.length / Math.max(1, take);
+    for (let i = 0; i < take; i++) chosen.add(arr[Math.floor(i * step)]);
+    budget -= take;
+  }
+  return { kept: chunks.filter((_, i) => chosen.has(i)), sourceCount: byFile.size };
 }
