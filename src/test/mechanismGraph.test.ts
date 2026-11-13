@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import trading from "../../public/fixtures/trading_tilt_transfer.json";
 import { causalLinks, containsMechanismJargon, MECHANISM_EDGES, mechanismsForUnit } from "../lib/mechanismGraph";
-import { buildCrossCorpusDpoCandidates, buildDatasetCandidates, canApproveCandidate, CROSS_CORPUS_DEFAULTS, DATASET_PRESETS, serializeDataset } from "../lib/datasetExporter";
+import { buildCrossCorpusDpoCandidates, buildDatasetCandidates, canApproveCandidate, CROSS_CORPUS_DEFAULTS, DATASET_PRESETS, pairKey, serializeDataset } from "../lib/datasetExporter";
 import { parseFieldImport } from "../lib/fieldImport";
 import type { FieldUnit, GeometricField } from "../lib/fieldData";
 
