@@ -42,6 +42,10 @@ function applyDomainLayer(field: GeometricField, meta: SecurityMeta | null) {
     const cu = field.units.filter((u) => u.clusterId === c.id);
     if (cu.length) c.avgFZ = cu.reduce((s, u) => s + u.fz, 0) / cu.length;
   }
+  field.stats.avgFZ = field.units.length
+    ? field.units.reduce((sum, u) => sum + u.fz, 0) / field.units.length
+    : 0;
+  field.stats.boundaryUnits = field.units.filter((u) => u.fz > 0.65).length;
   if (meta) {
     const stats: StructuralStats = {
       byType: meta.byType,

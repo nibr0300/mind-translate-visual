@@ -67,7 +67,7 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
   const docs = sentences.map(tokenize);
   const N = docs.length;
 
-  const df: Record<string, number> = {};
+  const df: Record<string, number> = Object.create(null);
   docs.forEach((doc) => {
     const seen = new Set<string>();
     doc.forEach((w) => {
@@ -91,14 +91,15 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
     // Rank by informativeness (tf-idf mass), not raw frequency.
     .sort((a, b) => df[b] * Math.log(N / df[b]) - df[a] * Math.log(N / df[a]));
 
+  const lexicalVocab = globalRanked.slice(0, lexicalBudget);
   const vocab = [
-    ...globalRanked.slice(0, lexicalBudget),
+    ...lexicalVocab,
     ...Array.from({ length: HASH_BUCKETS }, (_, i) => `__rare_${i}`),
   ];
   const vocabIndex = new Map(vocab.map((w, i) => [w, i]));
 
   const vectors = docs.map((doc) => {
-    const tf: Record<string, number> = {};
+    const tf: Record<string, number> = Object.create(null);
     doc.forEach((w) => (tf[w] = (tf[w] || 0) + 1));
     const maxTf = Math.max(...Object.values(tf), 1);
 
@@ -114,7 +115,7 @@ export function computeTFIDF(sentences: string[]): { vectors: number[][]; vocab:
     // dimensions. Thus short system axioms never become zero vectors.
     for (const w of new Set(doc.filter(isEligible))) {
       if (vocabIndex.has(w)) continue;
-      const bucket = lexicalBudget + Math.floor(seedHash(w) * HASH_BUCKETS);
+      const bucket = lexicalVocab.length + Math.floor(seedHash(w) * HASH_BUCKETS);
       vec[bucket] += (tf[w] / maxTf) * (1 + Math.log(N / (df[w] || 1)));
     }
     return vec;
@@ -236,7 +237,7 @@ export function generateClusterLabels(
     const clusterSentences = sentences.filter((_, i) => assignments[i] === c);
     const allTokens = clusterSentences.flatMap(tokenize).filter((w) => !STOPWORDS.has(w));
 
-    const tf: Record<string, number> = {};
+    const tf: Record<string, number> = Object.create(null);
     allTokens.forEach((w) => (tf[w] = (tf[w] || 0) + 1));
 
     const topTerms = Object.entries(tf)
