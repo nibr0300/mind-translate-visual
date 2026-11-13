@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { balanceChunks } from "@/lib/fieldGenerator";
 const mk = (type: string, n: number, file = "doc.pdf") =>
