@@ -65,19 +65,19 @@ const CODE_CALL =
 
 /** The act of naming something. */
 const DEFINITION =
-  /\b(?:definition|definiera[sr]?|definierad|denotes|betecknar|bet.?cknar|is defined as|defined as|kallas|d.?r X ?r|vi skriver|vi kallar|l.?t oss kalla|write .{0,20} for)\b|:=|\\triangleq|^\s*(?:def\.?|definition|definition)\s*\d/i;
+  /\b(?:definition|definiera|definierar|definierad|definieras|denotes|beteckna|betecknar|is defined as|defined as|kallas|där X är|vi skriver|vi kallar|låt oss kalla)\b|:=|\\triangleq|^\s*(?:def\.?|definition)\s*\d/i;
 
 /** The act of assuming something. */
 const AXIOM =
-  /\b(?:vi antar|vi f.?ruts?tter|antar att|antagande|antaganden|axiom|postulat|vi postulerar|vi modellerar|vi tolkar|vi identifierar|per definition|by definition|vi s.?ger att|om vi antar|assume|we assume|suppose|supposing|hypotes|gissningsvis|vi l.?tsas|f.?renklat|vi borts?er fr?n|vi n?rser oss fr?n)\b/i;
+  /\b(?:vi antar|vi förutsätter|antar att|antagande|antaganden|axiom|postulat|vi postulerar|vi modellerar|vi tolkar|vi identifierar|per definition|by definition|vi säger att|om vi antar|assume|we assume|suppose|supposing|hypotes|gissningsvis|vi låtsas|förenklat|vi bortser från|detta kräver att)\b/i;
 
 /** The act of asserting a result. */
 const CLAIM =
-  /\b(?:vi visar|vi bevisar|vi har visat|det kan visas|detta bevisar|bevisar att|d.?rmed har vi|f?ljden ?r|slutsatsen|vi h?vda|vi p?st?r|detta inneb?r|vi har uppn?tt|detta l?ser|detta ger oss|d.?rmed ?r|s?lunda|this proves|this shows|we have achieved|we demonstrate|it follows that|q\.e\.d|sats|theorem|lemma|korollarie|proposition|satsen)\b/i;
+  /\b(?:vi visar|vi bevisar|vi har visat|det kan visas|detta bevisar|bevisar att|därmed har vi|följden är|slutsatsen|vi hävdar|vi påstår|detta innebär|vi har uppnått|detta löser|detta ger oss|därmed är|sålunda|this proves|this shows|we have achieved|we demonstrate|it follows that|q\.e\.d|sats|theorem|lemma|korollarie|proposition|satsen)\b/i;
 
 /** The act of moving from one line to the next — with or without showing work. */
 const DERIVATION =
-  /\b(?:trivialt|trivially|l?tt inses|l?ttvisat|easily|uppenbart|obvious(?:ly)?|it is obvious|tydligen|utan vidare|hoppar ?ver|d?rmed|hence|therefore|all?ts?|f?ljder|f?ljer|substituera|s?tter vi in|steg f?r steg|mellanliggande|h?rledning|vi f?r|vi obt?|det ger|vilket ger|enligt ovan|se ekvation|analogt|av symmetri|by symmetry|easily seen|one can show|som framg?r|omedelbart|detsamma g?ller|utveckla|expandera|integrera|derivera)\b/i;
+  /\b(?:trivialt|trivially|lätt inses|lättvisat|easily|uppenbart|obvious|obviously|it is obvious|tydligen|utan vidare|hoppar över|därmed|hence|therefore|alltså|därför|följaktligen|följer|substituera|sätter vi in|steg för steg|mellanliggande|härledning|vi får|det ger|vilket ger|enligt ovan|se ekvation|analogt|av symmetri|by symmetry|one can show|easily seen|som framgår|omedelbart|detsamma gäller|utveckla|expandera|integrera|derivera)\b|⇒|⟹/i;
 
 /** Standalone mathematics: display math or a line that is mostly symbols. */
 const FORMULA_BLOCK =
