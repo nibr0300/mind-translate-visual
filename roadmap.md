@@ -1,5 +1,11 @@
 # Roadmap
 
+## MCP åtkomstkatalog och kontakt
+- [ ] Visa fyra önskade nivåer och separat Global Federation med tydlig skillnad mellan befintliga och planerade MCP-verktyg.
+- [ ] Låt besökare formulera en resursbunden åtkomstansökan via geometric_friction_field@proton.me; ansökan ger ingen behörighet.
+- [ ] Kontrollera ansökningsflödet och mobilvisningen.
+- [ ] Namnbyte — inväntar valt namn; upptagen mejladress fastställer inte om ett appnamn är upptaget.
+
 ## Structural upload sampling
 - [x] Confirmed first-only truncation with two failing regression tests; replaced it with file-balanced full-extent structural sampling, preserving priority and filling unused slots with prose. Four sampling tests pass; browser execution of real structural extraction selects 600 of 1200 code lines, including first and last. Preview build OK; no live AI upload or saved-field changes.
 
