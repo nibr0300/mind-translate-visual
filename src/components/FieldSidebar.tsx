@@ -186,9 +186,9 @@ export default function FieldSidebar({
       {/* Header */}
       <div className="p-5 border-b border-border">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full bg-primary animate-field-pulse" />
-          <h1 className="font-mono text-sm font-semibold tracking-wider uppercase text-primary">
-            Geometric Field
+          <div className="w-2 h-2 shrink-0 rounded-full bg-primary animate-field-pulse" />
+          <h1 className="font-mono text-sm font-semibold tracking-normal text-primary">
+            RFA Geometric Friction Field
           </h1>
         </div>
         <p className="text-[11px] text-muted-foreground font-mono">
