@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import McpAccessPanel from "./McpAccessPanel";
 
 const SHARE_PREF_KEY = "share_to_global_default";
 
@@ -52,11 +53,12 @@ export default function AccountPanel() {
   }
 
   async function createKey() {
+    if (!user) { toast.error("Sign in required"); return; }
     if (!keyName.trim()) { toast.error("Name required"); return; }
     const raw = "gft_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
     const hash = await sha256Hex(raw);
     const { error } = await supabase.from("api_keys").insert({
-      user_id: user!.id,
+      user_id: user.id,
       name: keyName.trim(),
       key_hash: hash,
       key_prefix: raw.slice(0, 10),
@@ -116,6 +118,8 @@ export default function AccountPanel() {
       </div>
 
       <div className="space-y-2">
+        <McpAccessPanel />
+        {user && <>
         <Label className="uppercase tracking-wide text-muted-foreground">MCP access</Label>
         <div className="font-mono break-all bg-muted/30 p-2 rounded text-[10px]">{mcpUrl}</div>
         <div className="flex gap-2">
@@ -143,6 +147,7 @@ export default function AccountPanel() {
             ))}
           </ul>
         )}
+        </>}
       </div>
     </div>
   );

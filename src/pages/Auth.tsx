@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import McpAccessPanel from "@/components/McpAccessPanel";
 
 export default function Auth() {
   const { user, loading } = useAuth();
@@ -77,7 +78,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background text-foreground font-mono p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-background text-foreground font-mono p-6">
       <form onSubmit={handle} className="w-full max-w-sm space-y-4 border border-border p-6 rounded">
         <h1 className="text-lg tracking-wide">{mode === "login" ? "Sign in" : "Create account"}</h1>
 
@@ -140,6 +141,10 @@ export default function Auth() {
           {mode === "login" ? "Need an account? Sign up" : "Have an account? Sign in"}
         </button>
       </form>
+      <details className="w-full max-w-sm border-t border-border pt-4">
+        <summary className="cursor-pointer text-sm text-primary">MCP · Åtkomstnivåer och ansökan</summary>
+        <div className="pt-4"><McpAccessPanel /></div>
+      </details>
     </div>
   );
 }
