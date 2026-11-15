@@ -1,9 +1,9 @@
 # Roadmap
 
 ## MCP åtkomstkatalog och kontakt
-- [ ] Visa fyra önskade nivåer och separat Global Federation med tydlig skillnad mellan befintliga och planerade MCP-verktyg.
-- [ ] Låt besökare formulera en resursbunden åtkomstansökan via geometric_friction_field@proton.me; ansökan ger ingen behörighet.
-- [ ] Kontrollera ansökningsflödet och mobilvisningen.
+- [x] Visa fyra önskade nivåer och separat Global Federation på inloggningssidan och i kontopanelen; befintliga och planerade verktyg skiljs åt, inga server-/nyckelbehörigheter ändras.
+- [x] Resursbunden mejlansökan till geometric_friction_field@proton.me med nivå, agent/app, syfte och separat global begäran; kopieringsalternativ och ingen automatisk behörighet.
+- [x] Fyra regeltester godkända; besökares nivå-3-ansökan kopierad med verkliga formulärvärden, mobilbredd 560 utan överströmning, inloggad katalog och befintliga nyckelkontroller verifierade utan sidfel. Förhandsvisning bygger OK; mejl har inte skickats.
 - [ ] Namnbyte — inväntar valt namn; upptagen mejladress fastställer inte om ett appnamn är upptaget.
 
 ## Structural upload sampling
