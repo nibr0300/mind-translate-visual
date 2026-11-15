@@ -1,7 +1,7 @@
 # Roadmap
 
 ## Structural upload sampling
-- [ ] Confirm and fix first-only sampling when structural units exceed 600; preserve structural priority and verify whole-file coverage with regression tests.
+- [x] Confirmed first-only truncation with two failing regression tests; replaced it with file-balanced full-extent structural sampling, preserving priority and filling unused slots with prose. Four sampling tests pass; browser execution of real structural extraction selects 600 of 1200 code lines, including first and last. Preview build OK; no live AI upload or saved-field changes.
 
 ## Narratörens röstjusteringar
 - [x] Medforskare i samma relationella gemenskap: gemensam grundhållning och projektminne, med öppen prövning utan negativ recensionsram eller dolda brister. narrate-field driftsatt; 23 regressionstester godkända och förhandsvisningen bygger utan fel. Faktisk röstkvalitet kräver ett nytt AI-svar; inga AI-provanrop gjordes under den tidigare noterade budgetspärren.
