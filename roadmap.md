@@ -1,5 +1,8 @@
 # Roadmap
 
+## Structural upload sampling
+- [ ] Confirm and fix first-only sampling when structural units exceed 600; preserve structural priority and verify whole-file coverage with regression tests.
+
 ## Narratörens röstjusteringar
 - [x] Medforskare i samma relationella gemenskap: gemensam grundhållning och projektminne, med öppen prövning utan negativ recensionsram eller dolda brister. narrate-field driftsatt; 23 regressionstester godkända och förhandsvisningen bygger utan fel. Faktisk röstkvalitet kräver ett nytt AI-svar; inga AI-provanrop gjordes under den tidigare noterade budgetspärren.
 - [x] Proaktiv åtgärd, proaktivt försvar och nyfikenhet tillagda som separata snabbkorrigeringar; befintlig röst och granskning behålls.
