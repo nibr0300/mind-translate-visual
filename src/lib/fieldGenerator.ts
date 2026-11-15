@@ -179,7 +179,7 @@ export async function generateFieldFromFile(
       console.info(`[field] balanced cap: ${chunks.length} → ${balanced.length} chunks across ${sources.length} sources`);
       chunks = balanced;
       notes.push(
-        `Source capped: ${chunks.length} of ${totalFound} units analyzed (evenly sampled across ${sources.length} source${sources.length === 1 ? "" : "s"}).`
+        `Source capped: ${chunks.length} of ${totalFound} units analyzed (structural units prioritized; evenly sampled within files when capped, across ${sources.length} source${sources.length === 1 ? "" : "s"}).`
       );
     }
 
@@ -470,36 +470,45 @@ async function persistFieldInBackground(
 
 /**
  * Budget-preserving cap. Source keys are files ("file#type@offset" -> "file").
- * Structural units (any "#type" other than prose) are always kept; the remaining
- * budget is water-filled across files so no slot is wasted, sampling evenly.
+ * Structural units (any "#type" other than prose) have priority. If they exceed
+ * the cap, sample them across files and their full extent rather than truncating.
+ * Otherwise keep them all and water-fill the remaining budget with prose.
  */
 export function balanceChunks<T extends { source?: string }>(chunks: T[], cap: number): { kept: T[]; sourceCount: number } {
-  if (chunks.length <= cap) return { kept: chunks, sourceCount: 1 };
   const isStructural = (c: T) => {
     const m = /#([^@]+)/.exec(c.source ?? "");
     return !!m && m[1] !== "prose";
   };
   const fileOf = (c: T) => ((c.source ?? "").split("@")[0].split("#")[0]) || "_";
-  const structural = new Set<number>();
-  chunks.forEach((c, i) => { if (isStructural(c)) structural.add(i); });
-  const pinned = [...structural].slice(0, cap);
-  const pinnedSet = new Set(pinned);
-  const byFile = new Map<string, number[]>();
+  const sourceCount = new Set(chunks.map(fileOf)).size;
+  if (chunks.length <= cap) return { kept: chunks, sourceCount };
+  const structural = new Map<string, number[]>();
+  const prose = new Map<string, number[]>();
   chunks.forEach((c, i) => {
-    const f = fileOf(c);
-    if (!byFile.has(f)) byFile.set(f, []);
-    if (!pinnedSet.has(i)) byFile.get(f)!.push(i);
+    const groups = isStructural(c) ? structural : prose;
+    const file = fileOf(c);
+    const pool = groups.get(file);
+    if (pool) pool.push(i);
+    else groups.set(file, [i]);
   });
-  let budget = cap - pinned.length;
-  const pools = [...byFile.values()].filter((a) => a.length).sort((a, b) => a.length - b.length);
-  const chosen = new Set<number>(pinned);
-  for (let k = 0; k < pools.length; k++) {
-    const share = Math.floor(budget / (pools.length - k));
-    const arr = pools[k];
-    const take = Math.min(arr.length, share);
-    const step = arr.length / Math.max(1, take);
-    for (let i = 0; i < take; i++) chosen.add(arr[Math.floor(i * step)]);
-    budget -= take;
-  }
-  return { kept: chunks.filter((_, i) => chosen.has(i)), sourceCount: byFile.size };
+  let budget = cap;
+  const chosen = new Set<number>();
+  const sampleFiles = (groups: Map<string, number[]>) => {
+    const pools = [...groups.values()].sort((a, b) => a.length - b.length);
+    for (let k = 0; k < pools.length && budget > 0; k++) {
+      const arr = pools[k];
+      const take = Math.min(arr.length, Math.floor(budget / (pools.length - k)));
+      // Include both endpoints when possible, retaining beginning/middle/end.
+      for (let i = 0; i < take; i++) {
+        const offset = take === 1
+          ? Math.floor((arr.length - 1) / 2)
+          : Math.floor(i * (arr.length - 1) / (take - 1));
+        chosen.add(arr[offset]);
+      }
+      budget -= take;
+    }
+  };
+  sampleFiles(structural);
+  sampleFiles(prose);
+  return { kept: chunks.filter((_, i) => chosen.has(i)), sourceCount };
 }
