@@ -155,6 +155,14 @@ export async function generateFieldFromFile(
       }
     } else {
       chunks = chunkUnits(rawUnits);
+      // Short texts: fall back to one node per sentence so a field can form.
+      if (chunks.length < 3) {
+        const sentenceChunks = splitShortText(rawUnits);
+        if (sentenceChunks.length >= 3) {
+          chunks = sentenceChunks;
+          notes.push(`Short text: read sentence by sentence (${chunks.length} nodes).`);
+        }
+      }
     }
     totalFound = chunks.length;
 
@@ -165,7 +173,7 @@ export async function generateFieldFromFile(
     }
 
     if (chunks.length < 3) {
-      throw new Error("Content too short to build a meaningful field (min 3 chunks).");
+      throw new Error("Content too short to build a meaningful field (needs at least 3 sentences).");
     }
 
     // Fair per-source cap: when a zip/album has many sources (e.g. 10 songs),
@@ -511,4 +519,17 @@ export function balanceChunks<T extends { source?: string }>(chunks: T[], cap: n
   sampleFiles(structural);
   sampleFiles(prose);
   return { kept: chunks.filter((_, i) => chosen.has(i)), sourceCount };
+}
+
+/** Split short text into one chunk per sentence/question (min 3 chars each). */
+export function splitShortText(units: { text: string; source?: string }[]): Chunk[] {
+  const out: Chunk[] = [];
+  for (const u of units) {
+    const parts = u.text.replace(/\s+/g, " ").match(/[^.!?…]+[.!?…]+["”»]?|[^.!?…]+$/g) ?? [];
+    for (const p of parts) {
+      const t = p.trim();
+      if (t.replace(/["”»“«\s]/g, "").length >= 3) out.push({ index: out.length, text: t, source: u.source });
+    }
+  }
+  return out;
 }
