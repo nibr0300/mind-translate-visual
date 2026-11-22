@@ -1,5 +1,9 @@
 # Roadmap
 
+## Automatisk samverkan mellan tre grindvakter
+- [ ] Fastställ de andra två grindvakternas kontroller och den anropande appen; inväntar beskrivning från användaren.
+- [ ] Utforma automatisk textbedömning med separata friktionssignaler, verifieringsunderlag och osäkerhetsstatus; inga sanningsgarantier från CTI och ingen automatisk inläsning i korpusen antas.
+
 ## Direkt textanalys
 - [x] Titel och textinmatning i uppladdningsdelen använder samma analys och valda domän som textfiler; inga nya MCP-skrivrättigheter.
 - [x] Sex tester godkända; inloggad inskriven text gav fem noder och korrekt JSON-export, texten behölls och mobilbredd 390 utan överströmning eller sidfel. Förhandsvisningen bygger OK. Kostsamma AI-/sparanrop blockerades i provet enligt befintlig budgetspärr; verklig djupanalys/sparning är inte verifierad här.
