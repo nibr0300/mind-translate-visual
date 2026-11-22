@@ -63,6 +63,13 @@ export function sanitizeMarkup(raw: string): SanitizeResult {
 /** Set by the last text extraction so the pipeline can surface a warning. */
 export let lastMarkupRatio = 0;
 
+/** Typed text uses the same ingestion path as an uploaded plain-text file. */
+export function createTextSource(text: string, title: string): File {
+  if (!text.trim()) throw new Error("Skriv eller klistra in text först.");
+  const name = title.trim() || "Inskriven text";
+  return new File([text], /\.txt$/i.test(name) ? name : `${name}.txt`, { type: "text/plain" });
+}
+
 /** Plain text, markdown, csv, html — split by paragraph after markup sanitization. */
 export async function extractFromText(file: File): Promise<RawTextUnit[]> {
   const raw = await file.text();

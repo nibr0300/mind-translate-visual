@@ -6,6 +6,11 @@ import { parseFieldImport, looksLikeSavedField, fieldImportSummary } from "@/lib
 import { toast } from "sonner";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import DrivePicker from "./DrivePicker";
+import { createTextSource } from "@/lib/inputAdapters/textAdapter";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ScanText } from "lucide-react";
 import {
   DOMAIN_PROFILES, getActiveDomainId, setActiveDomainId, getDomainProfile,
   getActiveSourceClass, setActiveSourceClass, getLlmAxesEnabled, setLlmAxesEnabled,
@@ -38,6 +43,8 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
   const [oversizedFile, setOversizedFile] = useState<File | null>(null);
+  const [directText, setDirectText] = useState("");
+  const [textTitle, setTextTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const { isAdmin } = useIsAdmin();
   const [domainId, setDomainId] = useState(getActiveDomainId);
@@ -260,6 +267,41 @@ export default function FileUploader({ onFieldGenerated }: FileUploaderProps) {
             </motion.div>
           )}
         </>
+      </div>
+
+      <div className="mt-4 space-y-2 border-t border-border pt-3">
+        <label htmlFor="direct-text-title" className="block font-mono text-[10px] text-muted-foreground">
+          Direkt text · titel
+        </label>
+        <Input
+          id="direct-text-title"
+          placeholder="Inskriven text"
+          value={textTitle}
+          onChange={(event) => setTextTitle(event.target.value)}
+          disabled={isProcessing}
+          className="h-8 font-mono text-xs"
+        />
+        <label htmlFor="direct-analysis-text" className="block font-mono text-[10px] text-muted-foreground">
+          Text att analysera
+        </label>
+        <Textarea
+          id="direct-analysis-text"
+          value={directText}
+          onChange={(event) => setDirectText(event.target.value)}
+          disabled={isProcessing}
+          className="min-h-36 max-h-96 resize-y font-mono text-xs"
+        />
+        <Button
+          className="w-full gap-2 font-mono text-xs"
+          disabled={isProcessing || !directText.trim()}
+          onClick={() => {
+            try { void processFile(createTextSource(directText, textTitle)); }
+            catch (err) { setError(err instanceof Error ? err.message : "Texten kunde inte läsas."); }
+          }}
+        >
+          <ScanText className="h-4 w-4" />
+          {isProcessing ? "Analyserar…" : "Analysera text"}
+        </Button>
       </div>
 
       {isAdmin && !isProcessing && (

@@ -1,5 +1,9 @@
 # Roadmap
 
+## Direkt textanalys
+- [x] Titel och textinmatning i uppladdningsdelen använder samma analys och valda domän som textfiler; inga nya MCP-skrivrättigheter.
+- [x] Sex tester godkända; inloggad inskriven text gav fem noder och korrekt JSON-export, texten behölls och mobilbredd 390 utan överströmning eller sidfel. Förhandsvisningen bygger OK. Kostsamma AI-/sparanrop blockerades i provet enligt befintlig budgetspärr; verklig djupanalys/sparning är inte verifierad här.
+
 ## MCP åtkomstkatalog och kontakt
 - [x] Visa fyra önskade nivåer och separat Global Federation på inloggningssidan och i kontopanelen; befintliga och planerade verktyg skiljs åt, inga server-/nyckelbehörigheter ändras.
 - [x] Resursbunden mejlansökan till geometric_friction_field@proton.me med nivå, agent/app, syfte och separat global begäran; kopieringsalternativ och ingen automatisk behörighet.
